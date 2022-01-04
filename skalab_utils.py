@@ -20,6 +20,14 @@ def ts_to_datestring(tstamp, formato="%Y-%m-%d %H:%M:%S"):
     return datetime.datetime.strftime(datetime.datetime.utcfromtimestamp(tstamp), formato)
 
 
+def fname_to_tstamp(date_time_string):
+    time_parts = date_time_string.split('_')
+    d = datetime.datetime.strptime(time_parts[0], "%Y%m%d")  # "%d/%m/%Y %H:%M:%S"
+    timestamp = calendar.timegm(d.timetuple())
+    timestamp += int(time_parts[1])# - (60 * 60 * 8)  # Australian Time
+    return timestamp
+
+
 def colors(name):
     if name == "white_on_red":
         return "background-color: rgb(204, 0, 0); color: rgb(255, 255, 255)"
