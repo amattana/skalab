@@ -287,10 +287,9 @@ class Subrack(QtWidgets.QMainWindow):
         if self.wg.qcombo_chart.currentIndex() == 0:
             # Chart: Subrack Temperatures
             self.plotChartMgn.set_ylim([0, 60])
-            for n, k in enumerate(traces.keys()):
-                for j, tr in enumerate(traces[k]):
-                    self.plotChartMgn.plotCurve(data=self.data_charts[k][j::2], trace=(j + n * 2),
-                                                color=COLORI[(j + n * 2)])
+            for n, k in enumerate(MgnTraces):
+                self.plotChartMgn.plotCurve(data=self.data_charts[k][0], trace=(0 + n * 2), color=COLORI[(0 + n * 2)])
+                self.plotChartMgn.plotCurve(data=self.data_charts[k][1], trace=(1 + n * 2), color=COLORI[(1 + n * 2)])
         elif self.wg.qcombo_chart.currentIndex() == 1:
             # Chart: TPM Temperatures
             self.plotChartTpm.set_ylim([0, 100])
