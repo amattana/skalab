@@ -692,7 +692,6 @@ class ChartPlots(QtWidgets.QWidget):
     def plotCurve(self, data, trace, color):
         self.canvas.lines[trace].set_ydata(data)
         self.canvas.lines[trace].set_color(color)
-        self.canvas.draw()
 
     def showGrid(self, show_grid=True):
         self.canvas.ax.grid(show_grid)

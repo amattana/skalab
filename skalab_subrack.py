@@ -114,20 +114,20 @@ class Subrack(QtWidgets.QMainWindow):
         self.resize(1168, 901)
 
         self.plotTpmPower = BarPlot(parent=self.wg.qplot_tpm_power, size=(4.95, 2.3), xlim=[0, 9], ylabel="Power (W)",
-                                    xrotation=0, xlabel="TPM Voltages", ylim=[0, 120],
-                                    yticks=[0, 20, 40, 60, 80, 100, 120], xticks=np.zeros(9))
+                                    xrotation=0, xlabel="TPM Voltages", ylim=[0, 140],
+                                    yticks=np.arange(0, 160, 20), xticks=np.zeros(9))
 
         self.plotTpmTemp = BarPlot(parent=self.wg.qplot_tpm_temp, size=(4.95, 2.3), xlim=[0, 9],
-                                   ylabel="Temperature (deg)", xrotation=0, xlabel="TPM Board", ylim=[20, 80],
-                                   yticks=[20, 30, 40, 50, 60, 70, 80], xticks=np.arange(9))
+                                   ylabel="Temperature (deg)", xrotation=0, xlabel="TPM Board", ylim=[20, 100],
+                                   yticks=np.arange(20, 120, 20), xticks=np.arange(9))
 
         self.plotMgnTemp = BarPlot(parent=self.wg.qplot_mgn_temp, size=(2.7, 2.3), xlim=[0, 5], ylim=[0, 60],
                                    ylabel="Temperature (deg)", xrotation=45, xlabel="SubRack Temperatures",
                                    yticks=[0, 10, 20, 30, 40, 50, 60], xticks=["", "Mgn-1", "Mgn-2", "Bck-1", "Bck-2"])
 
         self.plotPsu = BarPlot(parent=self.wg.qplot_psu, size=(2.7, 2.3), xlim=[0, 3], ylabel="Power (W)",
-                               xrotation=0, xlabel="PSU", ylim=[0, 600], xticks=["", "PSU-1", "PSU-2"],
-                               yticks=[0, 100, 200, 300, 400, 500, 600])
+                               xrotation=0, xlabel="PSU", ylim=[0, 1200], xticks=["", "PSU-1", "PSU-2"],
+                               yticks=np.arange(0, 1400, 200))
 
         self.plotChartMgn = ChartPlots(parent=self.wg.qplot_chart_mgn, ntraces=4, xlabel="time samples", ylim=[0, 60],
                                        ylabel="SubRack Temperatures", size=(11.3, 3.45), xlim=[0, 200])
@@ -135,7 +135,7 @@ class Subrack(QtWidgets.QMainWindow):
         self.plotChartTpm = ChartPlots(parent=self.wg.qplot_chart_tpm, ntraces=8, xlabel="time samples", ylim=[0, 120],
                                        ylabel="TPM Power", size=(11.3, 3.45), xlim=[0, 200])
 
-        self.wg.qline_ip.setText("%s:%d" %(ip, port))
+        self.wg.qline_ip.setText("%s:%d" % (ip, port))
         self.ip = ip
         self.port = port
 
@@ -172,6 +172,63 @@ class Subrack(QtWidgets.QMainWindow):
         else:
             self.wg.qplot_chart_tpm.setVisible(True)
             self.wg.qplot_chart_mgn.setVisible(False)
+        self.drawCharts()
+
+    def drawCharts(self):
+        # Draw selected chart
+        if self.wg.qcombo_chart.currentIndex() == 0:
+            # Chart: Subrack Temperatures
+            self.plotChartMgn.set_ylim([0, 60])
+            for n, k in enumerate(MgnTraces):
+                self.plotChartMgn.plotCurve(data=self.data_charts[k][0::2], trace=(0 + n * 2), color=COLORI[(0 + n * 2)])
+                self.plotChartMgn.plotCurve(data=self.data_charts[k][1::2], trace=(1 + n * 2), color=COLORI[(1 + n * 2)])
+            self.plotChartMgn.updatePlot()
+        elif self.wg.qcombo_chart.currentIndex() == 1:
+            # Chart: TPM Temperatures
+            self.plotChartTpm.set_ylim([0, 100])
+            self.plotChartTpm.set_ylabel("TPM Temperatures (deg)")
+            if "tpm_temperatures" in self.data_charts.keys():
+                for i in range(8):
+                    self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures"][i::8], trace=i,
+                                                color=COLORI[i])
+                self.plotChartTpm.updatePlot()
+            else:
+                self.wg.qlabel_message.setText("WARNING: TPM Temperatures not yet available!!!")
+        elif self.wg.qcombo_chart.currentIndex() == 2:
+            # Chart: TPM Powers
+            self.plotChartTpm.set_ylim([0, 140])
+            self.plotChartTpm.set_ylabel("TPM Powers (W)")
+            for i in range(8):
+                self.plotChartTpm.plotCurve(data=self.data_charts["tpm_powers"][i::8], trace=i, color=COLORI[i])
+            self.plotChartTpm.updatePlot()
+        elif self.wg.qcombo_chart.currentIndex() == 3:
+            # Chart: TPM Currents
+            self.plotChartTpm.set_ylim([0, 12])
+            self.plotChartTpm.set_ylabel("TPM Currents (A)")
+            for i in range(8):
+                self.plotChartTpm.plotCurve(data=self.data_charts["tpm_currents"][i::8], trace=i, color=COLORI[i])
+            self.plotChartTpm.updatePlot()
+        elif self.wg.qcombo_chart.currentIndex() == 4:
+            # Chart: TPM Voltages
+            self.plotChartTpm.set_ylim([0, 16])
+            self.plotChartTpm.set_ylabel("TPM Voltages (V)")
+            for i in range(8):
+                self.plotChartTpm.plotCurve(data=self.data_charts["tpm_voltages"][i::8], trace=i, color=COLORI[i])
+            self.plotChartTpm.updatePlot()
+
+    def drawBars(self):
+        # Draw Bars
+        for i in range(8):
+            self.plotTpmPower.plotBar(data=self.attributes["tpm_powers"][i], bar=i, color=COLORI[i])
+        self.plotTpmPower.set_xticklabels(labels=["%3.1f" % x for x in self.attributes["tpm_voltages"]])
+        self.plotTpmPower.updatePlot()
+        for i in range(2):
+            self.plotPsu.plotBar(data=self.attributes["power_supply_powers"][i], bar=i, color=COLORI[i])
+        self.plotPsu.updatePlot()
+        for n, k in enumerate(MgnTraces):
+            self.plotMgnTemp.plotBar(data=self.attributes[k][0], bar=(n * 2), color=COLORI[(n * 2)])
+            self.plotMgnTemp.plotBar(data=self.attributes[k][1], bar=(1 + n * 2), color=COLORI[(1 + n * 2)])
+        self.plotMgnTemp.updatePlot()
 
     def switchTpm(self, slot):
         if self.connected:
@@ -270,54 +327,8 @@ class Subrack(QtWidgets.QMainWindow):
 
     def updateTlm(self):
         self.wg.qlabel_message.setText("")
-        # Draw Bars
-        for i in range(8):
-            self.plotTpmPower.plotBar(data=self.attributes["tpm_powers"][i], bar=i, color=COLORI[i])
-        self.plotTpmPower.set_xticklabels(labels=["%3.1f" % x for x in self.attributes["tpm_voltages"]])
-        self.plotTpmPower.updatePlot()
-        for i in range(2):
-            self.plotPsu.plotBar(data=self.attributes["power_supply_powers"][i], bar=i, color=COLORI[i])
-        self.plotPsu.updatePlot()
-        for n, k in enumerate(MgnTraces):
-            self.plotMgnTemp.plotBar(data=self.attributes[k][0], bar=(n * 2), color=COLORI[(n * 2)])
-            self.plotMgnTemp.plotBar(data=self.attributes[k][1], bar=(1 + n * 2), color=COLORI[(1 + n * 2)])
-        self.plotMgnTemp.updatePlot()
-
-        # Draw selected chart
-        if self.wg.qcombo_chart.currentIndex() == 0:
-            # Chart: Subrack Temperatures
-            self.plotChartMgn.set_ylim([0, 60])
-            for n, k in enumerate(MgnTraces):
-                self.plotChartMgn.plotCurve(data=self.data_charts[k][0], trace=(0 + n * 2), color=COLORI[(0 + n * 2)])
-                self.plotChartMgn.plotCurve(data=self.data_charts[k][1], trace=(1 + n * 2), color=COLORI[(1 + n * 2)])
-        elif self.wg.qcombo_chart.currentIndex() == 1:
-            # Chart: TPM Temperatures
-            self.plotChartTpm.set_ylim([0, 100])
-            self.plotChartTpm.set_ylabel("TPM Temperatures (deg)")
-            if "tpm_temperatures" in self.data_charts.keys():
-                for i in range(8):
-                    self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures"][i::8], trace=i,
-                                                color=COLORI[i])
-            else:
-                self.wg.qlabel_message.setText("WARNING: TPM Temperatures not yet available!!!")
-        elif self.wg.qcombo_chart.currentIndex() == 2:
-            # Chart: TPM Powers
-            self.plotChartTpm.set_ylim([0, 120])
-            self.plotChartTpm.set_ylabel("TPM Powers (W)")
-            for i in range(8):
-                self.plotChartTpm.plotCurve(data=self.data_charts["tpm_powers"][i::8], trace=i, color=COLORI[i])
-        elif self.wg.qcombo_chart.currentIndex() == 3:
-            # Chart: TPM Currents
-            self.plotChartTpm.set_ylim([0, 10])
-            self.plotChartTpm.set_ylabel("TPM Currents (A)")
-            for i in range(8):
-                self.plotChartTpm.plotCurve(data=self.data_charts["tpm_currents"][i::8], trace=i, color=COLORI[i])
-        elif self.wg.qcombo_chart.currentIndex() == 4:
-            # Chart: TPM Voltages
-            self.plotChartTpm.set_ylim([0, 16])
-            self.plotChartTpm.set_ylabel("TPM Voltages (V)")
-            for i in range(8):
-                self.plotChartTpm.plotCurve(data=self.data_charts["tpm_voltages"][i::8], trace=i, color=COLORI[i])
+        self.drawBars()
+        self.drawCharts()
 
         # TPM status on QButtons
         for n, fault in enumerate(self.attributes["tpm_supply_fault"]):
