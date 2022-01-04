@@ -161,7 +161,7 @@ class Live(QtWidgets.QMainWindow):
             self.livePlots.plotClear()
             for n, i in enumerate(self.live_input_list):
                 # Plot X Pol
-                spettro, rfpow = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 0, :], self.live_nsamples, log=True)
+                spettro, rfpow = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 0, :], self.live_nsamples)
                 self.livePlots.plotCurve(self.live_asse_x, spettro, n, xAxisRange=self.live_xAxisRange,
                                         yAxisRange=self.live_yAxisRange, title="INPUT-%02d" % i,
                                         xLabel="MHz", yLabel="dB", colore="b") #, rfpower=rms,
@@ -171,7 +171,7 @@ class Live(QtWidgets.QMainWindow):
 
                 # Plot Y Pol
                 spettro, rfpow = calcolaspettro(
-                    self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 1, :], self.live_nsamples, log=True)
+                    self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 1, :], self.live_nsamples)
                 self.livePlots.plotCurve(self.live_asse_x, spettro, n, xAxisRange=self.live_xAxisRange,
                                         yAxisRange=self.live_yAxisRange, colore="g") #, rfpower=rms,
                                       #  annotate_rms=self.show_rms, grid=self.show_spectra_grid, lw=lw,
