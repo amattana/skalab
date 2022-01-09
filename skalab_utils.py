@@ -3,6 +3,7 @@ import datetime
 import subprocess
 import calendar
 import numpy as np
+import configparser
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
@@ -10,6 +11,12 @@ import sys
 sys.path.append("../../pyaavs/tests/")
 from pydaq.persisters import *
 from get_nic import getnic
+
+
+def parse_profile(config=""):
+    confparser = configparser.ConfigParser()
+    confparser.read(config)
+    return confparser
 
 
 def dt_to_timestamp(d):

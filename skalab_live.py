@@ -64,13 +64,16 @@ class Live(QtWidgets.QMainWindow):
     #housekeeping_signal = QtCore.pyqtSignal()
     #antenna_test_signal = QtCore.pyqtSignal()
 
-    def __init__(self, config="", uiFile=""):
+    def __init__(self, config="", uiFile="", profile="Default"):
         """ Initialise main window """
         super(Live, self).__init__()
         # Load window file
         self.wg = uic.loadUi(uiFile)
         self.setCentralWidget(self.wg)
         self.resize(1168, 901)
+
+        self.profile_name = profile
+        self.profile_file = ""
 
         # Populate the playback plots for the Live Spectra
         self.livePlots = MiniPlots(parent=self.wg.qplot_spectra, nplot=16)

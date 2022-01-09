@@ -1,16 +1,23 @@
 #!/usr/bin/env python
 import gc
+import os.path
+import glob
 import sys
 import numpy as np
+import configparser
 from PyQt5 import QtWidgets, uic, QtCore, QtGui
 from hardware_client import WebHardwareClient
-from skalab_utils import BarPlot, ChartPlots, colors, dt_to_timestamp, ts_to_datestring
+from skalab_utils import BarPlot, ChartPlots, colors, dt_to_timestamp, ts_to_datestring, parse_profile
 from threading import Thread
 from time import sleep
 import datetime
+from pathlib import Path
 COLORI = ["b", "g", "k", "r", "orange", "magenta", "darkgrey", "turquoise"]
 
 MgnTraces = ['board_temperatures', 'backplane_temperatures']
+default_app_dir = str(Path.home()) + "/.skalab/"
+default_profile = "Default"
+profile_filename = "subrack.ini"
 
 '''
 In [3]: client.execute_command("list_attributes")
@@ -100,18 +107,52 @@ def populateCharts(form):
     return qbuttons
 
 
+def make_profile(profile, prodict={}):
+    conf = configparser.ConfigParser()
+    if 'App' in prodict.keys() and 'data_path' in prodict['App'].keys():
+        conf['App'] = {'data_path': prodict['App']['data_path']}
+    else:
+        conf['App'] = {'data_path': '/storage/subrack/'}
+    conf['Device'] = {}
+    if 'Device' in prodict.keys() and 'ip' in prodict['Device'].keys():
+        conf['Device']['ip'] = prodict['Device']['ip']
+    else:
+        conf['Device']['ip'] = "10.0.10.48"
+    if 'Device' in prodict.keys() and 'port' in prodict['Device'].keys():
+        conf['Device']['port'] = prodict['Device']['port']
+    else:
+        conf['Device']['port'] = "8081"
+    if 'Device' in prodict.keys() and 'query_interval' in prodict['Device'].keys():
+        conf['Device']['query_interval'] = prodict['Device']['query_interval']
+    else:
+        conf['Device']['query_interval'] = "3"
+    if not os.path.exists(default_app_dir):
+        os.makedirs(default_app_dir)
+    conf_path = default_app_dir + profile
+    if not os.path.exists(conf_path):
+        os.makedirs(conf_path)
+    conf_path = conf_path + "/" + profile_filename
+    with open(conf_path, 'w') as configfile:
+        conf.write(configfile)
+
+
 class Subrack(QtWidgets.QMainWindow):
     """ Main UI Window class """
     # Signal for Slots
     signalTlm = QtCore.pyqtSignal()
 
-    def __init__(self, ip, port=8081, uiFile=""):
+    def __init__(self, ip=None, port=None, uiFile="", profile="Default", size=[1190, 936]):
         """ Initialise main window """
         super(Subrack, self).__init__()
         # Load window file
         self.wg = uic.loadUi(uiFile)
         self.setCentralWidget(self.wg)
-        self.resize(1168, 901)
+        self.resize(size[0], size[1])
+
+        self.profile = []
+        self.profile_name = profile
+        self.profile_file = ""
+        self.load_profile(profile, ip, port)
 
         self.plotTpmPower = BarPlot(parent=self.wg.qplot_tpm_power, size=(4.95, 2.3), xlim=[0, 9], ylabel="Power (W)",
                                     xrotation=0, xlabel="TPM Voltages", ylim=[0, 140],
@@ -135,17 +176,12 @@ class Subrack(QtWidgets.QMainWindow):
         self.plotChartTpm = ChartPlots(parent=self.wg.qplot_chart_tpm, ntraces=8, xlabel="time samples", ylim=[0, 120],
                                        ylabel="TPM Power", size=(11.3, 3.45), xlim=[0, 200])
 
-        self.wg.qline_ip.setText("%s:%d" % (ip, port))
-        self.ip = ip
-        self.port = port
-
         self.connected = False
         self.client = None
         self.subAttr = []
         self.attributes = {}
         self.qbutton_tpm = populateSlots(self.wg.frame_tpm)
         self.fans = populateFans(self.wg.frame_fan)
-        #self.charts = populateCharts(self.wg)
         self.data_charts = {}
 
         self.load_events()
@@ -164,6 +200,106 @@ class Subrack(QtWidgets.QMainWindow):
         self.wg.qbutton_tpm_on.clicked.connect(lambda: self.switchTpmsOn())
         self.wg.qbutton_tpm_off.clicked.connect(lambda: self.switchTpmsOff())
         self.wg.qcombo_chart.currentIndexChanged.connect(lambda: self.switchChart())
+        self.wg.qbutton_load.clicked.connect(lambda: self.load())
+
+    def config_table(self, conf):
+        self.wg.qtable_conf.clearSpans()
+        self.wg.qtable_conf.setGeometry(QtCore.QRect(20, 330, 591, 331))
+        self.wg.qtable_conf.setObjectName("qtable_conf")
+        self.wg.qtable_conf.setColumnCount(1)
+
+        total_rows = 0
+        for i in conf.sections():
+            total_rows = total_rows + len(conf[i]) + 1
+        self.wg.qtable_conf.setRowCount(total_rows + 2)
+
+        item = QtWidgets.QTableWidgetItem("VALUES")
+        item.setTextAlignment(QtCore.Qt.AlignCenter)
+        item.setFlags(QtCore.Qt.ItemIsEnabled)
+        self.wg.qtable_conf.setHorizontalHeaderItem(0, item)
+
+        item = QtWidgets.QTableWidgetItem("[SECTIONS] / KEYS")
+        item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        item.setFlags(QtCore.Qt.ItemIsEnabled)
+        self.wg.qtable_conf.setVerticalHeaderItem(0, item)
+
+        q = 1
+        for i in conf.sections():
+            item = QtWidgets.QTableWidgetItem("[" + i + "]")
+            item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+            item.setFlags(QtCore.Qt.ItemIsEnabled)
+            self.wg.qtable_conf.setVerticalHeaderItem(q, item)
+            q = q + 1
+            for k in conf[i]:
+                item = QtWidgets.QTableWidgetItem(k)
+                item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+                item.setFlags(QtCore.Qt.ItemIsEnabled)
+                self.wg.qtable_conf.setVerticalHeaderItem(q, item)
+                item = QtWidgets.QTableWidgetItem(conf[i][k])
+                item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+                item.setFlags(QtCore.Qt.ItemIsEnabled)
+                self.wg.qtable_conf.setItem(q, 0, item)
+                q = q + 1
+            item = QtWidgets.QTableWidgetItem(" ")
+            item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+            item.setFlags(QtCore.Qt.ItemIsEnabled)
+            self.wg.qtable_conf.setVerticalHeaderItem(q, item)
+            q = q + 1
+
+        self.wg.qtable_conf.horizontalHeader().setStretchLastSection(True)
+        self.wg.qtable_conf.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.wg.qtable_conf.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.wg.qtable_conf.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+
+    def load(self):
+        if not self.connected:
+            self.load_profile(self.wg.qcombo_profile.currentText())
+        else:
+            msgBox = QtWidgets.QMessageBox()
+            msgBox.setText("Please DISCONNECT from the Subrack first!")
+            msgBox.setWindowTitle("Error!")
+            msgBox.exec_()
+
+    def load_profile(self, profile, eth_ip=None, eth_port=None):
+        self.profile = []
+        fullpath = default_app_dir + profile + "/" + profile_filename
+        if os.path.exists(fullpath):
+            print("Loading SubRack Profile: " + profile + " (" + fullpath + ")")
+        else:
+            print("\nThe SubRack Profile does not exist.\nGenerating a new one in "
+                  + fullpath + "\n")
+            make_profile(profile=profile)
+        self.profile = parse_profile(fullpath)
+        self.profile_name = profile
+        self.profile_file = fullpath
+        self.wg.qline_configuration_file.setText(self.profile_file)
+        self.wg.qline_profile_ip.setText(self.profile['Device']['ip'])
+        self.wg.qline_profile_port.setText(self.profile['Device']['port'])
+        self.wg.qline_profile_interval.setText(self.profile['Device']['query_interval'])
+        self.config_table(self.profile)
+        # Overriding Configuration File with parameters
+        if eth_ip is not None:
+            self.ip = eth_ip
+        else:
+            self.ip = str(self.profile['Device']['ip'])
+        if eth_port is not None:
+            self.port = eth_port
+        else:
+            self.port = int(self.profile['Device']['port'])
+        self.wg.qline_ip.setText("%s:%d" % (self.ip, self.port))
+        self.updateProfileCombo(current=profile)
+
+    def updateProfileCombo(self, current):
+        profiles = []
+        for d in os.listdir(default_app_dir):
+            if os.path.exists(default_app_dir + "/" + d + "/subrack.ini"):
+                profiles += [d]
+        if profiles:
+            self.wg.qcombo_profile.clear()
+            for n, p in enumerate(profiles):
+                self.wg.qcombo_profile.addItem(p)
+                if current == p:
+                    self.wg.qcombo_profile.setCurrentIndex(n)
 
     def switchChart(self):
         if self.wg.qcombo_chart.currentIndex() == 0:
@@ -269,7 +405,7 @@ class Subrack(QtWidgets.QMainWindow):
                     self.getTelemetry()
                     self.connected = True
                 else:
-                    self.wg.qlabel_connection.setText("The SubRack server does not respond!")
+                    self.wg.qlabel_message.setText("The SubRack server does not respond!")
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
                     self.wg.qbutton_connect.setText("OFFLINE")
                     self.wg.frame_tpm.setEnabled(False)
@@ -317,7 +453,7 @@ class Subrack(QtWidgets.QMainWindow):
                 sleep(0.2)
                 self.signalTlm.emit()
                 cycle = 0.0
-                while cycle < 2 and not self.skip:
+                while cycle < (int(self.config['Device']['Request_Interval']) - 1) and not self.skip:
                     sleep(0.5)
                     cycle = cycle + 0.5
                 self.skip = False
@@ -372,6 +508,8 @@ if __name__ == "__main__":
     from sys import argv, stdout
 
     parser = OptionParser(usage="usage: %station_subrack [options]")
+    parser.add_option("--profile", action="store", dest="profile",
+                      type="str", default=None, help="Profile file")
     parser.add_option("--ip", action="store", dest="ip",
                       type="str", default=None, help="SubRack IP address [default: None]")
     parser.add_option("--port", action="store", dest="port",
@@ -384,40 +522,67 @@ if __name__ == "__main__":
                       default=False, help="Single Telemetry Request. If not provided, the script runs indefinitely")
     parser.add_option("--directory", action="store", dest="directory",
                       type="str", default="", help="Output Directory [Default: "", it means do not save data]")
-    (conf, args) = parser.parse_args(argv[1:])
+    (opt, args) = parser.parse_args(argv[1:])
 
-    if not conf.nogui:
+    if not opt.nogui:
         app = QtWidgets.QApplication(sys.argv)
-        window = Subrack(ip=conf.ip, port=conf.port, uiFile="skalab_subrack.ui")
+        window = Subrack(ip=opt.ip, port=opt.port, uiFile="skalab_subrack.ui", profile=opt.profile)
         window.signalTlm.connect(window.updateTlm)
         sys.exit(app.exec_())
     else:
+        profile = []
+        fullpath = default_app_dir + opt.profile + "/" + profile_filename
+        if os.path.exists(fullpath):
+            print("Loading SubRack Profile: " + opt.profile + " (" + fullpath + ")")
+        else:
+            print("\nThe SubRack Profile does not exist.\nGenerating a new one in "
+                  + fullpath + "\n")
+            make_profile(profile=opt.profile)
+        profile = parse_profile(fullpath)
+        profile_name = profile
+        profile_file = fullpath
+
+        # Overriding Configuration File with parameters
+        if opt.ip is not None:
+            ip = opt.ip
+        else:
+            ip = str(profile['Device']['ip'])
+        if opt.port is not None:
+            port = opt.port
+        else:
+            port = int(profile['Device']['port'])
+        interval = int(profile['Device']['request_interval'])
+        if not opt.interval == int(profile['Device']['request_interval']):
+            interval = opt.interval
+
         connected = False
-        if not conf.ip == "":
-            client = WebHardwareClient(conf.ip, conf.port)
+        if not opt.ip == "":
+            client = WebHardwareClient(opt.ip, opt.port)
             if client.connect():
                 connected = True
                 subAttr = client.execute_command("list_attributes")["retvalue"]
             else:
-                print("Unable to connect to the Webserver on %s:%d" % (conf.ip, conf.port))
+                print("Unable to connect to the Webserver on %s:%d" % (opt.ip, opt.port))
         if connected:
-            if conf.single:
+            if opt.single:
                 print("SINGLE REQUEST")
+                tstamp = dt_to_timestamp(datetime.datetime.utcnow())
                 attributes = {}
+                print("\nTstamp: %d\tDateTime: %s\n" % (tstamp, ts_to_datestring(tstamp)))
                 for att in subAttr:
                     attributes[att] = client.get_attribute(att)["value"]
-                print(attributes)
+                    print(att, attributes[att])
             else:
                 try:
                     print("CONTINUOUS REQUESTS")
                     while True:
                         tstamp = dt_to_timestamp(datetime.datetime.utcnow())
                         attributes = {}
+                        print("\nTstamp: %d\tDateTime: %s\n" % (tstamp, ts_to_datestring(tstamp)))
                         for att in subAttr:
                             attributes[att] = client.get_attribute(att)["value"]
-                        print("\nTstamp: %d\tDateTime: %s\n" % (tstamp, ts_to_datestring(tstamp)))
-                        print(attributes)
-                        sleep(conf.interval)
+                            print(att, attributes[att])
+                        sleep(opt.interval)
                 except KeyboardInterrupt:
                     print("\nTerminated by the user.\n")
             client.disconnect()

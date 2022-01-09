@@ -1,12 +1,21 @@
 #!/usr/bin/env python
+import shutil
 import sys
 import os
 import numpy as np
+import configparser
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 from pyaavs import station
 from skalab_live import Live
 from skalab_playback import Playback
 from skalab_subrack import Subrack
+from skalab_utils import parse_profile
+from pathlib import Path
+
+default_app_dir = str(Path.home()) + "/.skalab/"
+default_profile = "Default"
+profile_filename = "skalab.ini"
+
 COLORI = ["b", "g"]
 
 configuration = {'tiles': None,
@@ -55,37 +64,49 @@ configuration = {'tiles': None,
 class SkaLab(QtWidgets.QMainWindow):
     """ Main UI Window class """
 
-    def __init__(self, uiFile):
+    def __init__(self, uiFile, profile="Default"):
         """ Initialise main window """
         super(SkaLab, self).__init__()
         # Load window file
         self.wgMain = uic.loadUi(uiFile)
         self.setCentralWidget(self.wgMain)
-        self.resize(1211, 960)
+        self.resize(1210, 970)
         self.setWindowTitle("SKALAB Tool")
-        self.config_file = self.wgMain.conf_qline_configfile.text()
-        self.pic_ska = QtWidgets.QLabel(self.wgMain.qtabMainConf)
-        self.pic_ska.setGeometry(790, 20, 370, 154)
-        self.pic_ska.setPixmap(QtGui.QPixmap(os.getcwd() + "/ska_inaf_logo.jpg"))
+
+        self.updateProfileCombo(profile)
+        self.profile = []
+        self.profile_name = ""
+        self.profile_file = ""
+        self.load_profile(profile)
+        self.updateProfileCombo(current=self.profile_name)
+
+        self.config_file = self.profile['Init']['station_setup']
+        self.wgMain.qline_configfile.setText(self.config_file)
+
         self.tabSubrackIndex = 1
         self.tabLiveIndex = 2
         self.tabPlayIndex = 3
 
+        self.pic_ska = QtWidgets.QLabel(self.wgMain.qwpics)
+        self.pic_ska.setGeometry(1, 1, 370, 154)
+        self.pic_ska.setPixmap(QtGui.QPixmap(os.getcwd() + "/ska_inaf_logo.jpg"))
+
         QtWidgets.QTabWidget.setTabVisible(self.wgMain.qtabMain, self.tabLiveIndex, True)
         self.wgLiveLayout = QtWidgets.QVBoxLayout()
-        self.wgLive = Live(self.config_file, "skalab_live.ui")
+        self.wgLive = Live(self.config_file, "skalab_live.ui", profile=self.profile['App']['live'])
         self.wgLiveLayout.addWidget(self.wgLive)
         self.wgMain.qwLive.setLayout(self.wgLiveLayout)
 
         QtWidgets.QTabWidget.setTabVisible(self.wgMain.qtabMain, self.tabPlayIndex, True)
         self.wgPlayLayout = QtWidgets.QVBoxLayout()
-        self.wgPlay = Playback(self.config_file, "skalab_playback.ui")
+        self.wgPlay = Playback(self.config_file, "skalab_playback.ui", profile=self.profile['App']['playback'])
         self.wgPlayLayout.addWidget(self.wgPlay)
         self.wgMain.qwPlay.setLayout(self.wgPlayLayout)
 
         QtWidgets.QTabWidget.setTabVisible(self.wgMain.qtabMain, self.tabSubrackIndex, True)
         self.wgSubrackLayout = QtWidgets.QVBoxLayout()
-        self.wgSubrack = Subrack(ip="10.0.10.48", uiFile="skalab_subrack.ui")
+        self.wgSubrack = Subrack(uiFile="skalab_subrack.ui", size=[1190, 936],
+                                 profile=self.profile['App']['subrack'])
         self.wgSubrackLayout.addWidget(self.wgSubrack)
         self.wgMain.qwSubrack.setLayout(self.wgSubrackLayout)
         self.wgSubrack.signalTlm.connect(self.wgSubrack.updateTlm)
@@ -115,13 +136,62 @@ class SkaLab(QtWidgets.QMainWindow):
         self.power = {}
         self.raw = {}
         self.rms = {}
-        self.setup_config()
 
     def load_events(self):
-        self.wgMain.conf_qbutton_browse.clicked.connect(lambda: self.browse_config())
-        self.wgMain.conf_qbutton_setup.clicked.connect(lambda: self.setup_config())
-        self.wgMain.conf_qbutton_profile_save.clicked.connect(lambda: self.save_profile())
-        self.wgMain.conf_qbutton_profile_saveas.clicked.connect(lambda: self.save_as_profile())
+        self.wgMain.qbutton_browse.clicked.connect(lambda: self.browse_config())
+        self.wgMain.qbutton_load_configuration.clicked.connect(lambda: self.setup_config())
+        self.wgMain.qbutton_profile_save.clicked.connect(lambda: self.save_profile(self.wgMain.qcombo_profiles.currentText()))
+        self.wgMain.qbutton_profile_saveas.clicked.connect(lambda: self.save_as_profile())
+        self.wgMain.qbutton_profile_load.clicked.connect(lambda: self.reload_profile(self.wgMain.qcombo_profiles.currentText()))
+        self.wgMain.qbutton_profile_delete.clicked.connect(lambda: self.delete_profile(self.wgMain.qcombo_profiles.currentText()))
+
+    def load_profile(self, profile):
+        self.profile = []
+        fullpath = default_app_dir + profile + "/" + profile_filename
+        if os.path.exists(fullpath):
+            print("Loading Skalab Profile: " + profile + " (" + fullpath + ")")
+        else:
+            print("\nThe Skalab Profile does not exist.\nGenerating a new one in "
+                  + fullpath + "\n")
+            self.make_profile(profile=profile)
+        self.profile = parse_profile(fullpath)
+        self.profile_name = profile
+        self.profile_file = fullpath
+        self.wgMain.qline_profile.setText(fullpath)
+
+        if not self.profile.sections():
+            msgBox = QtWidgets.QMessageBox()
+            msgBox.setText("Cannot find this profile!")
+            msgBox.setWindowTitle("Error!")
+            msgBox.exec_()
+        else:
+            self.config_file = self.profile['Init']['station_setup']
+            self.wgMain.qline_configfile.setText(self.config_file)
+            self.populate_table_profile()
+
+    def reload_profile(self, profile):
+        self.load_profile(profile=profile)
+        if self.profile.sections():
+            if self.profile['App']['subrack']:
+                self.wgSubrack.load_profile(profile=self.profile['App']['subrack'])
+
+    def delete_profile(self, profile):
+        if os.path.exists(default_app_dir + profile):
+            shutil.rmtree(default_app_dir + profile)
+        self.updateProfileCombo(current="")
+        self.load_profile(self.wgMain.qcombo_profiles.currentText())
+
+    def updateProfileCombo(self, current):
+        profiles = []
+        for d in os.listdir(default_app_dir):
+            if os.path.exists(default_app_dir + d + "/skalab.ini"):
+                profiles += [d]
+        if profiles:
+            self.wgMain.qcombo_profiles.clear()
+            for n, p in enumerate(profiles):
+                self.wgMain.qcombo_profiles.addItem(p)
+                if current == p:
+                    self.wgMain.qcombo_profiles.setCurrentIndex(n)
 
     def browse_config(self):
         fd = QtWidgets.QFileDialog()
@@ -129,10 +199,9 @@ class SkaLab(QtWidgets.QMainWindow):
         options = fd.options()
         self.config_file = fd.getOpenFileName(self, caption="Choose a data folder",
                                               directory="/opt/aavs/config/", options=options)[0]
-        self.wgMain.conf_qline_configfile.setText(self.config_file)
+        self.wgMain.qline_configfile.setText(self.config_file)
 
     def setup_config(self):
-        print("CONFIG: " + self.config_file)
         if not self.config_file == "":
             self.wgPlay.config_file = self.config_file
             self.wgLive.config_file = self.config_file
@@ -141,9 +210,9 @@ class SkaLab(QtWidgets.QMainWindow):
             self.nof_tiles = len(station.configuration['tiles'])
             self.nof_antennas = int(station.configuration['station']['number_of_antennas'])
             self.bitfile = station.configuration['station']['bitfile']
-            self.wgMain.conf_qlabel_bitfile.setText("BITFILE:   " + self.bitfile)
+            self.wgMain.qlabel_bitfile.setText("BITFILE:   " + self.bitfile)
             self.truncation = int(station.configuration['station']['channel_truncation'])
-            self.setup_populate_tables()
+            self.populate_table_station()
             if not self.wgPlay == None:
                 self.wgPlay.wg.qcombo_tpm.clear()
                 self.wgLive.wg.qcombo_tpm.clear()
@@ -155,145 +224,219 @@ class SkaLab(QtWidgets.QMainWindow):
                 self.tiles += [i]
         else:
             msgBox = QtWidgets.QMessageBox()
-            msgBox.setText("Please SELECT a valid configuration file first...")
+            msgBox.setText("SKALAB: Please SELECT a valid configuration file first...")
             msgBox.setWindowTitle("Error!")
             msgBox.exec_()
 
-    def setup_populate_tables(self):
+    def populate_table_profile(self):
+        #self.wgMain.qtable_profile = QtWidgets.QTableWidget(self.wgMain.qtabMain)
+        #self.wgMain.qtable_profile.setGeometry(QtCore.QRect(20, 575, 461, 351))
+        self.wgMain.qtable_profile.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+        self.wgMain.qtable_profile.setObjectName("qtable_profile")
+        self.wgMain.qtable_profile.setColumnCount(1)
+        nrows = 2
+        for i in self.profile.sections():
+            nrows = nrows + len(self.profile[i].keys()) + 1
+        self.wgMain.qtable_profile.setRowCount(nrows)
+
+        # Header Horizontal
+        item = QtWidgets.QTableWidgetItem()
+        item.setTextAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignVCenter)
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        item.setFont(font)
+        self.wgMain.qtable_profile.setHorizontalHeaderItem(0, item)
+        item = self.wgMain.qtable_profile.horizontalHeaderItem(0)
+        item.setText("Profile: " + self.profile_name)
+        __sortingEnabled = self.wgMain.qtable_profile.isSortingEnabled()
+        self.wgMain.qtable_profile.setSortingEnabled(False)
+
+        row = 0
+        for k in self.profile.sections():
+            # Empty Row
+            item = QtWidgets.QTableWidgetItem()
+            self.wgMain.qtable_profile.setVerticalHeaderItem(row, item)
+            item = self.wgMain.qtable_profile.verticalHeaderItem(row)
+            item.setText(" ")
+            item = QtWidgets.QTableWidgetItem()
+            item.setText(" ")
+            self.wgMain.qtable_profile.setItem(row, 0, item)
+            row = row + 1
+
+            item = QtWidgets.QTableWidgetItem()
+            font = QtGui.QFont()
+            font.setBold(True)
+            font.setWeight(75)
+            item.setFont(font)
+            item.setText("[" + k + "]")
+            self.wgMain.qtable_profile.setVerticalHeaderItem(row, item)
+            row = row + 1
+
+            for s in self.profile[k].keys():
+                item = QtWidgets.QTableWidgetItem()
+                self.wgMain.qtable_profile.setVerticalHeaderItem(row, item)
+                item = self.wgMain.qtable_profile.verticalHeaderItem(row)
+                item.setText(s)
+                item = QtWidgets.QTableWidgetItem()
+                item.setText(self.profile[k][s])
+                self.wgMain.qtable_profile.setItem(row, 0, item)
+                row = row + 1
+
+        self.wgMain.qtable_profile.horizontalHeader().setDefaultSectionSize(365)
+        self.wgMain.qtable_profile.setSortingEnabled(__sortingEnabled)
+
+    def populate_table_station(self):
         # TABLE STATION
-        self.wgMain.conf_qtable_station.clearSpans()
-        self.wgMain.conf_qtable_station.setGeometry(QtCore.QRect(20, 230, 511, 151))
-        self.wgMain.conf_qtable_station.setObjectName("conf_qtable_station")
-        self.wgMain.conf_qtable_station.setColumnCount(1)
-        self.wgMain.conf_qtable_station.setRowCount(len(station.configuration['station'].keys()) - 1)
+        self.wgMain.qtable_station.clearSpans()
+        #self.wgMain.qtable_station.setGeometry(QtCore.QRect(20, 140, 171, 31))
+        self.wgMain.qtable_station.setObjectName("conf_qtable_station")
+        self.wgMain.qtable_station.setColumnCount(1)
+        self.wgMain.qtable_station.setRowCount(len(station.configuration['station'].keys()) - 1)
         n = 0
         for i in station.configuration['station'].keys():
             if not i == "bitfile":
-                self.wgMain.conf_qtable_station.setVerticalHeaderItem(n, QtWidgets.QTableWidgetItem(i.upper()))
+                self.wgMain.qtable_station.setVerticalHeaderItem(n, QtWidgets.QTableWidgetItem(i.upper()))
                 n = n + 1
-        self.wgMain.conf_qtable_station.setHorizontalHeaderItem(0, QtWidgets.QTableWidgetItem("VALUES"))
-        __sortingEnabled = self.wgMain.conf_qtable_station.isSortingEnabled()
-        self.wgMain.conf_qtable_station.setSortingEnabled(False)
+        self.wgMain.qtable_station.setHorizontalHeaderItem(0, QtWidgets.QTableWidgetItem("VALUES"))
+        __sortingEnabled = self.wgMain.qtable_station.isSortingEnabled()
+        self.wgMain.qtable_station.setSortingEnabled(False)
         n = 0
         for i in station.configuration['station'].keys():
             if not i == "bitfile":
                 item = QtWidgets.QTableWidgetItem(str(station.configuration['station'][i]))
                 item.setFlags(QtCore.Qt.ItemIsEnabled)
-                self.wgMain.conf_qtable_station.setItem(n, 0, item)
+                self.wgMain.qtable_station.setItem(n, 0, item)
                 n = n + 1
-        self.wgMain.conf_qtable_station.horizontalHeader().setStretchLastSection(True)
-        self.wgMain.conf_qtable_station.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wgMain.conf_qtable_station.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wgMain.conf_qtable_station.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+        self.wgMain.qtable_station.horizontalHeader().setStretchLastSection(True)
+        self.wgMain.qtable_station.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.wgMain.qtable_station.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.wgMain.qtable_station.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
 
         # TABLE TPM
-        self.wgMain.conf_qtable_tpm.clearSpans()
-        self.wgMain.conf_qtable_tpm.setGeometry(QtCore.QRect(20, 450, 511, 241))
-        self.wgMain.conf_qtable_tpm.setObjectName("conf_qtable_tpm")
-        self.wgMain.conf_qtable_tpm.setColumnCount(2)
-        self.wgMain.conf_qtable_tpm.setRowCount(len(station.configuration['tiles']))
+        self.wgMain.qtable_tpm.clearSpans()
+        #self.wgMain.qtable_tpm.setGeometry(QtCore.QRect(20, 180, 511, 141))
+        self.wgMain.qtable_tpm.setObjectName("conf_qtable_tpm")
+        self.wgMain.qtable_tpm.setColumnCount(2)
+        self.wgMain.qtable_tpm.setRowCount(len(station.configuration['tiles']))
         for i in range(len(station.configuration['tiles'])):
-            self.wgMain.conf_qtable_tpm.setVerticalHeaderItem(i, QtWidgets.QTableWidgetItem("TPM-%02d" % (i + 1)))
+            self.wgMain.qtable_tpm.setVerticalHeaderItem(i, QtWidgets.QTableWidgetItem("TPM-%02d" % (i + 1)))
         item = QtWidgets.QTableWidgetItem("IP ADDR")
         item.setTextAlignment(QtCore.Qt.AlignCenter)
-        self.wgMain.conf_qtable_tpm.setHorizontalHeaderItem(0, item)
+        self.wgMain.qtable_tpm.setHorizontalHeaderItem(0, item)
         item = QtWidgets.QTableWidgetItem("DELAYS")
         item.setTextAlignment(QtCore.Qt.AlignCenter)
-        self.wgMain.conf_qtable_tpm.setHorizontalHeaderItem(1, item)
+        self.wgMain.qtable_tpm.setHorizontalHeaderItem(1, item)
         for n, i in enumerate(station.configuration['tiles']):
             item = QtWidgets.QTableWidgetItem(str(i))
             item.setTextAlignment(QtCore.Qt.AlignCenter)
             item.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.wgMain.conf_qtable_tpm.setItem(n, 0, item)
+            self.wgMain.qtable_tpm.setItem(n, 0, item)
         for n, i in enumerate(station.configuration['time_delays']):
             item = QtWidgets.QTableWidgetItem(str(i))
             item.setTextAlignment(QtCore.Qt.AlignCenter)
             item.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.wgMain.conf_qtable_tpm.setItem(n, 1, item)
-        self.wgMain.conf_qtable_tpm.horizontalHeader().setStretchLastSection(True)
-        self.wgMain.conf_qtable_tpm.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wgMain.conf_qtable_tpm.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wgMain.conf_qtable_tpm.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+            self.wgMain.qtable_tpm.setItem(n, 1, item)
+        self.wgMain.qtable_tpm.horizontalHeader().setStretchLastSection(True)
+        self.wgMain.qtable_tpm.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.wgMain.qtable_tpm.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.wgMain.qtable_tpm.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
 
         # TABLE NETWORK
-        self.wgMain.conf_qtable_network.clearSpans()
-        self.wgMain.conf_qtable_network.setGeometry(QtCore.QRect(600, 230, 511, 461))
-        self.wgMain.conf_qtable_network.setObjectName("conf_qtable_network")
-        self.wgMain.conf_qtable_network.setColumnCount(1)
+        self.wgMain.qtable_network.clearSpans()
+        #self.wgMain.qtable_network.setGeometry(QtCore.QRect(600, 230, 511, 481))
+        self.wgMain.qtable_network.setObjectName("conf_qtable_network")
+        self.wgMain.qtable_network.setColumnCount(1)
 
         total_rows = len(station.configuration['network'].keys()) * 2 - 1
         for i in station.configuration['network'].keys():
             total_rows += len(station.configuration['network'][i])
-        self.wgMain.conf_qtable_network.setRowCount(total_rows)
+        self.wgMain.qtable_network.setRowCount(total_rows)
         item = QtWidgets.QTableWidgetItem("VALUE")
         item.setTextAlignment(QtCore.Qt.AlignCenter)
         item.setFlags(QtCore.Qt.ItemIsEnabled)
-        self.wgMain.conf_qtable_network.setHorizontalHeaderItem(0, item)
+        self.wgMain.qtable_network.setHorizontalHeaderItem(0, item)
         n = 0
         for i in station.configuration['network'].keys():
             if n:
                 item = QtWidgets.QTableWidgetItem(" ")
                 item.setTextAlignment(QtCore.Qt.AlignCenter)
                 item.setFlags(QtCore.Qt.ItemIsEnabled)
-                self.wgMain.conf_qtable_network.setVerticalHeaderItem(n, item)
+                self.wgMain.qtable_network.setVerticalHeaderItem(n, item)
                 item = QtWidgets.QTableWidgetItem(" ")
                 item.setTextAlignment(QtCore.Qt.AlignCenter)
                 item.setFlags(QtCore.Qt.ItemIsEnabled)
-                self.wgMain.conf_qtable_network.setItem(n, 0, item)
+                self.wgMain.qtable_network.setItem(n, 0, item)
                 n = n + 1
-            self.wgMain.conf_qtable_network.setVerticalHeaderItem(n, QtWidgets.QTableWidgetItem(str(i).upper()))
+            self.wgMain.qtable_network.setVerticalHeaderItem(n, QtWidgets.QTableWidgetItem(str(i).upper()))
             item = QtWidgets.QTableWidgetItem(" ")
             item.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.wgMain.conf_qtable_network.setItem(n, 0, item)
+            self.wgMain.qtable_network.setItem(n, 0, item)
             n = n + 1
             for k in sorted(station.configuration['network'][i].keys()):
-                self.wgMain.conf_qtable_network.setVerticalHeaderItem(n, QtWidgets.QTableWidgetItem(str(k).upper()))
+                self.wgMain.qtable_network.setVerticalHeaderItem(n, QtWidgets.QTableWidgetItem(str(k).upper()))
                 if "MAC" in str(k).upper() and not str(station.configuration['network'][i][k]) == "None":
                     item = QtWidgets.QTableWidgetItem(hex(station.configuration['network'][i][k]).upper())
                 else:
                     item = QtWidgets.QTableWidgetItem(str(station.configuration['network'][i][k]))
                 item.setTextAlignment(QtCore.Qt.AlignLeft)
                 item.setFlags(QtCore.Qt.ItemIsEnabled)
-                self.wgMain.conf_qtable_network.setItem(n, 0, item)
+                self.wgMain.qtable_network.setItem(n, 0, item)
                 n = n + 1
-        self.wgMain.conf_qtable_network.horizontalHeader().setStretchLastSection(True)
-        self.wgMain.conf_qtable_network.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wgMain.conf_qtable_network.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wgMain.conf_qtable_network.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+        self.wgMain.qtable_network.horizontalHeader().setStretchLastSection(True)
+        self.wgMain.qtable_network.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.wgMain.qtable_network.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.wgMain.qtable_network.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
 
-    def browse_data_folder(self):
-        fd = QtWidgets.QFileDialog()
-        fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
-        options = fd.options()
-        self.folder = fd.getExistingDirectory(self, caption="Choose a data folder",
-                                              directory="/storage/daq/", options=options)
-        self.wgMain.play_qline_datapath.setText(self.folder)
-        self.check_dir()
-        self.calc_data_volume()
+    def make_profile(self, profile="Default", subrack="Default", live="Default", playback="Default", config=""):
+        conf = configparser.ConfigParser()
+        conf['App'] = {'subrack': subrack,
+                       'live': live,
+                       'playback': playback}
+        conf['Init'] = {'station_setup': config}
+        if not os.path.exists(default_app_dir):
+            os.makedirs(default_app_dir)
+        conf_path = default_app_dir + profile
+        if not os.path.exists(conf_path):
+            os.makedirs(conf_path)
+        conf_path = conf_path + "/skalab.ini"
+        with open(conf_path, 'w') as configfile:
+            conf.write(configfile)
 
-    # def check_tab_show(self, b, index):
-    #     if b.isChecked():
-    #         QtWidgets.QTabWidget.setTabVisible(self.wgMain.qtabMain, index, True)
-    #     else:
-    #         QtWidgets.QTabWidget.setTabVisible(self.wgMain.qtabMain, index, False)
-    #
-    def save_profile(self):
-        if os.path.exists(self.wgMain.conf_qline_profile.text()):
-            print("Not yet implemented. SAVE PROFILE IN: " + self.wgMain.conf_qline_profile.text())
+    def setAutoload(self, load_profile="Default"):
+        conf = configparser.ConfigParser()
+        conf['App'] = {'autoload_profile': load_profile}
+        if not os.path.exists(default_app_dir):
+            os.makedirs(default_app_dir)
+        conf_path = default_app_dir + "/skalab.ini"
+        with open(conf_path, 'w') as configfile:
+            conf.write(configfile)
+
+    # def browse_data_folder(self):
+    #     fd = QtWidgets.QFileDialog()
+    #     fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
+    #     options = fd.options()
+    #     self.folder = fd.getExistingDirectory(self, caption="Choose a data folder",
+    #                                           directory="/storage/daq/", options=options)
+    #     self.wgMain.play_qline_datapath.setText(self.folder)
+    #     self.check_dir()
+    #     self.calc_data_volume()
+
+    def save_profile(self, this_profile):
+        self.make_profile(profile=this_profile, subrack=self.wgSubrack.profile_name, live=self.wgLive.profile_name,
+                          playback=self.wgPlay.profile_name, config=self.config_file)
+        self.populate_table_profile()
+        self.load_profile(profile=this_profile)
 
     def save_as_profile(self):
-        fd = QtWidgets.QFileDialog()
-        fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
-        options = fd.options()
-        new_profile_file = fd.getSaveFileName(self, caption="Save to an existing file or to a new file name...",
-                                              directory="/opt/aavs/config/skalab_profiles/", options=options,
-                                              filter="*.ini")[0]
-        print("Not yet implemented. SAVE AS PROFILE IN: " + new_profile_file)
+        text, ok = QtWidgets.QInputDialog.getText(self, 'Profiles', 'Enter a Profile name:')
+        if ok:
+            self.save_profile(this_profile=text)
+            self.updateProfileCombo(current=text)
+            #self.load_profile(profile=text)
 
     def closeEvent(self, event):
-        result = QtWidgets.QMessageBox.question(self,
-                                                "Confirm Exit...",
-                                                "Are you sure you want to exit ?",
+        result = QtWidgets.QMessageBox.question(self, "Confirm Exit...", "Are you sure you want to exit ?",
                                                 QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
         event.ignore()
 
@@ -301,13 +444,21 @@ class SkaLab(QtWidgets.QMainWindow):
             event.accept()
             self.wgSubrack.stopThreads = True
 
-            if self.wgMain.conf_radio_autosave.isChecked():
-                print("Saved profile: ")
+            if self.wgMain.qradio_autosave.isChecked():
+                self.save_profile(this_profile=self.profile_name)
+
+            if self.wgMain.qradio_autoload.isChecked():
+                self.setAutoload(load_profile=self.profile_name)
             else:
-                print("Autosave profile disabled!")
+                self.setAutoload()
 
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
-    window = SkaLab("skalab_main.ui")
+    profile = "Default"
+    if os.path.exists(default_app_dir + "skalab.ini"):
+        autoload = parse_profile(default_app_dir + "skalab.ini")
+        if autoload.sections():
+            profile = autoload["App"]["autoload_profile"]
+    window = SkaLab("skalab_main.ui", profile=profile)
     sys.exit(app.exec_())

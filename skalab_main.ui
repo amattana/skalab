@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1211</width>
-    <height>960</height>
+    <height>971</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,10 +16,10 @@
   <widget class="QTabWidget" name="qtabMain">
    <property name="geometry">
     <rect>
-     <x>10</x>
-     <y>20</y>
+     <x>5</x>
+     <y>5</y>
      <width>1191</width>
-     <height>931</height>
+     <height>956</height>
     </rect>
    </property>
    <property name="tabPosition">
@@ -40,16 +40,16 @@
    <property name="tabBarAutoHide">
     <bool>false</bool>
    </property>
-   <widget class="QWidget" name="qtabMainConf">
+   <widget class="QWidget" name="qtabSkalab">
     <attribute name="title">
-     <string>Configurations</string>
+     <string>SkaLab</string>
     </attribute>
-    <widget class="QComboBox" name="conf_combo_profiles">
+    <widget class="QComboBox" name="qcombo_profiles">
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>60</y>
-       <width>321</width>
+       <y>230</y>
+       <width>201</width>
        <height>31</height>
       </rect>
      </property>
@@ -64,27 +64,27 @@
       </property>
      </item>
     </widget>
-    <widget class="QLabel" name="conf_qlabel_profiles">
+    <widget class="QLabel" name="qlabel_profiles">
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>20</y>
+       <y>180</y>
        <width>121</width>
        <height>31</height>
       </rect>
      </property>
      <property name="text">
-      <string>SKALAB Profiles</string>
+      <string>SkaLab Profiles</string>
      </property>
      <property name="alignment">
       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
      </property>
     </widget>
-    <widget class="QPushButton" name="conf_qbutton_profile_load">
+    <widget class="QPushButton" name="qbutton_profile_load">
      <property name="geometry">
       <rect>
-       <x>360</x>
-       <y>60</y>
+       <x>240</x>
+       <y>230</y>
        <width>111</width>
        <height>31</height>
       </rect>
@@ -93,72 +93,188 @@
       <string>Load</string>
      </property>
     </widget>
-    <widget class="QFrame" name="frame">
+    <widget class="QPushButton" name="qbutton_profile_delete">
+     <property name="geometry">
+      <rect>
+       <x>370</x>
+       <y>230</y>
+       <width>111</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Delete</string>
+     </property>
+    </widget>
+    <widget class="QCheckBox" name="qradio_autosave">
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>180</y>
-       <width>1141</width>
-       <height>711</height>
+       <y>280</y>
+       <width>151</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string> Autosave on Exit</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QCheckBox" name="qradio_autoload">
+     <property name="geometry">
+      <rect>
+       <x>230</x>
+       <y>280</y>
+       <width>221</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string> AutoLoad on Program Start</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="qline_profile">
+     <property name="geometry">
+      <rect>
+       <x>120</x>
+       <y>480</y>
+       <width>361</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>/opt/aavs/config/skalab_profiles/Default.ini</string>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="qbutton_profile_saveas">
+     <property name="geometry">
+      <rect>
+       <x>370</x>
+       <y>410</y>
+       <width>111</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Save As...</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="qbutton_profile_save">
+     <property name="geometry">
+      <rect>
+       <x>370</x>
+       <y>360</y>
+       <width>111</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Save</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="qlabel_profile">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>480</y>
+       <width>91</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Profile File:</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLabel" name="qlabel_profile_2">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>360</y>
+       <width>301</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Save changes in the current SkaLab Profile</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLabel" name="qlabel_profile_3">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>410</y>
+       <width>301</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Save current setup in a New SkaLab Profile</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QWidget" name="qwpics" native="true">
+     <property name="geometry">
+      <rect>
+       <x>70</x>
+       <y>10</y>
+       <width>372</width>
+       <height>156</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QFrame" name="frame_station">
+     <property name="geometry">
+      <rect>
+       <x>510</x>
+       <y>20</y>
+       <width>661</width>
+       <height>891</height>
       </rect>
      </property>
      <property name="frameShape">
       <enum>QFrame::Box</enum>
      </property>
      <property name="frameShadow">
-      <enum>QFrame::Plain</enum>
+      <enum>QFrame::Raised</enum>
      </property>
-     <property name="lineWidth">
-      <number>1</number>
-     </property>
-     <widget class="QLabel" name="conf_qlabel_bitfile">
+     <widget class="QLabel" name="qlabel_config">
       <property name="geometry">
        <rect>
         <x>20</x>
-        <y>130</y>
-        <width>891</width>
+        <y>20</y>
+        <width>101</width>
         <height>31</height>
        </rect>
       </property>
       <property name="text">
-       <string>BITFILE:  -</string>
+       <string>Station File</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
       </property>
      </widget>
-     <widget class="QPushButton" name="conf_qbutton_setup">
+     <widget class="QLineEdit" name="qline_configfile">
       <property name="geometry">
        <rect>
-        <x>800</x>
-        <y>70</y>
-        <width>111</width>
-        <height>31</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Setup</string>
-      </property>
-     </widget>
-     <widget class="QPushButton" name="conf_qbutton_browse">
-      <property name="geometry">
-       <rect>
-        <x>670</x>
-        <y>70</y>
-        <width>111</width>
-        <height>31</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Browse</string>
-      </property>
-     </widget>
-     <widget class="QLineEdit" name="conf_qline_configfile">
-      <property name="geometry">
-       <rect>
-        <x>220</x>
-        <y>70</y>
-        <width>431</width>
+        <x>110</x>
+        <y>20</y>
+        <width>271</width>
         <height>31</height>
        </rect>
       </property>
@@ -169,104 +285,66 @@
        <bool>true</bool>
       </property>
      </widget>
-     <widget class="QLabel" name="conf_qlabel_config">
+     <widget class="QPushButton" name="qbutton_load_configuration">
       <property name="geometry">
        <rect>
-        <x>20</x>
-        <y>70</y>
-        <width>181</width>
-        <height>31</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Station Configuration File</string>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
-      </property>
-     </widget>
-     <widget class="QLabel" name="conf_qlabel_profiles_2">
-      <property name="geometry">
-       <rect>
-        <x>20</x>
-        <y>20</y>
-        <width>101</width>
-        <height>31</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Profile File</string>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
-      </property>
-     </widget>
-     <widget class="QLineEdit" name="conf_qline_profile">
-      <property name="geometry">
-       <rect>
-        <x>220</x>
-        <y>20</y>
-        <width>431</width>
-        <height>31</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>/opt/aavs/config/skalab_profiles/Default.ini</string>
-      </property>
-      <property name="readOnly">
-       <bool>true</bool>
-      </property>
-     </widget>
-     <widget class="QPushButton" name="conf_qbutton_profile_save">
-      <property name="geometry">
-       <rect>
-        <x>670</x>
+        <x>530</x>
         <y>20</y>
         <width>111</width>
         <height>31</height>
        </rect>
       </property>
       <property name="text">
-       <string>Save</string>
+       <string>Load</string>
       </property>
      </widget>
-     <widget class="QLabel" name="conf_qlabel_tpms">
+     <widget class="QPushButton" name="qbutton_browse">
       <property name="geometry">
        <rect>
-        <x>20</x>
-        <y>410</y>
-        <width>171</width>
+        <x>400</x>
+        <y>20</y>
+        <width>111</width>
         <height>31</height>
        </rect>
       </property>
       <property name="text">
-       <string>TPMs  -  Delays</string>
+       <string>Browse</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="qbutton_station_init">
+      <property name="geometry">
+       <rect>
+        <x>530</x>
+        <y>70</y>
+        <width>111</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>INIT</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="qlabel_bitfile">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>70</y>
+        <width>481</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>BITFILE:  -</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
       </property>
      </widget>
-     <widget class="QLabel" name="conf_qlabel_network">
-      <property name="geometry">
-       <rect>
-        <x>600</x>
-        <y>190</y>
-        <width>171</width>
-        <height>31</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>NETWORK</string>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
-      </property>
-     </widget>
-     <widget class="QLabel" name="conf_qlabel_station">
+     <widget class="QLabel" name="qlabel_station">
       <property name="geometry">
        <rect>
         <x>20</x>
-        <y>190</y>
+        <y>140</y>
         <width>171</width>
         <height>31</height>
        </rect>
@@ -278,114 +356,13 @@
        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
       </property>
      </widget>
-     <widget class="QTableWidget" name="conf_qtable_station">
+     <widget class="QTableWidget" name="qtable_tpm">
       <property name="geometry">
        <rect>
         <x>20</x>
-        <y>230</y>
+        <y>390</y>
         <width>511</width>
-        <height>151</height>
-       </rect>
-      </property>
-      <property name="verticalScrollBarPolicy">
-       <enum>Qt::ScrollBarAlwaysOn</enum>
-      </property>
-      <attribute name="horizontalHeaderDefaultSectionSize">
-       <number>308</number>
-      </attribute>
-      <row>
-       <property name="text">
-        <string>id</string>
-       </property>
-      </row>
-      <row>
-       <property name="text">
-        <string>name</string>
-       </property>
-      </row>
-      <row>
-       <property name="text">
-        <string>number_of_antennas</string>
-       </property>
-      </row>
-      <row>
-       <property name="text">
-        <string>channel_truncation</string>
-       </property>
-      </row>
-      <row>
-       <property name="text">
-        <string>beam_integration_time</string>
-       </property>
-      </row>
-      <row>
-       <property name="text">
-        <string>channel_integration_time</string>
-       </property>
-      </row>
-      <row>
-       <property name="text">
-        <string>beamformer_scaling</string>
-       </property>
-      </row>
-      <row>
-       <property name="text">
-        <string>equalize_preadu</string>
-       </property>
-      </row>
-      <column>
-       <property name="text">
-        <string>VALUES</string>
-       </property>
-      </column>
-      <item row="0" column="0">
-       <property name="text">
-        <string> - </string>
-       </property>
-      </item>
-      <item row="1" column="0">
-       <property name="text">
-        <string> - </string>
-       </property>
-      </item>
-      <item row="2" column="0">
-       <property name="text">
-        <string> - </string>
-       </property>
-      </item>
-      <item row="3" column="0">
-       <property name="text">
-        <string> - </string>
-       </property>
-      </item>
-      <item row="4" column="0">
-       <property name="text">
-        <string> - </string>
-       </property>
-      </item>
-      <item row="5" column="0">
-       <property name="text">
-        <string> - </string>
-       </property>
-      </item>
-      <item row="6" column="0">
-       <property name="text">
-        <string> - </string>
-       </property>
-      </item>
-      <item row="7" column="0">
-       <property name="text">
-        <string> - </string>
-       </property>
-      </item>
-     </widget>
-     <widget class="QTableWidget" name="conf_qtable_tpm">
-      <property name="geometry">
-       <rect>
-        <x>20</x>
-        <y>450</y>
-        <width>511</width>
-        <height>241</height>
+        <height>141</height>
        </rect>
       </property>
       <property name="verticalScrollBarPolicy">
@@ -588,13 +565,146 @@
        </property>
       </item>
      </widget>
-     <widget class="QTableWidget" name="conf_qtable_network">
+     <widget class="QTableWidget" name="qtable_station">
       <property name="geometry">
        <rect>
-        <x>600</x>
-        <y>230</y>
+        <x>20</x>
+        <y>180</y>
         <width>511</width>
-        <height>461</height>
+        <height>151</height>
+       </rect>
+      </property>
+      <property name="verticalScrollBarPolicy">
+       <enum>Qt::ScrollBarAlwaysOn</enum>
+      </property>
+      <attribute name="horizontalHeaderDefaultSectionSize">
+       <number>308</number>
+      </attribute>
+      <row>
+       <property name="text">
+        <string>id</string>
+       </property>
+      </row>
+      <row>
+       <property name="text">
+        <string>name</string>
+       </property>
+      </row>
+      <row>
+       <property name="text">
+        <string>number_of_antennas</string>
+       </property>
+      </row>
+      <row>
+       <property name="text">
+        <string>channel_truncation</string>
+       </property>
+      </row>
+      <row>
+       <property name="text">
+        <string>beam_integration_time</string>
+       </property>
+      </row>
+      <row>
+       <property name="text">
+        <string>channel_integration_time</string>
+       </property>
+      </row>
+      <row>
+       <property name="text">
+        <string>beamformer_scaling</string>
+       </property>
+      </row>
+      <row>
+       <property name="text">
+        <string>equalize_preadu</string>
+       </property>
+      </row>
+      <column>
+       <property name="text">
+        <string>VALUES</string>
+       </property>
+      </column>
+      <item row="0" column="0">
+       <property name="text">
+        <string> - </string>
+       </property>
+      </item>
+      <item row="1" column="0">
+       <property name="text">
+        <string> - </string>
+       </property>
+      </item>
+      <item row="2" column="0">
+       <property name="text">
+        <string> - </string>
+       </property>
+      </item>
+      <item row="3" column="0">
+       <property name="text">
+        <string> - </string>
+       </property>
+      </item>
+      <item row="4" column="0">
+       <property name="text">
+        <string> - </string>
+       </property>
+      </item>
+      <item row="5" column="0">
+       <property name="text">
+        <string> - </string>
+       </property>
+      </item>
+      <item row="6" column="0">
+       <property name="text">
+        <string> - </string>
+       </property>
+      </item>
+      <item row="7" column="0">
+       <property name="text">
+        <string> - </string>
+       </property>
+      </item>
+     </widget>
+     <widget class="QLabel" name="qlabel_tpms">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>350</y>
+        <width>171</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>TPMs  -  Delays</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+      </property>
+     </widget>
+     <widget class="QLabel" name="qlabel_network">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>550</y>
+        <width>171</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>NETWORK</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+      </property>
+     </widget>
+     <widget class="QTableWidget" name="qtable_network">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>590</y>
+        <width>511</width>
+        <height>291</height>
        </rect>
       </property>
       <property name="verticalScrollBarPolicy">
@@ -750,67 +860,25 @@
        </property>
       </item>
      </widget>
-     <widget class="QPushButton" name="conf_qbutton_profile_saveas">
-      <property name="geometry">
-       <rect>
-        <x>800</x>
-        <y>20</y>
-        <width>111</width>
-        <height>31</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Save As...</string>
-      </property>
-     </widget>
     </widget>
-    <widget class="QPushButton" name="conf_qbutton_profile_load_2">
-     <property name="geometry">
-      <rect>
-       <x>480</x>
-       <y>60</y>
-       <width>111</width>
-       <height>31</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>Delete</string>
-     </property>
-    </widget>
-    <widget class="QCheckBox" name="conf_radio_autosave">
+    <widget class="QTableWidget" name="qtable_profile">
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>130</y>
-       <width>151</width>
-       <height>31</height>
+       <y>550</y>
+       <width>461</width>
+       <height>351</height>
       </rect>
      </property>
-     <property name="text">
-      <string> Autosave on Exit</string>
+     <property name="verticalScrollBarPolicy">
+      <enum>Qt::ScrollBarAlwaysOn</enum>
      </property>
-     <property name="checked">
-      <bool>true</bool>
-     </property>
-    </widget>
-    <widget class="QCheckBox" name="conf_radio_autoload">
-     <property name="geometry">
-      <rect>
-       <x>190</x>
-       <y>130</y>
-       <width>221</width>
-       <height>31</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string> AutoLoad on Program Start</string>
-     </property>
-     <property name="checked">
-      <bool>true</bool>
-     </property>
+     <attribute name="horizontalHeaderDefaultSectionSize">
+      <number>365</number>
+     </attribute>
     </widget>
    </widget>
-   <widget class="QWidget" name="qtabMainSubrack">
+   <widget class="QWidget" name="qtabSubrack">
     <attribute name="title">
      <string>SubRack</string>
     </attribute>
@@ -820,12 +888,12 @@
        <x>0</x>
        <y>0</y>
        <width>1191</width>
-       <height>901</height>
+       <height>936</height>
       </rect>
      </property>
     </widget>
    </widget>
-   <widget class="QWidget" name="qtabMainLive">
+   <widget class="QWidget" name="qtabLive">
     <attribute name="title">
      <string>Live Monitor</string>
     </attribute>
@@ -840,7 +908,7 @@
      </property>
     </widget>
    </widget>
-   <widget class="QWidget" name="qtabMainPlayback">
+   <widget class="QWidget" name="qtabPlayback">
     <attribute name="title">
      <string>Playback</string>
     </attribute>
@@ -874,11 +942,11 @@
      </property>
     </widget>
    </widget>
-   <widget class="QWidget" name="tab">
+   <widget class="QWidget" name="qtabHelp">
     <attribute name="title">
      <string>Help</string>
     </attribute>
-    <widget class="QLabel" name="label">
+    <widget class="QLabel" name="qlabel_user_manual">
      <property name="geometry">
       <rect>
        <x>30</x>

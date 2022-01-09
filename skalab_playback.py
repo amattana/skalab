@@ -64,13 +64,16 @@ def moving_average(xx, w):
 class Playback(QtWidgets.QMainWindow):
     """ Main UI Window class """
 
-    def __init__(self, config="", uiFile=""):
+    def __init__(self, config="", uiFile="", profile="Default"):
         """ Initialise main window """
         super(Playback, self).__init__()
         # Load window file
         self.wg = uic.loadUi(uiFile)
         self.setCentralWidget(self.wg)
         self.resize(1180, 910)
+
+        self.profile_name = profile
+        self.profile_file = ""
 
         # Populate the playback plots for the spectra, and power data
         self.miniPlots = MiniPlots(parent=self.wg.qplot_spectra, nplot=16)
@@ -99,7 +102,7 @@ class Playback(QtWidgets.QMainWindow):
         self.load_events()
 
         self.config_file = config
-        self.setup_config()
+        #self.setup_config()
 
         self.station_name = ""
         self.folder = ""
@@ -187,7 +190,7 @@ class Playback(QtWidgets.QMainWindow):
                 self.tiles += [i]
         else:
             msgBox = QtWidgets.QMessageBox()
-            msgBox.setText("Please SELECT a valid configuration file first...")
+            msgBox.setText("PLAYBACK: Please SELECT a valid configuration file first...")
             msgBox.setWindowTitle("Error!")
             msgBox.exec_()
 
