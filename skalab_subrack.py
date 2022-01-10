@@ -462,7 +462,7 @@ class Subrack(QtWidgets.QMainWindow):
                 sleep(0.2)
                 self.signalTlm.emit()
                 cycle = 0.0
-                while cycle < (int(self.config['Device']['Request_Interval']) - 1) and not self.skip:
+                while cycle < (int(self.config['Device']['query_interval']) - 1) and not self.skip:
                     sleep(0.5)
                     cycle = cycle + 0.5
                 self.skip = False
