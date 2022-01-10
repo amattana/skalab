@@ -416,21 +416,10 @@ class SkaLab(QtWidgets.QMainWindow):
         with open(conf_path, 'w') as configfile:
             conf.write(configfile)
 
-    # def browse_data_folder(self):
-    #     fd = QtWidgets.QFileDialog()
-    #     fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
-    #     options = fd.options()
-    #     self.folder = fd.getExistingDirectory(self, caption="Choose a data folder",
-    #                                           directory="/storage/daq/", options=options)
-    #     self.wgMain.play_qline_datapath.setText(self.folder)
-    #     self.check_dir()
-    #     self.calc_data_volume()
-
     def save_profile(self, this_profile, reload=True):
         self.make_profile(profile=this_profile, subrack=self.wgSubrack.profile_name, live=self.wgLive.profile_name,
                           playback=self.wgPlay.profile_name, config=self.config_file)
         if reload:
-            self.populate_table_profile()
             self.load_profile(profile=this_profile)
 
     def save_as_profile(self):
