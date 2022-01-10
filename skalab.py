@@ -309,7 +309,14 @@ class SkaLab(QtWidgets.QMainWindow):
             if not i == "bitfile":
                 self.wgMain.qtable_station.setVerticalHeaderItem(n, QtWidgets.QTableWidgetItem(i.upper()))
                 n = n + 1
-        self.wgMain.qtable_station.setHorizontalHeaderItem(0, QtWidgets.QTableWidgetItem("VALUES"))
+
+        item = QtWidgets.QTableWidgetItem()
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        item.setFont(font)
+        item.setText("SECTION: STATION")
+        self.wgMain.qtable_station.setHorizontalHeaderItem(0, item)
         __sortingEnabled = self.wgMain.qtable_station.isSortingEnabled()
         self.wgMain.qtable_station.setSortingEnabled(False)
         n = 0
@@ -333,9 +340,17 @@ class SkaLab(QtWidgets.QMainWindow):
         for i in range(len(station.configuration['tiles'])):
             self.wgMain.qtable_tpm.setVerticalHeaderItem(i, QtWidgets.QTableWidgetItem("TPM-%02d" % (i + 1)))
         item = QtWidgets.QTableWidgetItem("IP ADDR")
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        item.setFont(font)
         item.setTextAlignment(QtCore.Qt.AlignCenter)
         self.wgMain.qtable_tpm.setHorizontalHeaderItem(0, item)
         item = QtWidgets.QTableWidgetItem("DELAYS")
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        item.setFont(font)
         item.setTextAlignment(QtCore.Qt.AlignCenter)
         self.wgMain.qtable_tpm.setHorizontalHeaderItem(1, item)
         for n, i in enumerate(station.configuration['tiles']):
@@ -363,7 +378,11 @@ class SkaLab(QtWidgets.QMainWindow):
         for i in station.configuration['network'].keys():
             total_rows += len(station.configuration['network'][i])
         self.wgMain.qtable_network.setRowCount(total_rows)
-        item = QtWidgets.QTableWidgetItem("VALUES")
+        item = QtWidgets.QTableWidgetItem("SECTION: NETWORK")
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        item.setFont(font)
         item.setTextAlignment(QtCore.Qt.AlignCenter)
         item.setFlags(QtCore.Qt.ItemIsEnabled)
         self.wgMain.qtable_network.setHorizontalHeaderItem(0, item)
