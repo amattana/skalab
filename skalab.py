@@ -83,6 +83,7 @@ class SkaLab(QtWidgets.QMainWindow):
         self.load_profile(profile)
         self.updateProfileCombo(current=self.profile_name)
 
+        self.config_file = ""
         if self.profile_name:
             self.config_file = self.profile['Init']['station_setup']
             self.wgMain.qline_configfile.setText(self.config_file)
