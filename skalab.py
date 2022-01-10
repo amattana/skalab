@@ -141,7 +141,8 @@ class SkaLab(QtWidgets.QMainWindow):
         self.power = {}
         self.raw = {}
         self.rms = {}
-        self.setup_config()
+        if self.config_file:
+            self.setup_config()
 
     def load_events(self):
         self.wgMain.qbutton_browse.clicked.connect(lambda: self.browse_config())
