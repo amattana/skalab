@@ -204,7 +204,7 @@ class Subrack(QtWidgets.QMainWindow):
 
     def config_table(self, conf):
         self.wg.qtable_conf.clearSpans()
-        self.wg.qtable_conf.setGeometry(QtCore.QRect(20, 330, 591, 331))
+        self.wg.qtable_conf.setGeometry(QtCore.QRect(660, 20, 461, 291))
         self.wg.qtable_conf.setObjectName("qtable_conf")
         self.wg.qtable_conf.setColumnCount(1)
 
@@ -213,12 +213,16 @@ class Subrack(QtWidgets.QMainWindow):
             total_rows = total_rows + len(conf[i]) + 1
         self.wg.qtable_conf.setRowCount(total_rows + 2)
 
-        item = QtWidgets.QTableWidgetItem("VALUES")
+        item = QtWidgets.QTableWidgetItem("Profile: " + self.profile_name)
         item.setTextAlignment(QtCore.Qt.AlignCenter)
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        item.setFont(font)
         item.setFlags(QtCore.Qt.ItemIsEnabled)
         self.wg.qtable_conf.setHorizontalHeaderItem(0, item)
 
-        item = QtWidgets.QTableWidgetItem("[SECTIONS] / KEYS")
+        item = QtWidgets.QTableWidgetItem(" ")
         item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         item.setFlags(QtCore.Qt.ItemIsEnabled)
         self.wg.qtable_conf.setVerticalHeaderItem(0, item)
@@ -228,6 +232,10 @@ class Subrack(QtWidgets.QMainWindow):
             item = QtWidgets.QTableWidgetItem("[" + i + "]")
             item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
             item.setFlags(QtCore.Qt.ItemIsEnabled)
+            font = QtGui.QFont()
+            font.setBold(True)
+            font.setWeight(75)
+            item.setFont(font)
             self.wg.qtable_conf.setVerticalHeaderItem(q, item)
             q = q + 1
             for k in conf[i]:
@@ -276,6 +284,7 @@ class Subrack(QtWidgets.QMainWindow):
         self.wg.qline_profile_ip.setText(self.profile['Device']['ip'])
         self.wg.qline_profile_port.setText(self.profile['Device']['port'])
         self.wg.qline_profile_interval.setText(self.profile['Device']['query_interval'])
+        self.wg.qline_output_dir.setText(self.profile['App']['data_path'])
         self.config_table(self.profile)
         # Overriding Configuration File with parameters
         if eth_ip is not None:

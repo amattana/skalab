@@ -88,8 +88,8 @@ class SkaLab(QtWidgets.QMainWindow):
         self.tabPlayIndex = 3
 
         self.pic_ska = QtWidgets.QLabel(self.wgMain.qwpics)
-        self.pic_ska.setGeometry(1, 1, 370, 154)
-        self.pic_ska.setPixmap(QtGui.QPixmap(os.getcwd() + "/ska_inaf_logo.jpg"))
+        self.pic_ska.setGeometry(1, 1, 489, 120)
+        self.pic_ska.setPixmap(QtGui.QPixmap(os.getcwd() + "/ska_inaf_logo.png"))
 
         QtWidgets.QTabWidget.setTabVisible(self.wgMain.qtabMain, self.tabLiveIndex, True)
         self.wgLiveLayout = QtWidgets.QVBoxLayout()
@@ -136,6 +136,7 @@ class SkaLab(QtWidgets.QMainWindow):
         self.power = {}
         self.raw = {}
         self.rms = {}
+        self.setup_config()
 
     def load_events(self):
         self.wgMain.qbutton_browse.clicked.connect(lambda: self.browse_config())
@@ -210,7 +211,10 @@ class SkaLab(QtWidgets.QMainWindow):
             self.nof_tiles = len(station.configuration['tiles'])
             self.nof_antennas = int(station.configuration['station']['number_of_antennas'])
             self.bitfile = station.configuration['station']['bitfile']
-            self.wgMain.qlabel_bitfile.setText("BITFILE:   " + self.bitfile)
+            if len(self.bitfile) > 52:
+                self.wgMain.qlabel_bitfile.setText("..." + self.bitfile[-52:])
+            else:
+                self.wgMain.qlabel_bitfile.setText(self.bitfile)
             self.truncation = int(station.configuration['station']['channel_truncation'])
             self.populate_table_station()
             if not self.wgPlay == None:
@@ -352,7 +356,7 @@ class SkaLab(QtWidgets.QMainWindow):
         for i in station.configuration['network'].keys():
             total_rows += len(station.configuration['network'][i])
         self.wgMain.qtable_network.setRowCount(total_rows)
-        item = QtWidgets.QTableWidgetItem("VALUE")
+        item = QtWidgets.QTableWidgetItem("VALUES")
         item.setTextAlignment(QtCore.Qt.AlignCenter)
         item.setFlags(QtCore.Qt.ItemIsEnabled)
         self.wgMain.qtable_network.setHorizontalHeaderItem(0, item)
@@ -422,11 +426,12 @@ class SkaLab(QtWidgets.QMainWindow):
     #     self.check_dir()
     #     self.calc_data_volume()
 
-    def save_profile(self, this_profile):
+    def save_profile(self, this_profile, reload=True):
         self.make_profile(profile=this_profile, subrack=self.wgSubrack.profile_name, live=self.wgLive.profile_name,
                           playback=self.wgPlay.profile_name, config=self.config_file)
-        self.populate_table_profile()
-        self.load_profile(profile=this_profile)
+        if reload:
+            self.populate_table_profile()
+            self.load_profile(profile=this_profile)
 
     def save_as_profile(self):
         text, ok = QtWidgets.QInputDialog.getText(self, 'Profiles', 'Enter a Profile name:')
@@ -445,7 +450,7 @@ class SkaLab(QtWidgets.QMainWindow):
             self.wgSubrack.stopThreads = True
 
             if self.wgMain.qradio_autosave.isChecked():
-                self.save_profile(this_profile=self.profile_name)
+                self.save_profile(this_profile=self.profile_name, reload=False)
 
             if self.wgMain.qradio_autoload.isChecked():
                 self.setAutoload(load_profile=self.profile_name)
