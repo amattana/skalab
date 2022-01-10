@@ -147,28 +147,29 @@ class SkaLab(QtWidgets.QMainWindow):
         self.wgMain.qbutton_profile_delete.clicked.connect(lambda: self.delete_profile(self.wgMain.qcombo_profiles.currentText()))
 
     def load_profile(self, profile):
-        self.profile = []
-        fullpath = default_app_dir + profile + "/" + profile_filename
-        if os.path.exists(fullpath):
-            print("Loading Skalab Profile: " + profile + " (" + fullpath + ")")
-        else:
-            print("\nThe Skalab Profile does not exist.\nGenerating a new one in "
-                  + fullpath + "\n")
-            self.make_profile(profile=profile)
-        self.profile = parse_profile(fullpath)
-        self.profile_name = profile
-        self.profile_file = fullpath
-        self.wgMain.qline_profile.setText(fullpath)
+        if not profile == "":
+            self.profile = []
+            fullpath = default_app_dir + profile + "/" + profile_filename
+            if os.path.exists(fullpath):
+                print("Loading Skalab Profile: " + profile + " (" + fullpath + ")")
+            else:
+                print("\nThe Skalab Profile does not exist.\nGenerating a new one in "
+                      + fullpath + "\n")
+                self.make_profile(profile=profile)
+            self.profile = parse_profile(fullpath)
+            self.profile_name = profile
+            self.profile_file = fullpath
+            self.wgMain.qline_profile.setText(fullpath)
 
-        if not self.profile.sections():
-            msgBox = QtWidgets.QMessageBox()
-            msgBox.setText("Cannot find this profile!")
-            msgBox.setWindowTitle("Error!")
-            msgBox.exec_()
-        else:
-            self.config_file = self.profile['Init']['station_setup']
-            self.wgMain.qline_configfile.setText(self.config_file)
-            self.populate_table_profile()
+            if not self.profile.sections():
+                msgBox = QtWidgets.QMessageBox()
+                msgBox.setText("Cannot find this profile!")
+                msgBox.setWindowTitle("Error!")
+                msgBox.exec_()
+            else:
+                self.config_file = self.profile['Init']['station_setup']
+                self.wgMain.qline_configfile.setText(self.config_file)
+                self.populate_table_profile()
 
     def reload_profile(self, profile):
         self.load_profile(profile=profile)
@@ -407,7 +408,7 @@ class SkaLab(QtWidgets.QMainWindow):
         with open(conf_path, 'w') as configfile:
             conf.write(configfile)
 
-    def setAutoload(self, load_profile="Default"):
+    def setAutoload(self, load_profile=""):
         conf = configparser.ConfigParser()
         conf['App'] = {'autoload_profile': load_profile}
         if not os.path.exists(default_app_dir):
