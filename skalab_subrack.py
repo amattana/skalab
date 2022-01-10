@@ -113,7 +113,7 @@ class Subrack(QtWidgets.QMainWindow):
     # Signal for Slots
     signalTlm = QtCore.pyqtSignal()
 
-    def __init__(self, ip=None, port=None, uiFile="", profile="Default", size=[1190, 936]):
+    def __init__(self, ip=None, port=None, uiFile="", profile="", size=[1190, 936]):
         """ Initialise main window """
         super(Subrack, self).__init__()
         # Load window file
@@ -121,10 +121,11 @@ class Subrack(QtWidgets.QMainWindow):
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
 
-        self.profile = []
         self.profile_name = profile
-        self.profile_file = ""
-        self.load_profile(profile, ip, port)
+        if self.profile_name == "":
+            self.profile_name = "Default"
+        self.profile = []
+        self.load_profile(self.profile_name, ip, port)
 
         self.plotTpmPower = BarPlot(parent=self.wg.qplot_tpm_power, size=(4.95, 2.3), xlim=[0, 9], ylabel="Power (W)",
                                     xrotation=0, xlabel="TPM Voltages", ylim=[0, 140],
