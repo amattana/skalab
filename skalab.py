@@ -74,7 +74,9 @@ class SkaLab(QtWidgets.QMainWindow):
         self.setWindowTitle("SKALAB Tool")
 
         self.updateProfileCombo(profile)
-        self.profile = {'App': {'subrack': ""},
+        self.profile = {'App': {'subrack': "",
+                                'live': "",
+                                'playback': ""},
                         'Init': {'station_setup': ""}}
         self.profile_name = ""
         self.profile_file = ""
