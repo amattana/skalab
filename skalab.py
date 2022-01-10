@@ -74,14 +74,16 @@ class SkaLab(QtWidgets.QMainWindow):
         self.setWindowTitle("SKALAB Tool")
 
         self.updateProfileCombo(profile)
-        self.profile = []
+        self.profile = {'App': {'subrack': ""},
+                        'Init': {'station_setup': ""}}
         self.profile_name = ""
         self.profile_file = ""
         self.load_profile(profile)
         self.updateProfileCombo(current=self.profile_name)
 
-        self.config_file = self.profile['Init']['station_setup']
-        self.wgMain.qline_configfile.setText(self.config_file)
+        if self.profile_name:
+            self.config_file = self.profile['Init']['station_setup']
+            self.wgMain.qline_configfile.setText(self.config_file)
 
         self.tabSubrackIndex = 1
         self.tabLiveIndex = 2
