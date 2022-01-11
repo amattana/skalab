@@ -366,29 +366,39 @@ class Subrack(QtWidgets.QMainWindow):
         elif self.wg.qcombo_chart.currentIndex() == 1:
             # Chart: TPM Temperatures
             self.plotChartTpm.set_ylim([0, 100])
-            self.plotChartTpm.set_ylabel("TPM Temperatures (deg)")
-            if "tpm_temperatures" in self.data_charts.keys():
-                for i in range(8):
-                    self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures"][i::8], trace=i,
-                                                color=COLORI[i])
-                self.plotChartTpm.updatePlot()
-            else:
-                self.wg.qlabel_message.setText("WARNING: TPM Temperatures not yet available!!!")
+            self.plotChartTpm.set_ylabel("TPM Board Temperatures (deg)")
+            for i in range(8):
+                self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures_0"][i::8], trace=i, color=COLORI[i])
+            self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 2:
+            # Chart: TPM Temperatures
+            self.plotChartTpm.set_ylim([0, 100])
+            self.plotChartTpm.set_ylabel("TPM FPGA-0 Temperatures (deg)")
+            for i in range(8):
+                self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures_1"][i::8], trace=i, color=COLORI[i])
+            self.plotChartTpm.updatePlot()
+        elif self.wg.qcombo_chart.currentIndex() == 3:
+            # Chart: TPM Temperatures
+            self.plotChartTpm.set_ylim([0, 100])
+            self.plotChartTpm.set_ylabel("TPM FPGA-1 Temperatures (deg)")
+            for i in range(8):
+                self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures_2"][i::8], trace=i, color=COLORI[i])
+            self.plotChartTpm.updatePlot()
+        elif self.wg.qcombo_chart.currentIndex() == 4:
             # Chart: TPM Powers
             self.plotChartTpm.set_ylim([0, 140])
             self.plotChartTpm.set_ylabel("TPM Powers (W)")
             for i in range(8):
                 self.plotChartTpm.plotCurve(data=self.data_charts["tpm_powers"][i::8], trace=i, color=COLORI[i])
             self.plotChartTpm.updatePlot()
-        elif self.wg.qcombo_chart.currentIndex() == 3:
+        elif self.wg.qcombo_chart.currentIndex() == 5:
             # Chart: TPM Currents
             self.plotChartTpm.set_ylim([0, 12])
             self.plotChartTpm.set_ylabel("TPM Currents (A)")
             for i in range(8):
                 self.plotChartTpm.plotCurve(data=self.data_charts["tpm_currents"][i::8], trace=i, color=COLORI[i])
             self.plotChartTpm.updatePlot()
-        elif self.wg.qcombo_chart.currentIndex() == 4:
+        elif self.wg.qcombo_chart.currentIndex() == 6:
             # Chart: TPM Voltages
             self.plotChartTpm.set_ylim([0, 16])
             self.plotChartTpm.set_ylabel("TPM Voltages (V)")
@@ -480,9 +490,16 @@ class Subrack(QtWidgets.QMainWindow):
             if not att == "api_version":
                 try:
                     if type(attributes[att]) is list:
-                        if att not in self.data_charts.keys():
-                            self.data_charts[att] = np.zeros(len(attributes[att]) * 201) * np.nan
-                        self.data_charts[att] = np.append(self.data_charts[att][len(attributes[att]):], attributes[att])
+                        if type(attributes[att][0]) is list:
+                            for k in range(len(attributes[att])):
+                                nested_att = ("%s_%d" % (att, k))
+                                if nested_att not in self.data_charts.keys():
+                                    self.data_charts[nested_att] = np.zeros(len(attributes[att][k]) * 201) * np.nan
+                                self.data_charts[nested_att] = np.append(self.data_charts[nested_att][len(attributes[att][k]):], attributes[att][k])
+                        else:
+                            if att not in self.data_charts.keys():
+                                self.data_charts[att] = np.zeros(len(attributes[att]) * 201) * np.nan
+                            self.data_charts[att] = np.append(self.data_charts[att][len(attributes[att]):], attributes[att])
                     elif attributes[att] is not None:
                         if att not in self.data_charts.keys():
                             self.data_charts[att] = np.zeros(201) * np.nan

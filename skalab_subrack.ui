@@ -73,7 +73,17 @@
      </item>
      <item>
       <property name="text">
-       <string>TPM Temperatures</string>
+       <string>TPM Board Temperatures</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>TPM FPGA0 Temperatures</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>TPM FPGA1 Temperatures</string>
       </property>
      </item>
      <item>
