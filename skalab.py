@@ -73,7 +73,6 @@ class SkaLab(QtWidgets.QMainWindow):
         self.resize(1210, 970)
         self.setWindowTitle("SKALAB Tool")
 
-        self.updateProfileCombo(profile)
         self.profile = {'App': {'subrack': "",
                                 'live': "",
                                 'playback': ""},
@@ -474,11 +473,21 @@ class SkaLab(QtWidgets.QMainWindow):
 
 
 if __name__ == "__main__":
+    from optparse import OptionParser
+    from sys import argv, stdout
+
+    parser = OptionParser(usage="usage: %station_subrack [options]")
+    parser.add_option("--profile", action="store", dest="profile",
+                      type="str", default="Default", help="Skalab Profile to load")
+    (opt, args) = parser.parse_args(argv[1:])
+
     app = QtWidgets.QApplication(sys.argv)
-    profile = "Default"
     if os.path.exists(default_app_dir + "skalab.ini"):
         autoload = parse_profile(default_app_dir + "skalab.ini")
         if autoload.sections():
             profile = autoload["App"]["autoload_profile"]
+    else:
+        profile = opt.profile
+
     window = SkaLab("skalab_main.ui", profile=profile)
     sys.exit(app.exec_())

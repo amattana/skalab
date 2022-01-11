@@ -219,7 +219,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>10.0.10.48:8081</string>
+      <string>ip:port</string>
      </property>
     </widget>
     <widget class="QLabel" name="qlabel_ip">
@@ -989,7 +989,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>10.0.10.48</string>
+      <string/>
      </property>
      <property name="readOnly">
       <bool>false</bool>
@@ -1059,7 +1059,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>3</string>
+      <string/>
      </property>
      <property name="readOnly">
       <bool>false</bool>
@@ -1126,7 +1126,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>/storage</string>
+      <string/>
      </property>
      <property name="readOnly">
       <bool>false</bool>
