@@ -484,7 +484,11 @@ class Subrack(QtWidgets.QMainWindow):
             elif attributes[att] is not None:
                 if att not in self.data_charts.keys():
                     self.data_charts[att] = np.zeros(201) * np.nan
-                self.data_charts[att] = self.data_charts[att][1:] + [attributes[att]]
+                try:
+                    self.data_charts[att] = self.data_charts[att][1:] + [attributes[att]]
+                except:
+                    print("Exception raised for key: ", att,
+                          "  --> self.data_charts[att] = self.data_charts[att][1:] + [attributes[att]]")
         self.attributes = attributes
 
     def readTlm(self):
