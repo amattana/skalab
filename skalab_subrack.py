@@ -367,26 +367,26 @@ class Subrack(QtWidgets.QMainWindow):
             # Chart: TPM Temperatures
             self.plotChartTpm.set_ylim([0, 100])
             self.plotChartTpm.set_ylabel("TPM Board Temperatures (deg)")
-            for i in range(8):
-                try:
+            if "tpm_temperatures_0" in self.data_charts.keys():
+                for i in range(8):
                     self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures_0"][i::8], trace=i, color=COLORI[i])
-                except:
-                    print(self.data_charts.keys())
             self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 2:
             # Chart: TPM Temperatures
             self.plotChartTpm.set_ylim([0, 100])
             self.plotChartTpm.set_ylabel("TPM FPGA-0 Temperatures (deg)")
-            for i in range(8):
-                self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures_1"][i::8], trace=i, color=COLORI[i])
-            self.plotChartTpm.updatePlot()
+            if "tpm_temperatures_1" in self.data_charts.keys():
+                for i in range(8):
+                    self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures_1"][i::8], trace=i, color=COLORI[i])
+                self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 3:
             # Chart: TPM Temperatures
             self.plotChartTpm.set_ylim([0, 100])
             self.plotChartTpm.set_ylabel("TPM FPGA-1 Temperatures (deg)")
-            for i in range(8):
-                self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures_2"][i::8], trace=i, color=COLORI[i])
-            self.plotChartTpm.updatePlot()
+            if "tpm_temperatures_2" in self.data_charts.keys():
+                for i in range(8):
+                    self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures_2"][i::8], trace=i, color=COLORI[i])
+                self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 4:
             # Chart: TPM Powers
             self.plotChartTpm.set_ylim([0, 140])
@@ -461,6 +461,8 @@ class Subrack(QtWidgets.QMainWindow):
                     self.wg.frame_fan.setEnabled(True)
                     self.getTelemetry()
                     self.connected = True
+                    if 'api_version' in self.attributes.keys():
+                        self.wg.qlabel_message.setText("SubRack API version: " + self.attributes['api_version'])
                 else:
                     self.wg.qlabel_message.setText("The SubRack server does not respond!")
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
@@ -509,6 +511,7 @@ class Subrack(QtWidgets.QMainWindow):
                         self.data_charts[att] = self.data_charts[att][1:] + [attributes[att]]
                 except:
                     print("ERROR!!! ", self.subAttr)
+
         self.attributes = attributes
 
     def readTlm(self):
