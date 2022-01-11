@@ -493,24 +493,21 @@ class Subrack(QtWidgets.QMainWindow):
             pass
         for att in self.subAttr:
             if not att == "api_version":
-                try:
-                    if type(attributes[att]) is list:
-                        if type(attributes[att][0]) is list:
-                            for k in range(len(attributes[att])):
-                                nested_att = ("%s_%d" % (att, k))
-                                if nested_att not in self.data_charts.keys():
-                                    self.data_charts[nested_att] = np.zeros(len(attributes[att][k]) * 201) * np.nan
-                                self.data_charts[nested_att] = np.append(self.data_charts[nested_att][len(attributes[att][k]):], attributes[att][k])
-                        else:
-                            if att not in self.data_charts.keys():
-                                self.data_charts[att] = np.zeros(len(attributes[att]) * 201) * np.nan
-                            self.data_charts[att] = np.append(self.data_charts[att][len(attributes[att]):], attributes[att])
-                    elif attributes[att] is not None:
+                if type(attributes[att]) is list:
+                    if type(attributes[att][0]) is list:
+                        for k in range(len(attributes[att])):
+                            nested_att = ("%s_%d" % (att, k))
+                            if nested_att not in self.data_charts.keys():
+                                self.data_charts[nested_att] = np.zeros(len(attributes[att][k]) * 201) * np.nan
+                            self.data_charts[nested_att] = np.append(self.data_charts[nested_att][len(attributes[att][k]):], attributes[att][k])
+                    else:
                         if att not in self.data_charts.keys():
-                            self.data_charts[att] = np.zeros(201) * np.nan
-                        self.data_charts[att] = self.data_charts[att][1:] + [attributes[att]]
-                except:
-                    print("ERROR!!! ", self.subAttr)
+                            self.data_charts[att] = np.zeros(len(attributes[att]) * 201) * np.nan
+                        self.data_charts[att] = np.append(self.data_charts[att][len(attributes[att]):], attributes[att])
+                elif attributes[att] is not None:
+                    if att not in self.data_charts.keys():
+                        self.data_charts[att] = np.zeros(201) * np.nan
+                    self.data_charts[att] = self.data_charts[att][1:] + [attributes[att]]
 
         self.attributes = attributes
 
