@@ -368,7 +368,10 @@ class Subrack(QtWidgets.QMainWindow):
             self.plotChartTpm.set_ylim([0, 100])
             self.plotChartTpm.set_ylabel("TPM Board Temperatures (deg)")
             for i in range(8):
-                self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures_0"][i::8], trace=i, color=COLORI[i])
+                try:
+                    self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures_0"][i::8], trace=i, color=COLORI[i])
+                except:
+                    print(self.data_charts.keys())
             self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 2:
             # Chart: TPM Temperatures
