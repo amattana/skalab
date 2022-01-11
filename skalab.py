@@ -1,11 +1,19 @@
 #!/usr/bin/env python
+import gc
 import shutil
+import socket
 import sys
 import os
+import time
+from threading import Thread
+
 import numpy as np
 import configparser
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 from pyaavs import station
+from pyfabil import TPMGeneric
+from pyfabil.base.definitions import LibraryError, BoardError, PluginError, InstrumentError
+
 from skalab_live import Live
 from skalab_playback import Playback
 from skalab_subrack import Subrack
@@ -86,6 +94,11 @@ class SkaLab(QtWidgets.QMainWindow):
         if self.profile_name:
             self.config_file = self.profile['Init']['station_setup']
             self.wgMain.qline_configfile.setText(self.config_file)
+        self.tpm_station = None
+        self.doInit = False
+        self.stopThreads = False
+        self.processInit = Thread(target=self.do_station_init)
+        self.processInit.start()
 
         self.tabSubrackIndex = 1
         self.tabLiveIndex = 2
@@ -150,6 +163,7 @@ class SkaLab(QtWidgets.QMainWindow):
         self.wgMain.qbutton_profile_saveas.clicked.connect(lambda: self.save_as_profile())
         self.wgMain.qbutton_profile_load.clicked.connect(lambda: self.reload_profile(self.wgMain.qcombo_profiles.currentText()))
         self.wgMain.qbutton_profile_delete.clicked.connect(lambda: self.delete_profile(self.wgMain.qcombo_profiles.currentText()))
+        self.wgMain.qbutton_station_init.clicked.connect(lambda: self.station_init())
 
     def load_profile(self, profile):
         if not profile == "":
@@ -237,6 +251,60 @@ class SkaLab(QtWidgets.QMainWindow):
             msgBox.setText("SKALAB: Please SELECT a valid configuration file first...")
             msgBox.setWindowTitle("Error!")
             msgBox.exec_()
+
+    def station_init(self):
+        result = QtWidgets.QMessageBox.question(self, "Confirm Action -IP",
+                                                "Are you sure to Program and Init the Station?",
+                                                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        if result == QtWidgets.QMessageBox.Yes:
+            if self.config_file:
+                # Create station
+                station.load_configuration_file(self.config_file)
+                # Check wether the TPM are ON or OFF
+                station_on = True
+                for tpm_ip in station.configuration['tiles']:
+                    try:
+                        tpm = TPMGeneric()
+                        tpm_version = tpm.get_tpm_version(socket.gethostbyname(tpm_ip), 10000)
+                    except (BoardError, LibraryError):
+                        station_on = False
+                        break
+                if station_on:
+                    self.doInit = True
+                else:
+                    msgBox = QtWidgets.QMessageBox()
+                    msgBox.setText("STATION\nOne or more TPMs forming the station are OFF\nPlease check the power!")
+                    msgBox.setWindowTitle("ERROR: TPM POWERED OFF")
+                    msgBox.setIcon(QtWidgets.QMessageBox.Critical)
+                    msgBox.exec_()
+            else:
+                msgBox = QtWidgets.QMessageBox()
+                msgBox.setText("SKALAB: Please LOAD a configuration file first...")
+                msgBox.setWindowTitle("Error!")
+                msgBox.setIcon(QtWidgets.QMessageBox.Critical)
+                msgBox.exec_()
+
+    def do_station_init(self):
+        while True:
+            if self.doInit:
+                station.load_configuration_file(self.config_file)
+                station.configuration['station']['initialise'] = True
+                station.configuration['station']['program'] = True
+                self.tpm_station = station.Station(station.configuration)
+                self.wgMain.qbutton_station_init.setEnabled(False)
+                self.tpm_station.connect()
+                if self.tpm_station.properly_formed_station:
+                    self.wgMain.qbutton_station_init.setStyleSheet("background-color: rgb(78, 154, 6);")
+                else:
+                    self.wgMain.qbutton_station_init.setStyleSheet("background-color: rgb(204, 0, 0);")
+                self.wgMain.qbutton_station_init.setEnabled(True)
+                del self.tpm_station
+                gc.collect()
+                self.tpm_station = None
+                self.doInit = False
+            if self.stopThreads:
+                break
+            time.sleep(0.3)
 
     def populate_table_profile(self):
         #self.wgMain.qtable_profile = QtWidgets.QTableWidget(self.wgMain.qtabMain)
@@ -462,6 +530,7 @@ class SkaLab(QtWidgets.QMainWindow):
         if result == QtWidgets.QMessageBox.Yes:
             event.accept()
             self.wgSubrack.stopThreads = True
+            self.stopThreads = True
 
             if self.wgMain.qradio_autosave.isChecked():
                 self.save_profile(this_profile=self.profile_name, reload=False)
