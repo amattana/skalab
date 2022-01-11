@@ -477,18 +477,18 @@ class Subrack(QtWidgets.QMainWindow):
             print("Error reading Telemetry, skipping...")
             pass
         for att in self.subAttr:
-            if type(attributes[att]) is list:
-                if att not in self.data_charts.keys():
-                    self.data_charts[att] = np.zeros(len(attributes[att]) * 201) * np.nan
-                self.data_charts[att] = np.append(self.data_charts[att][len(attributes[att]):], attributes[att])
-            elif attributes[att] is not None:
-                if att not in self.data_charts.keys():
-                    self.data_charts[att] = np.zeros(201) * np.nan
+            if not att == "api_version":
                 try:
-                    self.data_charts[att] = self.data_charts[att][1:] + [attributes[att]]
+                    if type(attributes[att]) is list:
+                        if att not in self.data_charts.keys():
+                            self.data_charts[att] = np.zeros(len(attributes[att]) * 201) * np.nan
+                        self.data_charts[att] = np.append(self.data_charts[att][len(attributes[att]):], attributes[att])
+                    elif attributes[att] is not None:
+                        if att not in self.data_charts.keys():
+                            self.data_charts[att] = np.zeros(201) * np.nan
+                        self.data_charts[att] = self.data_charts[att][1:] + [attributes[att]]
                 except:
-                    print("Exception raised for key: ", att,
-                          "  --> self.data_charts[att] = self.data_charts[att][1:] + [attributes[att]]")
+                    print("ERROR!!! ", self.subAttr)
         self.attributes = attributes
 
     def readTlm(self):
