@@ -594,7 +594,7 @@ if __name__ == "__main__":
             else:
                 port = int(profile['Device']['port'])
             interval = int(profile['Device']['query_interval'])
-            if not opt.interval == int(profile['Device']['request_interval']):
+            if not opt.interval == int(profile['Device']['query_interval']):
                 interval = opt.interval
 
             connected = False
