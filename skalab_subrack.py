@@ -378,7 +378,7 @@ class Subrack(QtWidgets.QMainWindow):
             if "tpm_temperatures_1" in self.data_charts.keys():
                 for i in range(8):
                     self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures_1"][i::8], trace=i, color=COLORI[i])
-                self.plotChartTpm.updatePlot()
+            self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 3:
             # Chart: TPM Temperatures
             self.plotChartTpm.set_ylim([0, 100])
@@ -386,7 +386,7 @@ class Subrack(QtWidgets.QMainWindow):
             if "tpm_temperatures_2" in self.data_charts.keys():
                 for i in range(8):
                     self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures_2"][i::8], trace=i, color=COLORI[i])
-                self.plotChartTpm.updatePlot()
+            self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 4:
             # Chart: TPM Powers
             self.plotChartTpm.set_ylim([0, 140])
