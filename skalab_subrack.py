@@ -593,7 +593,7 @@ if __name__ == "__main__":
                 port = opt.port
             else:
                 port = int(profile['Device']['port'])
-            interval = int(profile['Device']['request_interval'])
+            interval = int(profile['Device']['query_interval'])
             if not opt.interval == int(profile['Device']['request_interval']):
                 interval = opt.interval
 
