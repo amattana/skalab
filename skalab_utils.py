@@ -77,7 +77,7 @@ class MiniCanvas(FigureCanvas):
 class MiniPlots(QtWidgets.QWidget):
     """ Class encapsulating a matplotlib plot"""
     def __init__(self, parent=None, nplot=16, dpi=100, xlabel="MHz", ylabel="dB", xlim=[0, 400],
-                 ylim=[-80, -20], size=(11.5, 6.8)):
+                 ylim=[-80, -20], size=(11.2, 6.8)):
         QtWidgets.QWidget.__init__(self, parent)
         """ Class initialiser """
         self.nplot = nplot
@@ -618,6 +618,9 @@ class BarPlot(QtWidgets.QWidget):
         self.xrotation = xrotation
         self.show()
         self.bars = self.canvas.ax.bar(np.arange(xlim[-1]-1) + 1, np.zeros(xlim[-1]-1), 0.8, color='b')
+
+    def set_xlabel(self, label):
+        self.canvas.ax.set_xlabel(label)
 
     def set_xticklabels(self, labels):
         self.canvas.ax.set_xlim([0, len(labels) + 1])

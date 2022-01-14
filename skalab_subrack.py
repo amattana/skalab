@@ -125,11 +125,12 @@ class Subrack(QtWidgets.QMainWindow):
         self.telemetry = {}
         self.query_once = []
         self.query_deny = []
-        self.query_tiles= []
+        self.query_tiles = []
         self.profile_name = profile
         if self.profile_name == "":
             self.profile_name = "Default"
         self.profile = {}
+        self.profile_file = ""
         self.load_profile(self.profile_name, ip, port)
 
         self.plotTpmPower = BarPlot(parent=self.wg.qplot_tpm_power, size=(4.95, 2.3), xlim=[0, 9], ylabel="Power (W)",
@@ -188,6 +189,7 @@ class Subrack(QtWidgets.QMainWindow):
         self.wg.qtable_conf.setGeometry(QtCore.QRect(660, 20, 461, 291))
         self.wg.qtable_conf.setObjectName("qtable_conf")
         self.wg.qtable_conf.setColumnCount(1)
+        self.wg.qtable_conf.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
 
         total_rows = 1
         for i in self.profile.sections():
@@ -234,10 +236,8 @@ class Subrack(QtWidgets.QMainWindow):
             item.setFlags(QtCore.Qt.ItemIsEnabled)
             self.wg.qtable_conf.setVerticalHeaderItem(q, item)
             q = q + 1
-
         self.wg.qtable_conf.horizontalHeader().setStretchLastSection(True)
-        self.wg.qtable_conf.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wg.qtable_conf.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        #self.wg.qtable_conf.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.wg.qtable_conf.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
 
     def load(self):
@@ -561,6 +561,7 @@ class Subrack(QtWidgets.QMainWindow):
 
     def getTelemetry(self):
         tkey = ""
+        telemetry = {}
         try:
             for tlmk in self.tlm_keys:
                 tkey = tlmk
@@ -568,34 +569,35 @@ class Subrack(QtWidgets.QMainWindow):
                     if self.connected:
                         data = self.client.get_attribute(tlmk)
                         if data["status"] == "OK":
-                            self.telemetry[tlmk] = data["value"]
+                            telemetry[tlmk] = data["value"]
         except:
             print("Error reading Telemetry [attribute: %s], skipping..." % tkey)
             return
-        for tlmk in self.telemetry.keys():
-            if not tlmk in self.query_deny:
-                if type(self.telemetry[tlmk]) is list:
-                    if type(self.telemetry[tlmk][0]) is list:
-                        for k in range(len(self.telemetry[tlmk])):
+        self.telemetry = dict(telemetry)
+        for tlmk in telemetry.keys():
+            if tlmk not in self.query_deny:
+                if type(telemetry[tlmk]) is list:
+                    if type(telemetry[tlmk][0]) is list:
+                        for k in range(len(telemetry[tlmk])):
                             nested_att = ("%s_%d" % (tlmk, k))
                             if nested_att not in self.data_charts.keys():
-                                self.data_charts[nested_att] = np.zeros(len(self.telemetry[tlmk][k]) * 201) * np.nan
+                                self.data_charts[nested_att] = np.zeros(len(telemetry[tlmk][k]) * 201) * np.nan
                             self.data_charts[nested_att] = \
-                                np.append(self.data_charts[nested_att][len(self.telemetry[tlmk][k]):],
-                                          self.telemetry[tlmk][k])
-                            self.telemetry["%s_%d" % (tlmk, k)] = list(self.telemetry[tlmk][k])
+                                np.append(self.data_charts[nested_att][len(telemetry[tlmk][k]):],
+                                          telemetry[tlmk][k])
+                            self.telemetry["%s_%d" % (tlmk, k)] = list(telemetry[tlmk][k])
                     else:
                         if tlmk not in self.data_charts.keys():
-                            self.data_charts[tlmk] = np.zeros(len(self.telemetry[tlmk]) * 201) * np.nan
-                        self.data_charts[tlmk] = np.append(self.data_charts[tlmk][len(self.telemetry[tlmk]):],
-                                                          self.telemetry[tlmk])
-                elif self.telemetry[tlmk] is not None:
+                            self.data_charts[tlmk] = np.zeros(len(telemetry[tlmk]) * 201) * np.nan
+                        self.data_charts[tlmk] = np.append(self.data_charts[tlmk][len(telemetry[tlmk]):],
+                                                          telemetry[tlmk])
+                elif telemetry[tlmk] is not None:
                     if tlmk not in self.data_charts.keys():
                         self.data_charts[tlmk] = np.zeros(201) * np.nan
                     try:
-                        self.data_charts[tlmk] = self.data_charts[tlmk][1:] + [self.telemetry[tlmk]]
+                        self.data_charts[tlmk] = self.data_charts[tlmk][1:] + [telemetry[tlmk]]
                     except:
-                        print("ERROR --> key:", tlmk, "\nValue: ", self.telemetry[tlmk])
+                        print("ERROR --> key:", tlmk, "\nValue: ", telemetry[tlmk])
                         pass
                 else:
                     if tlmk not in self.data_charts.keys():

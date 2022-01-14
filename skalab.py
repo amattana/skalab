@@ -110,7 +110,7 @@ class SkaLab(QtWidgets.QMainWindow):
 
         QtWidgets.QTabWidget.setTabVisible(self.wgMain.qtabMain, self.tabLiveIndex, True)
         self.wgLiveLayout = QtWidgets.QVBoxLayout()
-        self.wgLive = Live(self.config_file, "skalab_live.ui", profile=self.profile['App']['live'])
+        self.wgLive = Live(self.config_file, "skalab_live.ui", size=[1190, 936], profile=self.profile['App']['live'])
         self.wgLiveLayout.addWidget(self.wgLive)
         self.wgMain.qwLive.setLayout(self.wgLiveLayout)
 

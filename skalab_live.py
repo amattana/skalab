@@ -1,16 +1,25 @@
 #!/usr/bin/env python
+import os
 import sys
 import gc
 import threading
+from pathlib import Path
+
+import configparser
 import numpy as np
-from PyQt5 import QtWidgets, uic
+from PyQt5 import QtWidgets, uic, QtCore, QtGui
 from PyQt5.QtCore import Qt
 import pydaq.daq_receiver as daq
-from skalab_utils import MiniPlots, calcolaspettro, closest, MyDaq, get_if_name
+from skalab_utils import MiniPlots, calcolaspettro, closest, MyDaq, get_if_name, parse_profile
 from pyaavs.station import Station, load_station_configuration
 from pyaavs import station
 
 COLORI = ["b", "g"]
+
+default_app_dir = str(Path.home()) + "/.skalab/"
+default_profile = "Default"
+profile_filename = "live.ini"
+
 
 configuration = {'tiles': None,
                  'time_delays': None,
@@ -58,22 +67,27 @@ configuration = {'tiles': None,
 def moving_average(xx, w):
     return np.convolve(xx, np.ones(w), 'valid') / w
 
+
 class Live(QtWidgets.QMainWindow):
     """ Main UI Window class """
     # Signal for Slots
     #housekeeping_signal = QtCore.pyqtSignal()
     #antenna_test_signal = QtCore.pyqtSignal()
 
-    def __init__(self, config="", uiFile="", profile="Default"):
+    def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936]):
         """ Initialise main window """
         super(Live, self).__init__()
         # Load window file
         self.wg = uic.loadUi(uiFile)
         self.setCentralWidget(self.wg)
-        self.resize(1168, 901)
+        self.resize(size[0], size[1])
 
         self.profile_name = profile
+        if self.profile_name == "":
+            self.profile_name = "Default"
+        self.profile = {}
         self.profile_file = ""
+        self.load_profile(self.profile_name)
 
         # Populate the playback plots for the Live Spectra
         self.livePlots = MiniPlots(parent=self.wg.qplot_spectra, nplot=16)
@@ -109,6 +123,157 @@ class Live(QtWidgets.QMainWindow):
         self.wg.qbutton_single.clicked.connect(lambda: self.get_single_meas())
         self.wg.qcheck_spectra_grid.stateChanged.connect(self.live_show_spectra_grid)
 
+    def load_profile(self, profile):
+        self.profile = {}
+        fullpath = default_app_dir + profile + "/" + profile_filename
+        if os.path.exists(fullpath):
+            print("Loading Live Profile: " + profile + " (" + fullpath + ")")
+        else:
+            print("\nThe Live Profile does not exist.\nGenerating a new one in "
+                  + fullpath + "\n")
+            self.make_profile(profile=profile, prodict={})
+        self.profile = parse_profile(fullpath)
+        self.profile_name = profile
+        self.profile_file = fullpath
+        self.wg.qline_configuration_file.setText(self.profile_file)
+        self.wg.qline_profile_interval.setText(self.profile['App']['query_interval'])
+        self.wg.qline_output_dir.setText(self.profile['App']['data_path'])
+        # Overriding Configuration File with parameters
+        self.updateProfileCombo(current=profile)
+        self.populate_table_profile()
+
+    def populate_table_profile(self):
+        self.wg.qtable_conf.clearSpans()
+        self.wg.qtable_conf.setGeometry(QtCore.QRect(660, 20, 461, 291))
+        self.wg.qtable_conf.setObjectName("qtable_conf")
+        self.wg.qtable_conf.setColumnCount(1)
+        self.wg.qtable_conf.setWordWrap(True)
+
+        total_rows = 1
+        for i in self.profile.sections():
+            total_rows = total_rows + len(self.profile[i]) + 1
+        self.wg.qtable_conf.setRowCount(total_rows + 2)
+
+        item = QtWidgets.QTableWidgetItem("Profile: " + self.profile_name)
+        item.setTextAlignment(QtCore.Qt.AlignCenter)
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        item.setFont(font)
+        item.setFlags(QtCore.Qt.ItemIsEnabled)
+        self.wg.qtable_conf.setHorizontalHeaderItem(0, item)
+
+        item = QtWidgets.QTableWidgetItem(" ")
+        item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        item.setFlags(QtCore.Qt.ItemIsEnabled)
+        self.wg.qtable_conf.setVerticalHeaderItem(0, item)
+
+        q = 1
+        for i in self.profile.sections():
+            item = QtWidgets.QTableWidgetItem("[" + i + "]")
+            item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+            item.setFlags(QtCore.Qt.ItemIsEnabled)
+            font = QtGui.QFont()
+            font.setBold(True)
+            font.setWeight(75)
+            item.setFont(font)
+            self.wg.qtable_conf.setVerticalHeaderItem(q, item)
+            q = q + 1
+            for k in self.profile[i]:
+                item = QtWidgets.QTableWidgetItem(k)
+                item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+                item.setFlags(QtCore.Qt.ItemIsEnabled)
+                self.wg.qtable_conf.setVerticalHeaderItem(q, item)
+                item = QtWidgets.QTableWidgetItem(self.profile[i][k])
+                item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+                item.setFlags(QtCore.Qt.ItemIsEnabled)
+                self.wg.qtable_conf.setItem(q, 0, item)
+                q = q + 1
+            item = QtWidgets.QTableWidgetItem(" ")
+            item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+            item.setFlags(QtCore.Qt.ItemIsEnabled)
+            self.wg.qtable_conf.setVerticalHeaderItem(q, item)
+            q = q + 1
+
+        self.wg.qtable_conf.horizontalHeader().setStretchLastSection(True)
+        self.wg.qtable_conf.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.wg.qtable_conf.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.wg.qtable_conf.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+
+    def make_profile(self, profile: str, prodict: dict):
+        conf = configparser.ConfigParser()
+        conf['App'] = {}
+        if 'App' in prodict.keys() and 'station_config' in prodict['App'].keys():
+            conf['App']['station_config'] = prodict['App']['station_config']
+        else:
+            conf['App']['station_config'] = ""
+        if 'App' in prodict.keys() and 'data_path' in prodict['App'].keys():
+            conf['App']['data_path'] = prodict['App']['data_path']
+        else:
+            conf['App']['data_path'] = ""
+        if 'App' in prodict.keys() and 'query_interval' in prodict['App'].keys():
+            conf['App']['query_interval'] = prodict['App']['query_interval']
+        else:
+            conf['App']['query_interval'] = "3"
+        conf['Spectra'] = {}
+        if 'Spectra' in prodict.keys() and 'qline_rbw' in prodict['Spectra'].keys():
+            conf['Spectra']['qline_rbw'] = prodict['Spectra']['qline_rbw']
+        else:
+            conf['Spectra']['qline_rbw'] = "1000"
+        if 'Spectra' in prodict.keys() and 'qline_spectra_level_min' in prodict['Spectra'].keys():
+            conf['Spectra']['qline_spectra_level_min'] = prodict['Spectra']['qline_spectra_level_min']
+        else:
+            conf['Spectra']['qline_spectra_level_min'] = "-100"
+        if 'Spectra' in prodict.keys() and 'qline_spectra_level_max' in prodict['Spectra'].keys():
+            conf['Spectra']['qline_spectra_level_max'] = prodict['Spectra']['qline_spectra_level_max']
+        else:
+            conf['Spectra']['qline_spectra_level_max'] = "0"
+        if 'Spectra' in prodict.keys() and 'qline_spectra_band_from' in prodict['Spectra'].keys():
+            conf['Spectra']['qline_spectra_band_from'] = prodict['Spectra']['qline_spectra_band_from']
+        else:
+            conf['Spectra']['qline_spectra_band_from'] = "1"
+        if 'Spectra' in prodict.keys() and 'qline_spectra_band_to' in prodict['Spectra'].keys():
+            conf['Spectra']['qline_spectra_band_to'] = prodict['Spectra']['qline_spectra_band_to']
+        else:
+            conf['Spectra']['qline_spectra_band_to'] = "400"
+        if 'Spectra' in prodict.keys() and 'qcheck_spectra_grid' in prodict['Spectra'].keys():
+            conf['Spectra']['qcheck_spectra_grid'] = prodict['Spectra']['qcheck_spectra_grid']
+        else:
+            conf['Spectra']['qcheck_spectra_grid'] = "True"
+        if 'Spectra' in prodict.keys() and 'qcheck_spectra_noline' in prodict['Spectra'].keys():
+            conf['Spectra']['qcheck_spectra_noline'] = prodict['Spectra']['qcheck_spectra_noline']
+        else:
+            conf['Spectra']['qcheck_spectra_noline'] = "False"
+        if 'Spectra' in prodict.keys() and 'qcheck_xpol_sp' in prodict['Spectra'].keys():
+            conf['Spectra']['qcheck_xpol_sp'] = prodict['Spectra']['qcheck_xpol_sp']
+        else:
+            conf['Spectra']['qcheck_xpol_sp'] = "True"
+        if 'Spectra' in prodict.keys() and 'qcheck_ypol_sp' in prodict['Spectra'].keys():
+            conf['Spectra']['qcheck_ypol_sp'] = prodict['Spectra']['qcheck_ypol_sp']
+        else:
+            conf['Spectra']['qcheck_ypol_sp'] = "True"
+
+        if not os.path.exists(default_app_dir):
+            os.makedirs(default_app_dir)
+        conf_path = default_app_dir + profile
+        if not os.path.exists(conf_path):
+            os.makedirs(conf_path)
+        conf_path = conf_path + "/" + profile_filename
+        with open(conf_path, 'w') as configfile:
+            conf.write(configfile)
+
+    def updateProfileCombo(self, current):
+        profiles = []
+        for d in os.listdir(default_app_dir):
+            if os.path.exists(default_app_dir + "/" + d + "/live.ini"):
+                profiles += [d]
+        if profiles:
+            self.wg.qcombo_profile.clear()
+            for n, p in enumerate(profiles):
+                self.wg.qcombo_profile.addItem(p)
+                if current == p:
+                    self.wg.qcombo_profile.setCurrentIndex(n)
+
     def station_connect(self):
         # Set current thread name
         threading.currentThread().name = "Station"
@@ -123,13 +288,13 @@ class Live(QtWidgets.QMainWindow):
             # Connect station (program, initialise and configure if required)
             self.tpm_station.connect()
             self.tpm_station.tiles[0].get_temperature()
-            self.wg.qlabel_connection.setText("Connected")
+            #self.wg.qlabel_connection.setText("Connected")
             self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")
             self.wg.qbutton_connect.setText("ONLINE")
             self.station_connected = True
 
         except:
-            self.wg.qlabel_connection.setText("ERROR: Unable to connect to the TPMs Station. Retry...")
+            #self.wg.qlabel_connection.setText("ERROR: Unable to connect to the TPMs Station. Retry...")
             self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
             self.wg.qbutton_connect.setText("OFFLINE")
             self.station_connected = False
@@ -152,7 +317,8 @@ class Live(QtWidgets.QMainWindow):
 
         self.tpm_nic_name = get_if_name(self.station_configuration['network']['lmc']['lmc_ip'])
         if self.tpm_nic_name == "":
-            self.wg.qlabel_connection.setText("Connected. (ETH Card name ERROR)")
+            #self.wg.qlabel_connection.setText("Connected. (ETH Card name ERROR)")
+            print("Connected. (ETH Card name ERROR)")
         if not self.tpm_nic_name == "":
             self.mydaq = MyDaq(daq, self.tpm_nic_name, self.tpm_station, len(self.station_configuration['tiles']))
         self.live_data = self.mydaq.execute()
