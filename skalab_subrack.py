@@ -121,10 +121,15 @@ class Subrack(QtWidgets.QMainWindow):
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
 
+        self.tlm_keys = []
+        self.telemetry = {}
+        self.query_once = []
+        self.query_deny = []
+        self.query_tiles= []
         self.profile_name = profile
         if self.profile_name == "":
             self.profile_name = "Default"
-        self.profile = []
+        self.profile = {}
         self.load_profile(self.profile_name, ip, port)
 
         self.plotTpmPower = BarPlot(parent=self.wg.qplot_tpm_power, size=(4.95, 2.3), xlim=[0, 9], ylabel="Power (W)",
@@ -151,8 +156,6 @@ class Subrack(QtWidgets.QMainWindow):
 
         self.connected = False
         self.client = None
-        self.subAttr = []
-        self.attributes = {}
         self.qbutton_tpm = populateSlots(self.wg.frame_tpm)
         self.fans = populateFans(self.wg.frame_fan)
         self.data_charts = {}
@@ -173,6 +176,7 @@ class Subrack(QtWidgets.QMainWindow):
         self.wg.qbutton_tpm_on.clicked.connect(lambda: self.switchTpmsOn())
         self.wg.qbutton_tpm_off.clicked.connect(lambda: self.switchTpmsOff())
         self.wg.qcombo_chart.currentIndexChanged.connect(lambda: self.switchChart())
+        self.wg.qbutton_clear_chart.clicked.connect(lambda: self.clearChart())
         self.wg.qbutton_load.clicked.connect(lambda: self.load())
         self.wg.qbutton_browse.clicked.connect(lambda: self.browse_outdir())
         self.wg.qbutton_saveas.clicked.connect(lambda: self.save_as_profile())
@@ -185,7 +189,7 @@ class Subrack(QtWidgets.QMainWindow):
         self.wg.qtable_conf.setObjectName("qtable_conf")
         self.wg.qtable_conf.setColumnCount(1)
 
-        total_rows = 0
+        total_rows = 1
         for i in self.profile.sections():
             total_rows = total_rows + len(self.profile[i]) + 1
         self.wg.qtable_conf.setRowCount(total_rows + 2)
@@ -246,7 +250,7 @@ class Subrack(QtWidgets.QMainWindow):
             msgBox.exec_()
 
     def load_profile(self, profile, eth_ip=None, eth_port=None):
-        self.profile = []
+        self.profile = {}
         fullpath = default_app_dir + profile + "/" + profile_filename
         if os.path.exists(fullpath):
             print("Loading SubRack Profile: " + profile + " (" + fullpath + ")")
@@ -257,6 +261,15 @@ class Subrack(QtWidgets.QMainWindow):
         self.profile = parse_profile(fullpath)
         self.profile_name = profile
         self.profile_file = fullpath
+        if 'Query' in self.profile.sections():
+            if 'once' in self.profile['Query'].keys():
+                self.query_once = list(self.profile['Query']['once'].split(","))
+        if 'Query' in self.profile.sections():
+            if 'deny' in self.profile['Query'].keys():
+                self.query_deny = list(self.profile['Query']['deny'].split(","))
+        if 'Query' in self.profile.sections():
+            if 'deny' in self.profile['Query'].keys():
+                self.query_tiles = list(self.profile['Query']['tiles'].split(","))
         self.wg.qline_configuration_file.setText(self.profile_file)
         self.wg.qline_profile_ip.setText(self.profile['Device']['ip'])
         self.wg.qline_profile_port.setText(self.profile['Device']['port'])
@@ -326,6 +339,20 @@ class Subrack(QtWidgets.QMainWindow):
             conf['Device']['query_interval'] = prodict['Device']['query_interval']
         else:
             conf['Device']['query_interval'] = "3"
+        conf['Query'] = {}
+        if 'Query' in prodict.keys() and 'once' in prodict['Query'].keys():
+            conf['Query']['once'] = prodict['Query']['once']
+        else:
+            conf['Query']['once'] = "api_version,assigned_tpm_ip_adds"
+        if 'Query' in prodict.keys() and 'deny' in prodict['Query'].keys():
+            conf['Query']['deny'] = prodict['Query']['deny']
+        else:
+            conf['Query']['deny'] = "api_version,tpm_ips,tpm_mcu_temperatures,assigned_tpm_ip_adds," + \
+                                    "tpms_temp_alarms,tpms_voltage_alarms,tpms_temperatures"
+        if 'Query' in prodict.keys() and 'deny' in prodict['Query'].keys():
+            conf['Query']['tiles'] = prodict['Query']['tiles']
+        else:
+            conf['Query']['tiles'] = "api_version,tpm_ips,assigned_tpm_ip_adds"
         if not os.path.exists(default_app_dir):
             os.makedirs(default_app_dir)
         conf_path = default_app_dir + profile
@@ -355,84 +382,126 @@ class Subrack(QtWidgets.QMainWindow):
         self.drawCharts()
 
     def drawCharts(self):
+        self.plotChartMgn.set_xlabel("time sample")
+        self.plotChartTpm.set_xlabel("time sample")
         # Draw selected chart
         if self.wg.qcombo_chart.currentIndex() == 0:
             # Chart: Subrack Temperatures
             self.plotChartMgn.set_ylim([0, 60])
-            for n, k in enumerate(MgnTraces):
-                self.plotChartMgn.plotCurve(data=self.data_charts[k][0::2], trace=(0 + n * 2), color=COLORI[(0 + n * 2)])
-                self.plotChartMgn.plotCurve(data=self.data_charts[k][1::2], trace=(1 + n * 2), color=COLORI[(1 + n * 2)])
+            if MgnTraces[0] in self.data_charts.keys():
+                for n, k in enumerate(MgnTraces):
+                    self.plotChartMgn.plotCurve(data=self.data_charts[k][0::2], trace=(0 + n * 2), color=COLORI[(0 + n * 2)])
+                    self.plotChartMgn.plotCurve(data=self.data_charts[k][1::2], trace=(1 + n * 2), color=COLORI[(1 + n * 2)])
+            else:
+                self.plotChartMgn.set_xlabel("Subrack '" + MgnTraces[0] + "' and '" + MgnTraces[1] + "' not yet available.")
             self.plotChartMgn.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 1:
             # Chart: TPM Temperatures
             self.plotChartTpm.set_ylim([0, 100])
             self.plotChartTpm.set_ylabel("TPM Board Temperatures (deg)")
-            if "tpm_temperatures_0" in self.data_charts.keys():
+            if "tpms_temperatures_0" in self.data_charts.keys():
                 for i in range(8):
-                    self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures_0"][i::8], trace=i, color=COLORI[i])
+                    self.plotChartTpm.plotCurve(data=self.data_charts["tpms_temperatures_0"][i::8], trace=i, color=COLORI[i])
+            else:
+                self.plotChartTpm.set_xlabel("Subrack 'tpms_temperatures_0' not yet available.")
             self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 2:
             # Chart: TPM Temperatures
             self.plotChartTpm.set_ylim([0, 100])
             self.plotChartTpm.set_ylabel("TPM FPGA-0 Temperatures (deg)")
-            if "tpm_temperatures_1" in self.data_charts.keys():
+            if "tpms_temperatures_1" in self.data_charts.keys():
                 for i in range(8):
-                    self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures_1"][i::8], trace=i, color=COLORI[i])
+                    self.plotChartTpm.plotCurve(data=self.data_charts["tpms_temperatures_1"][i::8], trace=i, color=COLORI[i])
+            else:
+                self.plotChartTpm.set_xlabel("Subrack 'tpms_temperatures_1' not yet available.")
             self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 3:
             # Chart: TPM Temperatures
             self.plotChartTpm.set_ylim([0, 100])
             self.plotChartTpm.set_ylabel("TPM FPGA-1 Temperatures (deg)")
-            if "tpm_temperatures_2" in self.data_charts.keys():
+            if "tpms_temperatures_2" in self.data_charts.keys():
                 for i in range(8):
-                    self.plotChartTpm.plotCurve(data=self.data_charts["tpm_temperatures_2"][i::8], trace=i, color=COLORI[i])
+                    self.plotChartTpm.plotCurve(data=self.data_charts["tpms_temperatures_2"][i::8], trace=i, color=COLORI[i])
+            else:
+                self.plotChartTpm.set_xlabel("Subrack 'tpms_temperatures_2' not yet available.")
             self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 4:
             # Chart: TPM Powers
             self.plotChartTpm.set_ylim([0, 140])
             self.plotChartTpm.set_ylabel("TPM Powers (W)")
-            for i in range(8):
-                self.plotChartTpm.plotCurve(data=self.data_charts["tpm_powers"][i::8], trace=i, color=COLORI[i])
+            if "tpm_powers" in self.data_charts.keys():
+                for i in range(8):
+                    self.plotChartTpm.plotCurve(data=self.data_charts["tpm_powers"][i::8], trace=i, color=COLORI[i])
+            else:
+                self.plotChartTpm.set_xlabel("Subrack 'tpm_powers' not yet available.")
             self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 5:
             # Chart: TPM Currents
             self.plotChartTpm.set_ylim([0, 12])
             self.plotChartTpm.set_ylabel("TPM Currents (A)")
-            for i in range(8):
-                self.plotChartTpm.plotCurve(data=self.data_charts["tpm_currents"][i::8], trace=i, color=COLORI[i])
+            if "tpm_currents" in self.data_charts.keys():
+                for i in range(8):
+                    self.plotChartTpm.plotCurve(data=self.data_charts["tpm_currents"][i::8], trace=i, color=COLORI[i])
+            else:
+                self.plotChartTpm.set_xlabel("Subrack 'tpm_currents' not yet available.")
             self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 6:
             # Chart: TPM Voltages
             self.plotChartTpm.set_ylim([0, 16])
             self.plotChartTpm.set_ylabel("TPM Voltages (V)")
-            for i in range(8):
-                self.plotChartTpm.plotCurve(data=self.data_charts["tpm_voltages"][i::8], trace=i, color=COLORI[i])
+            if "tpm_voltages" in self.data_charts.keys():
+                for i in range(8):
+                    self.plotChartTpm.plotCurve(data=self.data_charts["tpm_voltages"][i::8], trace=i, color=COLORI[i])
+            else:
+                self.plotChartTpm.set_xlabel("Subrack 'tpm_voltages' not yet available.")
             self.plotChartTpm.updatePlot()
+
+    def clearChart(self):
+        del self.data_charts
+        gc.collect()
+        self.data_charts = {}
 
     def drawBars(self):
         # Draw Bars
-        for i in range(8):
-            self.plotTpmPower.plotBar(data=self.attributes["tpm_powers"][i], bar=i, color=COLORI[i])
-        self.plotTpmPower.set_xticklabels(labels=["%3.1f" % x for x in self.attributes["tpm_voltages"]])
+        if "tpm_powers" and "tpm_voltages" in self.telemetry.keys():
+            self.plotTpmPower.set_xlabel("TPM Voltages")
+            for i in range(8):
+                self.plotTpmPower.plotBar(data=self.telemetry["tpm_powers"][i], bar=i, color=COLORI[i])
+            self.plotTpmPower.set_xticklabels(labels=["%3.1f" % x for x in self.telemetry["tpm_voltages"]])
+        else:
+            self.plotTpmPower.set_xlabel("No data available")
         self.plotTpmPower.updatePlot()
-        for i in range(2):
-            self.plotPsu.plotBar(data=self.attributes["power_supply_powers"][i], bar=i, color=COLORI[i])
+        if "power_supply_powers" in self.telemetry.keys():
+            self.plotPsu.set_xlabel("PSU")
+            for i in range(2):
+                self.plotPsu.plotBar(data=self.telemetry["power_supply_powers"][i], bar=i, color=COLORI[i])
+        else:
+            self.plotPsu.set_xlabel("No data available")
         self.plotPsu.updatePlot()
-        for n, k in enumerate(MgnTraces):
-            self.plotMgnTemp.plotBar(data=self.attributes[k][0], bar=(n * 2), color=COLORI[(n * 2)])
-            self.plotMgnTemp.plotBar(data=self.attributes[k][1], bar=(1 + n * 2), color=COLORI[(1 + n * 2)])
+        if MgnTraces[0] and MgnTraces[1] in self.telemetry.keys():
+            self.plotMgnTemp.set_xlabel("SubRack Temperatures")
+            for n, k in enumerate(MgnTraces):
+                self.plotMgnTemp.plotBar(data=self.telemetry[k][0], bar=(n * 2), color=COLORI[(n * 2)])
+                self.plotMgnTemp.plotBar(data=self.telemetry[k][1], bar=(1 + n * 2), color=COLORI[(1 + n * 2)])
+        else:
+            self.plotMgnTemp.set_xlabel("No data available")
         self.plotMgnTemp.updatePlot()
+        if "tpms_temperatures_0" in self.telemetry.keys():
+            self.plotTpmTemp.set_xlabel("TPM Board Temperatures")
+            for i in range(8):
+                self.plotTpmTemp.plotBar(data=self.telemetry["tpms_temperatures_0"][i], bar=i, color=COLORI[i])
+        else:
+            self.plotTpmTemp.set_xlabel("No data available")
+        self.plotTpmTemp.updatePlot()
 
     def switchTpm(self, slot):
         if self.connected:
-            if self.attributes["tpm_on_off"][slot]:
+            if self.telemetry["tpm_on_off"][slot]:
                 self.client.execute_command(command="turn_off_tpm", parameters="%d" % (int(slot) + 1))
                 print("Turn OFF TPM-%02d" % (int(slot) + 1))
             else:
                 self.client.execute_command(command="turn_on_tpm", parameters="%d" % (int(slot) + 1))
                 print("Turn ON TPM-%02d" % (int(slot) + 1))
-            # self.getTelemetry()
-            # self.signalTlm.emit()
 
     def switchTpmsOn(self):
         if self.connected:
@@ -454,15 +523,22 @@ class Subrack(QtWidgets.QMainWindow):
                 print("Connecting to Subrack %s:%d..." % (self.ip, self.port))
                 self.client = WebHardwareClient(self.ip, self.port)
                 if self.client.connect():
-                    self.subAttr = self.client.execute_command("list_attributes")["retvalue"]
+                    self.tlm_keys = self.client.execute_command("list_attributes")["retvalue"]
+                    for tlmk in self.tlm_keys:
+                        if tlmk in self.query_once:
+                            data = self.client.get_attribute(tlmk)
+                            if data["status"] == "OK":
+                                self.telemetry[tlmk] = data["value"]
+                            else:
+                                self.telemetry[tlmk] = data["info"]
+                    if 'api_version' in self.tlm_keys:
+                        self.wg.qlabel_message.setText("SubRack API version: " + self.telemetry['api_version'])
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")
                     self.wg.qbutton_connect.setText("ONLINE")
                     self.wg.frame_tpm.setEnabled(True)
                     self.wg.frame_fan.setEnabled(True)
-                    self.getTelemetry()
                     self.connected = True
-                    if 'api_version' in self.attributes.keys():
-                        self.wg.qlabel_message.setText("SubRack API version: " + self.attributes['api_version'])
+                    self.getTelemetry()
                 else:
                     self.wg.qlabel_message.setText("The SubRack server does not respond!")
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
@@ -484,32 +560,59 @@ class Subrack(QtWidgets.QMainWindow):
             self.wg.qlabel_connection.setText("Missing IP!")
 
     def getTelemetry(self):
+        tkey = ""
         try:
-            attributes = {}
-            for att in self.subAttr:
-                attributes[att] = self.client.get_attribute(att)["value"]
+            for tlmk in self.tlm_keys:
+                tkey = tlmk
+                if not tlmk in self.query_deny:
+                    if self.connected:
+                        data = self.client.get_attribute(tlmk)
+                        if data["status"] == "OK":
+                            self.telemetry[tlmk] = data["value"]
         except:
-            print("Error reading Telemetry, skipping...")
-            pass
-        for att in self.subAttr:
-            if not att == "api_version":
-                if type(attributes[att]) is list:
-                    if type(attributes[att][0]) is list:
-                        for k in range(len(attributes[att])):
-                            nested_att = ("%s_%d" % (att, k))
+            print("Error reading Telemetry [attribute: %s], skipping..." % tkey)
+            return
+        for tlmk in self.telemetry.keys():
+            if not tlmk in self.query_deny:
+                if type(self.telemetry[tlmk]) is list:
+                    if type(self.telemetry[tlmk][0]) is list:
+                        for k in range(len(self.telemetry[tlmk])):
+                            nested_att = ("%s_%d" % (tlmk, k))
                             if nested_att not in self.data_charts.keys():
-                                self.data_charts[nested_att] = np.zeros(len(attributes[att][k]) * 201) * np.nan
-                            self.data_charts[nested_att] = np.append(self.data_charts[nested_att][len(attributes[att][k]):], attributes[att][k])
+                                self.data_charts[nested_att] = np.zeros(len(self.telemetry[tlmk][k]) * 201) * np.nan
+                            self.data_charts[nested_att] = \
+                                np.append(self.data_charts[nested_att][len(self.telemetry[tlmk][k]):],
+                                          self.telemetry[tlmk][k])
+                            self.telemetry["%s_%d" % (tlmk, k)] = list(self.telemetry[tlmk][k])
                     else:
-                        if att not in self.data_charts.keys():
-                            self.data_charts[att] = np.zeros(len(attributes[att]) * 201) * np.nan
-                        self.data_charts[att] = np.append(self.data_charts[att][len(attributes[att]):], attributes[att])
-                elif attributes[att] is not None:
-                    if att not in self.data_charts.keys():
-                        self.data_charts[att] = np.zeros(201) * np.nan
-                    self.data_charts[att] = self.data_charts[att][1:] + [attributes[att]]
+                        if tlmk not in self.data_charts.keys():
+                            self.data_charts[tlmk] = np.zeros(len(self.telemetry[tlmk]) * 201) * np.nan
+                        self.data_charts[tlmk] = np.append(self.data_charts[tlmk][len(self.telemetry[tlmk]):],
+                                                          self.telemetry[tlmk])
+                elif self.telemetry[tlmk] is not None:
+                    if tlmk not in self.data_charts.keys():
+                        self.data_charts[tlmk] = np.zeros(201) * np.nan
+                    try:
+                        self.data_charts[tlmk] = self.data_charts[tlmk][1:] + [self.telemetry[tlmk]]
+                    except:
+                        print("ERROR --> key:", tlmk, "\nValue: ", self.telemetry[tlmk])
+                        pass
+                else:
+                    if tlmk not in self.data_charts.keys():
+                        self.data_charts[tlmk] = np.zeros(201) * np.nan
+                    self.data_charts[tlmk] = self.data_charts[tlmk][1:] + [np.nan]
 
-        self.attributes = attributes
+    def getTiles(self):
+        try:
+            for tlmk in self.query_tiles:
+                data = self.client.get_attribute(tlmk)
+                if data["status"] == "OK":
+                    self.telemetry[tlmk] = data["value"]
+                else:
+                    self.telemetry[tlmk] = []
+            return self.telemetry['tpm_ips']
+        except:
+            return []
 
     def readTlm(self):
         while True:
@@ -517,6 +620,7 @@ class Subrack(QtWidgets.QMainWindow):
                 try:
                     self.getTelemetry()
                 except:
+                    print("Failed to get Subrack Telemetry!")
                     pass
                 sleep(0.2)
                 self.signalTlm.emit()
@@ -530,32 +634,42 @@ class Subrack(QtWidgets.QMainWindow):
             sleep(1)
 
     def updateTlm(self):
-        self.wg.qlabel_message.setText("")
+        #self.wg.qlabel_message.setText("")
         self.drawBars()
         self.drawCharts()
 
         # TPM status on QButtons
-        for n, fault in enumerate(self.attributes["tpm_supply_fault"]):
-            if fault:
-                self.qbutton_tpm[n].setStyleSheet(colors("yellow_on_black"))
-            else:
-                if self.attributes["tpm_present"][n]:
-                    self.qbutton_tpm[n].setStyleSheet(colors("black_on_red"))
+        if "tpm_supply_fault" in self.telemetry.keys():
+            for n, fault in enumerate(self.telemetry["tpm_supply_fault"]):
+                if fault:
+                    self.qbutton_tpm[n].setStyleSheet(colors("yellow_on_black"))
                 else:
-                    self.qbutton_tpm[n].setStyleSheet(colors("black_on_grey"))
-                if self.attributes["tpm_on_off"][n]:
-                    self.qbutton_tpm[n].setStyleSheet(colors("black_on_green"))
+                    if "tpm_present" in self.telemetry.keys():
+                        if self.telemetry["tpm_present"][n]:
+                            self.qbutton_tpm[n].setStyleSheet(colors("black_on_red"))
+                        else:
+                            self.qbutton_tpm[n].setStyleSheet(colors("black_on_grey"))
+                    if "tpm_on_off" in self.telemetry.keys():
+                        if self.telemetry["tpm_on_off"][n]:
+                            self.qbutton_tpm[n].setStyleSheet(colors("black_on_green"))
 
         # Fan status on Sliders
-        for i in range(4):
-            self.fans[i]['rpm'].setText("%d" % int(self.attributes['subrack_fan_speeds'][i]))
-            self.fans[i]['slider'].setProperty("value", (int(self.attributes['subrack_fan_speeds_percent'][i])))
-            if int(self.attributes['subrack_fan_mode'][i]) == 1:
-                self.fans[i]['auto'].setStyleSheet(colors("black_on_green"))
-                self.fans[i]['manual'].setStyleSheet(colors("black_on_red"))
-            else:
-                self.fans[i]['auto'].setStyleSheet(colors("black_on_red"))
-                self.fans[i]['manual'].setStyleSheet(colors("black_on_green"))
+        if 'subrack_fan_speeds' and 'subrack_fan_speeds_percent' in self.telemetry.keys():
+            for i in range(4):
+                self.fans[i]['rpm'].setText("%d" % int(self.telemetry['subrack_fan_speeds'][i]))
+                self.fans[i]['slider'].setProperty("value", (int(self.telemetry['subrack_fan_speeds_percent'][i])))
+                if int(self.telemetry['subrack_fan_mode'][i]) == 1:
+                    self.fans[i]['auto'].setStyleSheet(colors("black_on_green"))
+                    self.fans[i]['manual'].setStyleSheet(colors("black_on_red"))
+                else:
+                    self.fans[i]['auto'].setStyleSheet(colors("black_on_red"))
+                    self.fans[i]['manual'].setStyleSheet(colors("black_on_green"))
+
+        if "subrack_timestamp" in self.telemetry.keys():
+            self.wg.qlabel_tstamp.setText("SUBRACK UTC TIME:     " +
+                                          ts_to_datestring(int(self.telemetry['subrack_timestamp'])))
+        else:
+            self.wg.qlabel_tstamp.setText("")
 
     def closeEvent(self, event):
         result = QtWidgets.QMessageBox.question(self,
@@ -626,7 +740,7 @@ if __name__ == "__main__":
                 client = WebHardwareClient(opt.ip, opt.port)
                 if client.connect():
                     connected = True
-                    subAttr = client.execute_command("list_attributes")["retvalue"]
+                    tlm_keys = client.execute_command("list_attributes")["retvalue"]
                 else:
                     print("Unable to connect to the Webserver on %s:%d" % (opt.ip, opt.port))
             if connected:
@@ -635,7 +749,7 @@ if __name__ == "__main__":
                     tstamp = dt_to_timestamp(datetime.datetime.utcnow())
                     attributes = {}
                     print("\nTstamp: %d\tDateTime: %s\n" % (tstamp, ts_to_datestring(tstamp)))
-                    for att in subAttr:
+                    for att in tlm_keys:
                         attributes[att] = client.get_attribute(att)["value"]
                         print(att, attributes[att])
                 else:

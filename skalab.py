@@ -262,6 +262,43 @@ class SkaLab(QtWidgets.QMainWindow):
                 station.load_configuration_file(self.config_file)
                 # Check wether the TPM are ON or OFF
                 station_on = True
+                tpm_ip_list = list(station.configuration['tiles'])
+                tpm_ip_from_subrack = self.wgSubrack.getTiles()
+                if tpm_ip_from_subrack:
+                    tpm_ip_from_subrack = [x for x in tpm_ip_from_subrack if not x == '0']
+                    if not len(tpm_ip_list) == len(tpm_ip_from_subrack):
+                        msgBox = QtWidgets.QMessageBox()
+                        message = "STATION\nOne or more TPMs forming the station are OFF\nPlease check the power!"
+                        msgBox.setText(message)
+                        msgBox.setWindowTitle("ERROR: TPM POWERED OFF")
+                        msgBox.setIcon(QtWidgets.QMessageBox.Critical)
+                        details = "STATION IP LIST FROM CONFIG FILE (%d): " % len(tpm_ip_list)
+                        for i in tpm_ip_list:
+                            details += "\n%s" % i
+                        details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(tpm_ip_from_subrack)
+                        for i in tpm_ip_from_subrack:
+                            details += "\n%s" % i
+                        msgBox.setDetailedText(details)
+                        msgBox.exec_()
+                        print(self.wgSubrack.telemetry)
+                        return
+                    else:
+                        if not np.array_equal(tpm_ip_list, tpm_ip_from_subrack):
+                            msgBox = QtWidgets.QMessageBox()
+                            message = "STATION\nIPs provided by the SubRack are different from what defined in the " \
+                                      "config file.\nINIT will use the new assigned IPs."
+                            msgBox.setText(message)
+                            msgBox.setWindowTitle("WARNING: IP mismatch")
+                            msgBox.setIcon(QtWidgets.QMessageBox.Warning)
+                            details = "STATION IP LIST FROM CONFIG FILE (%d): " % len(tpm_ip_list)
+                            for i in tpm_ip_list:
+                                details += "\n%s" % i
+                            details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(tpm_ip_from_subrack)
+                            for i in tpm_ip_from_subrack:
+                                details += "\n%s" % i
+                            msgBox.setDetailedText(details)
+                            msgBox.exec_()
+                            station.configuration['tiles'] = list(tpm_ip_from_subrack)
                 for tpm_ip in station.configuration['tiles']:
                     try:
                         tpm = TPMGeneric()
@@ -273,9 +310,17 @@ class SkaLab(QtWidgets.QMainWindow):
                     self.doInit = True
                 else:
                     msgBox = QtWidgets.QMessageBox()
-                    msgBox.setText("STATION\nOne or more TPMs forming the station are OFF\nPlease check the power!")
-                    msgBox.setWindowTitle("ERROR: TPM POWERED OFF")
+                    msgBox.setText("STATION\nOne or more TPMs forming the station is unreachable\n"
+                                   "Please check the power or the connection!")
+                    msgBox.setWindowTitle("ERROR: TPM UNREACHABLE")
                     msgBox.setIcon(QtWidgets.QMessageBox.Critical)
+                    details = "STATION IP LIST FROM CONFIG FILE (%d): " % len(tpm_ip_list)
+                    for i in tpm_ip_list:
+                        details += "\n%s" % i
+                    details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(tpm_ip_from_subrack)
+                    for i in tpm_ip_from_subrack:
+                        details += "\n%s" % i
+                    msgBox.setDetailedText(details)
                     msgBox.exec_()
             else:
                 msgBox = QtWidgets.QMessageBox()
@@ -287,19 +332,41 @@ class SkaLab(QtWidgets.QMainWindow):
     def do_station_init(self):
         while True:
             if self.doInit:
-                station.load_configuration_file(self.config_file)
                 station.configuration['station']['initialise'] = True
                 station.configuration['station']['program'] = True
-                self.tpm_station = station.Station(station.configuration)
-                self.wgMain.qbutton_station_init.setEnabled(False)
-                self.tpm_station.connect()
-                if self.tpm_station.properly_formed_station:
-                    self.wgMain.qbutton_station_init.setStyleSheet("background-color: rgb(78, 154, 6);")
-                else:
-                    self.wgMain.qbutton_station_init.setStyleSheet("background-color: rgb(204, 0, 0);")
-                self.wgMain.qbutton_station_init.setEnabled(True)
-                del self.tpm_station
-                gc.collect()
+                try:
+                    self.tpm_station = station.Station(station.configuration)
+                    self.wgMain.qbutton_station_init.setEnabled(False)
+                    self.tpm_station.connect()
+                    station.configuration['station']['initialise'] = False
+                    station.configuration['station']['program'] = False
+                    if self.tpm_station.properly_formed_station:
+                        self.wgMain.qbutton_station_init.setStyleSheet("background-color: rgb(78, 154, 6);")
+
+                        # ByPass the MCU temperature controls
+                        for tile in self.tpm_station.tiles:
+                            tile[0x90000034] = 0xBADC0DE
+                            tile[0x30000518] = 1
+                            time.sleep(0.1)
+                        time.sleep(1)
+                        print("MCU Controls Hacked with \nVal 0xBADC0DE in Reg 0x90000034,"
+                              "\nVal 0x0000001 in Reg 0x30000518")
+
+                        # Switch On the PreADUs
+                        for tile in self.tpm_station.tiles:
+                            tile["board.regfile.enable.fe"] = 1
+                            time.sleep(0.1)
+                        time.sleep(1)
+                        self.tpm_station.set_preadu_attenuation(0)
+                        print("TPM PreADUs Powered ON")
+
+                    else:
+                        self.wgMain.qbutton_station_init.setStyleSheet("background-color: rgb(204, 0, 0);")
+                    self.wgMain.qbutton_station_init.setEnabled(True)
+                    del self.tpm_station
+                    gc.collect()
+                except:
+                    self.wgMain.qbutton_station_init.setEnabled(True)
                 self.tpm_station = None
                 self.doInit = False
             if self.stopThreads:
