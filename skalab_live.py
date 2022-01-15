@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import os
+import shutil
 import sys
 import gc
 import threading
@@ -121,7 +122,13 @@ class Live(QtWidgets.QMainWindow):
         # Live Plots Connections
         self.wg.qbutton_connect.clicked.connect(lambda: self.station_connect())
         self.wg.qbutton_single.clicked.connect(lambda: self.get_single_meas())
+        self.wg.qbutton_browse_data_directory.clicked.connect(lambda: self.browse_outdir())
+        self.wg.qbutton_browse_station_config.clicked.connect(lambda: self.browse_config())
+        self.wg.qbutton_single.clicked.connect(lambda: self.get_single_meas())
         self.wg.qcheck_spectra_grid.stateChanged.connect(self.live_show_spectra_grid)
+        self.wg.qbutton_saveas.clicked.connect(lambda: self.save_as_profile())
+        self.wg.qbutton_save.clicked.connect(lambda: self.save_profile(this_profile=self.profile_name))
+        self.wg.qbutton_delete.clicked.connect(lambda: self.delete_profile(self.wg.qcombo_profile.currentText()))
 
     def load_profile(self, profile):
         self.profile = {}
@@ -137,14 +144,31 @@ class Live(QtWidgets.QMainWindow):
         self.profile_file = fullpath
         self.wg.qline_configuration_file.setText(self.profile_file)
         self.wg.qline_profile_interval.setText(self.profile['App']['query_interval'])
+        self.wg.qline_configfile.setText(self.profile['App']['station_config'])
         self.wg.qline_output_dir.setText(self.profile['App']['data_path'])
         # Overriding Configuration File with parameters
         self.updateProfileCombo(current=profile)
         self.populate_table_profile()
 
+    def browse_outdir(self):
+        fd = QtWidgets.QFileDialog()
+        fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
+        options = fd.options()
+        self.folder = fd.getExistingDirectory(self, caption="Choose a directory to save the data",
+                                              directory="/storage/", options=options)
+        self.wg.qline_output_dir.setText(self.folder)
+
+    def browse_config(self):
+        fd = QtWidgets.QFileDialog()
+        fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
+        options = fd.options()
+        self.config_file = fd.getOpenFileName(self, caption="Select a Station Config File...",
+                                              directory="/opt/aavs/config/", options=options)[0]
+        self.wg.qline_configfile.setText(self.config_file)
+
     def populate_table_profile(self):
         self.wg.qtable_conf.clearSpans()
-        self.wg.qtable_conf.setGeometry(QtCore.QRect(660, 20, 461, 291))
+        self.wg.qtable_conf.setGeometry(QtCore.QRect(640, 20, 481, 821))
         self.wg.qtable_conf.setObjectName("qtable_conf")
         self.wg.qtable_conf.setColumnCount(1)
         self.wg.qtable_conf.setWordWrap(True)
@@ -273,6 +297,25 @@ class Live(QtWidgets.QMainWindow):
                 self.wg.qcombo_profile.addItem(p)
                 if current == p:
                     self.wg.qcombo_profile.setCurrentIndex(n)
+
+    def save_profile(self, this_profile, reload=True):
+        self.make_profile(profile=this_profile,
+                          prodict={'App': {'data_path': self.wg.qline_output_dir.text(),
+                                           'station_config': self.wg.qline_configfile.text(),
+                                           'query_interval': self.wg.qline_profile_interval.text()}})
+        if reload:
+            self.load_profile(profile=this_profile)
+
+    def save_as_profile(self):
+        text, ok = QtWidgets.QInputDialog.getText(self, 'Profiles', 'Enter a Profile name:')
+        if ok:
+            self.save_profile(this_profile=text)
+
+    def delete_profile(self, profile):
+        if os.path.exists(default_app_dir + profile):
+            shutil.rmtree(default_app_dir + profile)
+        self.updateProfileCombo(current="")
+        self.load_profile(self.wg.qcombo_profile.currentText())
 
     def station_connect(self):
         # Set current thread name
