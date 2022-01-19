@@ -16,7 +16,7 @@ __copyright__ = "Copyright 2022, Istituto di RadioAstronomia, Radiotelescopi di 
 __author__ = "Andrea Mattana"
 __credits__ = ["Andrea Mattana"]
 __license__ = "GPL"
-__version__ = "1.0"
+__version__ = "1.0.3"
 __release__ = "2022-01-15"
 __maintainer__ = "Andrea Mattana"
 
@@ -269,11 +269,13 @@ class SkaLab(QtWidgets.QMainWindow):
             self.populate_table_station()
             if not self.wgPlay == None:
                 self.wgPlay.wg.qcombo_tpm.clear()
+            if not self.wgLive == None:
                 self.wgLive.wg.qcombo_tpm.clear()
             self.tiles = []
             for n, i in enumerate(station.configuration['tiles']):
                 if not self.wgPlay == None:
                     self.wgPlay.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (n + 1, i))
+                if not self.wgLive == None:
                     self.wgLive.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (n + 1, i))
                 self.tiles += [i]
         else:
@@ -329,6 +331,7 @@ class SkaLab(QtWidgets.QMainWindow):
                             msgBox.setDetailedText(details)
                             msgBox.exec_()
                             station.configuration['tiles'] = list(tpm_ip_from_subrack)
+                            self.wgLive.setupNewTilesIPs(list(tpm_ip_from_subrack))
                 for tpm_ip in station.configuration['tiles']:
                     try:
                         tpm = TPMGeneric()
@@ -626,6 +629,7 @@ class SkaLab(QtWidgets.QMainWindow):
 
         if result == QtWidgets.QMessageBox.Yes:
             event.accept()
+            self.wgLive.stopThreads = True
             self.wgSubrack.stopThreads = True
             self.stopThreads = True
 

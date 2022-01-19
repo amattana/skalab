@@ -168,7 +168,7 @@ class Subrack(QtWidgets.QMainWindow):
         self.load_events()
         self.show()
         self.stopThreads = False
-        self.skip = False
+        self.skipThreadPause = False
         self.processTlm = Thread(target=self.readTlm)
         self.processTlm.start()
 
@@ -205,32 +205,32 @@ class Subrack(QtWidgets.QMainWindow):
         if self.connected:
             self.client.execute_command(command="turn_on_tpms")
             #print("Turn ON ALL")
-            self.skip = True
+            self.skipThreadPause = True
 
     def cmdSwitchTpmsOff(self):
         if self.connected:
             self.client.execute_command(command="turn_off_tpms")
             #print("Turn OFF ALL")
-            self.skip = True
+            self.skipThreadPause = True
 
     def cmdSetFanManual(self, fan_id):
         if self.connected:
             self.client.execute_command(command="set_fan_mode", parameters="%d,0" % (fan_id + 1))
             #print("Set FAN Mode MANUAL on FAN #%d" % (fan_id + 1))
-            self.skip = True
+            self.skipThreadPause = True
 
     def cmdSetFanAuto(self, fan_id):
         if self.connected:
             self.client.execute_command(command="set_fan_mode", parameters="%d,1" % (fan_id + 1))
             #print("Set FAN Mode AUTO on FAN #%d" % (fan_id + 1))
-            self.skip = True
+            self.skipThreadPause = True
 
     def cmdSetFanSpeed(self, fan_id):
         if self.connected:
             self.client.execute_command(command="set_subrack_fan_speed",
                                         parameters="%d,%d" % (fan_id + 1, int(self.fans[fan_id]['slider'].value())))
             #print("Set FAN SPEED %d on FAN #%d" % (int(self.fans[fan_id]['slider'].value()), fan_id + 1))
-            self.skip = True
+            self.skipThreadPause = True
 
     def populate_table_profile(self):
         self.wg.qtable_conf.clearSpans()
@@ -700,10 +700,10 @@ class Subrack(QtWidgets.QMainWindow):
                 sleep(0.2)
                 self.signalTlm.emit()
                 cycle = 0.0
-                while cycle < (int(self.profile['Device']['query_interval']) - 1) and not self.skip:
+                while cycle < (int(self.profile['Device']['query_interval']) - 1) and not self.skipThreadPause:
                     sleep(0.5)
                     cycle = cycle + 0.5
-                self.skip = False
+                self.skipThreadPause = False
             if self.stopThreads:
                 break
             sleep(1)

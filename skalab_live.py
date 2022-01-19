@@ -1,19 +1,21 @@
 #!/usr/bin/env python
+import datetime
 import os
 import shutil
 import sys
 import gc
-import threading
 from pathlib import Path
-
 import configparser
+from time import sleep
+
 import numpy as np
 from PyQt5 import QtWidgets, uic, QtCore, QtGui
 from PyQt5.QtCore import Qt
 import pydaq.daq_receiver as daq
-from skalab_utils import MiniPlots, calcolaspettro, closest, MyDaq, get_if_name, parse_profile
+from skalab_utils import MiniPlots, calcolaspettro, closest, MyDaq, get_if_name, parse_profile, ts_to_datestring, dt_to_timestamp
 from pyaavs.station import Station, load_station_configuration
 from pyaavs import station
+from threading import Thread
 
 COLORI = ["b", "g"]
 
@@ -72,8 +74,7 @@ def moving_average(xx, w):
 class Live(QtWidgets.QMainWindow):
     """ Main UI Window class """
     # Signal for Slots
-    #housekeeping_signal = QtCore.pyqtSignal()
-    #antenna_test_signal = QtCore.pyqtSignal()
+    signalRun = QtCore.pyqtSignal()
 
     def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936]):
         """ Initialise main window """
@@ -96,11 +97,19 @@ class Live(QtWidgets.QMainWindow):
         self.show()
         self.load_events()
 
+        self.newTilesIPs = None
         self.tpm_station = None
-        self.station_connected = False
+        self.connected = False
         self.station_configuration = {}
         self.tpm_nic_name = ""
         self.mydaq = None
+
+        self.stopThreads = False
+        self.skipThreadPause = False
+        self.ThreadPause = True
+        self.live_data = []
+        self.procRun = Thread(target=self.procRunDaq)
+        self.procRun.start()
 
         self.config_file = config
         self.show_live_spectra_grid = self.wg.qcheck_spectra_grid.isChecked()
@@ -121,10 +130,12 @@ class Live(QtWidgets.QMainWindow):
     def load_events(self):
         # Live Plots Connections
         self.wg.qbutton_connect.clicked.connect(lambda: self.station_connect())
-        self.wg.qbutton_single.clicked.connect(lambda: self.get_single_meas())
+        self.wg.qbutton_single.clicked.connect(lambda: self.doSingleAcquisition())
+        self.wg.qbutton_run.clicked.connect(lambda: self.startContinuousAcquisition())
+        self.wg.qbutton_stop.clicked.connect(lambda: self.stopContinuousAcquisition())
+
         self.wg.qbutton_browse_data_directory.clicked.connect(lambda: self.browse_outdir())
         self.wg.qbutton_browse_station_config.clicked.connect(lambda: self.browse_config())
-        self.wg.qbutton_single.clicked.connect(lambda: self.get_single_meas())
         self.wg.qcheck_spectra_grid.stateChanged.connect(self.live_show_spectra_grid)
         self.wg.qbutton_saveas.clicked.connect(lambda: self.save_as_profile())
         self.wg.qbutton_save.clicked.connect(lambda: self.save_profile(this_profile=self.profile_name))
@@ -318,31 +329,92 @@ class Live(QtWidgets.QMainWindow):
         self.load_profile(self.wg.qcombo_profile.currentText())
 
     def station_connect(self):
-        # Set current thread name
-        threading.currentThread().name = "Station"
-        # Load station configuration
-        station.load_configuration_file(self.config_file)
+        if not self.connected:
+            # Load station configuration
+            station.load_configuration_file(self.config_file)
+            self.station_configuration = station.configuration
+            if self.newTilesIPs is not None:
+                station.configuration['tiles'] = self.newTilesIPs
+            # Test
+            try:
+                # Create station
+                self.tpm_station = Station(station.configuration)
+                # Connect station (program, initialise and configure if required)
+                self.tpm_station.connect()
+                self.tpm_station.tiles[0].get_temperature()
+                #self.wg.qlabel_connection.setText("Connected")
+                self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")
+                self.wg.qbutton_connect.setText("ONLINE")
+                self.connected = True
+                self.setupDAQ()
 
-        self.station_configuration = station.configuration
-        # Test
-        try:
-            # Create station
-            self.tpm_station = Station(station.configuration)
-            # Connect station (program, initialise and configure if required)
-            self.tpm_station.connect()
-            self.tpm_station.tiles[0].get_temperature()
-            #self.wg.qlabel_connection.setText("Connected")
-            self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")
-            self.wg.qbutton_connect.setText("ONLINE")
-            self.station_connected = True
+            except:
+                #self.wg.qlabel_connection.setText("ERROR: Unable to connect to the TPMs Station. Retry...")
+                self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
+                self.wg.qbutton_connect.setText("OFFLINE")
+                self.connected = False
+        else:
+            self.disconnect()
 
-        except:
-            #self.wg.qlabel_connection.setText("ERROR: Unable to connect to the TPMs Station. Retry...")
-            self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
-            self.wg.qbutton_connect.setText("OFFLINE")
-            self.station_connected = False
+    def station_disconnect(self):
+        self.ThreadPause = True
+        sleep(0.5)
+        del self.tpm_station
+        gc.collect()
+        self.closeDAQ()
+        self.tpm_station = None
+        self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
+        self.wg.qbutton_connect.setText("OFFLINE")
+        self.connected = False
 
-    def get_single_meas(self):
+    def procRunDaq(self):
+        while True:
+            if self.connected:
+                try:
+                    if not self.ThreadPause:
+                        self.getAcquisition()
+                except:
+                    print("Failed to get DAQ data!")
+                    pass
+                sleep(0.2)
+                #self.signalRun.emit()
+                self.plotAcquisition()
+                cycle = 0.0
+                while cycle < (int(self.profile['App']['query_interval']) - 1) and not self.skipThreadPause:
+                    sleep(0.5)
+                    cycle = cycle + 0.5
+                self.skipThreadPause = False
+            if self.stopThreads:
+                break
+            sleep(1)
+
+    def setupDAQ(self):
+        self.tpm_nic_name = get_if_name(self.station_configuration['network']['lmc']['lmc_ip'])
+        if self.tpm_nic_name == "":
+            #self.wg.qlabel_connection.setText("Connected. (ETH Card name ERROR)")
+            print("Connected. (ETH Card name ERROR)")
+        if not self.tpm_nic_name == "":
+            self.mydaq = MyDaq(daq, self.tpm_nic_name, self.tpm_station, len(self.station_configuration['tiles']))
+
+    def closeDAQ(self):
+        self.mydaq.close()
+        del self.mydaq
+        gc.collect()
+
+    def setupNewTilesIPs(self, newTiles):
+        if self.connected:
+            self.station_disconnect()
+        self.newTilesIPs = newTiles
+        self.station_configuration['tiles'] = newTiles
+
+    def runAcquisition(self):
+        self.live_data = self.mydaq.execute()
+        self.wg.qlabel_tstamp.setText(ts_to_datestring(dt_to_timestamp(datetime.datetime.utcnow())))
+
+    def updatePlots(self):
+        self.plotAcquisition()
+
+    def plotAcquisition(self):
         if not self.wg.qline_channels.text() == self.live_channels:
             self.live_reformat_plots()
 
@@ -358,14 +430,7 @@ class Live(QtWidgets.QMainWindow):
         yAxisRange = (float(self.wg.qline_spectra_level_min.text()),
                       float(self.wg.qline_spectra_level_max.text()))
 
-        self.tpm_nic_name = get_if_name(self.station_configuration['network']['lmc']['lmc_ip'])
-        if self.tpm_nic_name == "":
-            #self.wg.qlabel_connection.setText("Connected. (ETH Card name ERROR)")
-            print("Connected. (ETH Card name ERROR)")
-        if not self.tpm_nic_name == "":
-            self.mydaq = MyDaq(daq, self.tpm_nic_name, self.tpm_station, len(self.station_configuration['tiles']))
-        self.live_data = self.mydaq.execute()
-        #print("RECEIVED DATA: %d" % len(self.live_data[int(self.wg.qcombo_tpm.currentIndex())]))
+        # print("RECEIVED DATA: %d" % len(self.live_data[int(self.wg.qcombo_tpm.currentIndex())]))
         lw = 1
         if self.wg.qcheck_spectra_noline.isChecked():
             lw = 0
@@ -373,26 +438,55 @@ class Live(QtWidgets.QMainWindow):
             self.livePlots.plotClear()
             for n, i in enumerate(self.live_input_list):
                 # Plot X Pol
-                spettro, rfpow = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 0, :], self.live_nsamples)
+                spettro, rfpow = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 0, :],
+                                                self.live_nsamples)
                 self.livePlots.plotCurve(self.live_asse_x, spettro, n, xAxisRange=self.live_xAxisRange,
-                                        yAxisRange=self.live_yAxisRange, title="INPUT-%02d" % i,
-                                        xLabel="MHz", yLabel="dB", colore="b") #, rfpower=rms,
-                                        # annotate_rms=self.show_rms, grid=self.show_spectra_grid, lw=lw,
-                                        # show_line=self.wg.play_qcheck_xpol_sp.isChecked(),
-                                        # rms_position=float(self.wg.play_qline_rms_pos.text()))
+                                         yAxisRange=self.live_yAxisRange, title="INPUT-%02d" % i,
+                                         xLabel="MHz", yLabel="dB", colore="b")  # , rfpower=rms,
+                # annotate_rms=self.show_rms, grid=self.show_spectra_grid, lw=lw,
+                # show_line=self.wg.play_qcheck_xpol_sp.isChecked(),
+                # rms_position=float(self.wg.play_qline_rms_pos.text()))
 
                 # Plot Y Pol
                 spettro, rfpow = calcolaspettro(
                     self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 1, :], self.live_nsamples)
                 self.livePlots.plotCurve(self.live_asse_x, spettro, n, xAxisRange=self.live_xAxisRange,
-                                        yAxisRange=self.live_yAxisRange, colore="g") #, rfpower=rms,
-                                      #  annotate_rms=self.show_rms, grid=self.show_spectra_grid, lw=lw,
-                                      #  show_line=self.wg.play_qcheck_ypol_sp.isChecked(),
-                                      #  rms_position=float(self.wg.play_qline_rms_pos.text()))
+                                         yAxisRange=self.live_yAxisRange, colore="g")  # , rfpower=rms,
+                #  annotate_rms=self.show_rms, grid=self.show_spectra_grid, lw=lw,
+                #  show_line=self.wg.play_qcheck_ypol_sp.isChecked(),
+                #  rms_position=float(self.wg.play_qline_rms_pos.text()))
             self.livePlots.updatePlot()
-        self.mydaq.close()
-        del self.mydaq
-        gc.collect()
+
+    def doSingleAcquisition(self):
+        self.getAcquisition()
+        self.plotAcquisition()
+
+    def startContinuousAcquisition(self):
+        self.ThreadPause = False
+        self.wg.qbutton_run.setEnabled(False)
+        self.wg.qbutton_single.setEnabled(False)
+
+    def stopContinuousAcquisition(self):
+        self.ThreadPause = True
+        self.wg.qbutton_single.setEnabled(True)
+        self.wg.qbutton_run.setEnabled(True)
+
+    def getAcquisition(self):
+        if self.connected:
+            if self.mydaq is not None:
+                self.runAcquisition()
+            else:
+                msgBox = QtWidgets.QMessageBox()
+                msgBox.setText("The DAQ is not running, please check the setup")
+                msgBox.setWindowTitle("Error!")
+                msgBox.setIcon(QtWidgets.QMessageBox.Critical)
+                msgBox.exec_()
+        else:
+            msgBox = QtWidgets.QMessageBox()
+            msgBox.setText("Please connect to the STATION first!")
+            msgBox.setWindowTitle("Error!")
+            msgBox.setIcon(QtWidgets.QMessageBox.Critical)
+            msgBox.exec_()
 
     def live_tpm_update(self, tpm_list=[]):
         # Update TPM list
@@ -465,10 +559,8 @@ class Live(QtWidgets.QMainWindow):
 
         if result == QtWidgets.QMessageBox.Yes:
             event.accept()
-            #self.stopThreads = True
-
-    #def updateHK(self):
-    #    pass
+            self.stopThreads = True
+            sleep(1)
 
 
 if __name__ == "__main__":
@@ -482,5 +574,6 @@ if __name__ == "__main__":
 
     app = QtWidgets.QApplication(sys.argv)
     window = Live(config=conf.config, uiFile="skalab_live.ui")
+    #window.signalRun.connect(window.updatePlots())
 
     sys.exit(app.exec_())
