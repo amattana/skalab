@@ -13,6 +13,8 @@ from threading import Thread
 from time import sleep
 import datetime
 from pathlib import Path
+import h5py
+
 COLORI = ["b", "g", "k", "r", "orange", "magenta", "darkgrey", "turquoise"]
 
 MgnTraces = ['board_temperatures', 'backplane_temperatures']
@@ -126,6 +128,8 @@ class Subrack(QtWidgets.QMainWindow):
         self.query_once = []
         self.query_deny = []
         self.query_tiles = []
+        self.tlm_file = ""
+        self.tlm_hdf = None
         self.profile_name = profile
         if self.profile_name == "":
             self.profile_name = "Default"
@@ -171,11 +175,11 @@ class Subrack(QtWidgets.QMainWindow):
         self.wg.qplot_chart_tpm.setVisible(False)
 
     def load_events(self):
-        self.wg.qbutton_connect.clicked.connect(lambda: self.subrack_connect())
+        self.wg.qbutton_connect.clicked.connect(lambda: self.connect())
         for n, t in enumerate(self.qbutton_tpm):
-            t.clicked.connect(lambda state, g=n: self.switchTpm(g))
-        self.wg.qbutton_tpm_on.clicked.connect(lambda: self.switchTpmsOn())
-        self.wg.qbutton_tpm_off.clicked.connect(lambda: self.switchTpmsOff())
+            t.clicked.connect(lambda state, g=n: self.cmdSwitchTpm(g))
+        self.wg.qbutton_tpm_on.clicked.connect(lambda: self.cmdSwitchTpmsOn())
+        self.wg.qbutton_tpm_off.clicked.connect(lambda: self.cmdSwitchTpmsOff())
         self.wg.qcombo_chart.currentIndexChanged.connect(lambda: self.switchChart())
         self.wg.qbutton_clear_chart.clicked.connect(lambda: self.clearChart())
         self.wg.qbutton_load.clicked.connect(lambda: self.load())
@@ -183,6 +187,50 @@ class Subrack(QtWidgets.QMainWindow):
         self.wg.qbutton_saveas.clicked.connect(lambda: self.save_as_profile())
         self.wg.qbutton_save.clicked.connect(lambda: self.save_profile(this_profile=self.profile_name))
         self.wg.qbutton_delete.clicked.connect(lambda: self.delete_profile(self.wg.qcombo_profile.currentText()))
+        for i in range(4):
+            self.fans[i]['manual'].clicked.connect(lambda state, g=i: self.cmdSetFanManual(fan_id=g))
+            self.fans[i]['auto'].clicked.connect(lambda state, g=i: self.cmdSetFanAuto(fan_id=g))
+            self.fans[i]['slider'].valueChanged.connect(lambda state, g=i: self.cmdSetFanSpeed(fan_id=g))
+
+    def cmdSwitchTpm(self, slot):
+        if self.connected:
+            if self.telemetry["tpm_on_off"][slot]:
+                self.client.execute_command(command="turn_off_tpm", parameters="%d" % (int(slot) + 1))
+                #print("Turn OFF TPM-%02d" % (int(slot) + 1))
+            else:
+                self.client.execute_command(command="turn_on_tpm", parameters="%d" % (int(slot) + 1))
+                #print("Turn ON TPM-%02d" % (int(slot) + 1))
+
+    def cmdSwitchTpmsOn(self):
+        if self.connected:
+            self.client.execute_command(command="turn_on_tpms")
+            #print("Turn ON ALL")
+            self.skip = True
+
+    def cmdSwitchTpmsOff(self):
+        if self.connected:
+            self.client.execute_command(command="turn_off_tpms")
+            #print("Turn OFF ALL")
+            self.skip = True
+
+    def cmdSetFanManual(self, fan_id):
+        if self.connected:
+            self.client.execute_command(command="set_fan_mode", parameters="%d,0" % (fan_id + 1))
+            #print("Set FAN Mode MANUAL on FAN #%d" % (fan_id + 1))
+            self.skip = True
+
+    def cmdSetFanAuto(self, fan_id):
+        if self.connected:
+            self.client.execute_command(command="set_fan_mode", parameters="%d,1" % (fan_id + 1))
+            #print("Set FAN Mode AUTO on FAN #%d" % (fan_id + 1))
+            self.skip = True
+
+    def cmdSetFanSpeed(self, fan_id):
+        if self.connected:
+            self.client.execute_command(command="set_subrack_fan_speed",
+                                        parameters="%d,%d" % (fan_id + 1, int(self.fans[fan_id]['slider'].value())))
+            #print("Set FAN SPEED %d on FAN #%d" % (int(self.fans[fan_id]['slider'].value()), fan_id + 1))
+            self.skip = True
 
     def populate_table_profile(self):
         self.wg.qtable_conf.clearSpans()
@@ -494,28 +542,23 @@ class Subrack(QtWidgets.QMainWindow):
             self.plotTpmTemp.set_xlabel("No data available")
         self.plotTpmTemp.updatePlot()
 
-    def switchTpm(self, slot):
-        if self.connected:
-            if self.telemetry["tpm_on_off"][slot]:
-                self.client.execute_command(command="turn_off_tpm", parameters="%d" % (int(slot) + 1))
-                print("Turn OFF TPM-%02d" % (int(slot) + 1))
-            else:
-                self.client.execute_command(command="turn_on_tpm", parameters="%d" % (int(slot) + 1))
-                print("Turn ON TPM-%02d" % (int(slot) + 1))
+    def setup_hdf5(self):
+        if not self.profile['App']['data_path'] == "":
+            fname = self.profile['App']['data_path']
+            if not fname[-1] == "/":
+                fname = fname + "/"
+            fname += datetime.datetime.strftime(datetime.datetime.utcnow(), "subrack_tlm_%Y-%m-%d_%H%M%S.h5")
+            return h5py.File(fname, 'a')
+        else:
+            msgBox = QtWidgets.QMessageBox()
+            msgBox.setText("Please Select a valid path to save the Subrack data and save it into the current profile")
+            msgBox.setWindowTitle("Error!")
+            msgBox.setIcon(QtWidgets.QMessageBox.Critical)
+            msgBox.exec_()
+            return None
 
-    def switchTpmsOn(self):
-        if self.connected:
-            self.client.execute_command(command="turn_on_tpms")
-            print("Turn ON ALL")
-            self.skip = True
 
-    def switchTpmsOff(self):
-        if self.connected:
-            self.client.execute_command(command="turn_off_tpms")
-            print("Turn OFF ALL")
-            self.skip = True
-
-    def subrack_connect(self):
+    def connect(self):
         if not self.wg.qline_ip.text() == "":
             if not self.connected:
                 self.ip = self.wg.qline_ip.text().split(":")[0]
@@ -538,6 +581,8 @@ class Subrack(QtWidgets.QMainWindow):
                     self.wg.frame_tpm.setEnabled(True)
                     self.wg.frame_fan.setEnabled(True)
                     self.connected = True
+
+                    self.tlm_hdf = self.setup_hdf5()
                     self.getTelemetry()
                 else:
                     self.wg.qlabel_message.setText("The SubRack server does not respond!")
@@ -556,6 +601,11 @@ class Subrack(QtWidgets.QMainWindow):
                 self.client.disconnect()
                 del self.client
                 gc.collect()
+                if type(self.tlm_hdf) is not None:
+                    try:
+                        self.tlm_hdf.close()
+                    except:
+                        pass
         else:
             self.wg.qlabel_connection.setText("Missing IP!")
 
@@ -586,11 +636,11 @@ class Subrack(QtWidgets.QMainWindow):
                                 np.append(self.data_charts[nested_att][len(telemetry[tlmk][k]):],
                                           telemetry[tlmk][k])
                             self.telemetry["%s_%d" % (tlmk, k)] = list(telemetry[tlmk][k])
+                        del self.telemetry[tlmk]
                     else:
                         if tlmk not in self.data_charts.keys():
                             self.data_charts[tlmk] = np.zeros(len(telemetry[tlmk]) * 201) * np.nan
-                        self.data_charts[tlmk] = np.append(self.data_charts[tlmk][len(telemetry[tlmk]):],
-                                                          telemetry[tlmk])
+                        self.data_charts[tlmk] = np.append(self.data_charts[tlmk][len(telemetry[tlmk]):], telemetry[tlmk])
                 elif telemetry[tlmk] is not None:
                     if tlmk not in self.data_charts.keys():
                         self.data_charts[tlmk] = np.zeros(201) * np.nan
@@ -603,6 +653,29 @@ class Subrack(QtWidgets.QMainWindow):
                     if tlmk not in self.data_charts.keys():
                         self.data_charts[tlmk] = np.zeros(201) * np.nan
                     self.data_charts[tlmk] = self.data_charts[tlmk][1:] + [np.nan]
+        self.writeTlm()
+
+    def writeTlm(self):
+        if self.tlm_hdf is not None:
+            for tlmk in self.telemetry.keys():
+                if tlmk not in self.tlm_hdf:
+                    try:
+                        if type(self.telemetry[tlmk]) is list:
+                            self.tlm_hdf.create_dataset(tlmk, data=[self.telemetry[tlmk]], chunks=True,
+                                                        maxshape=(None, len(self.telemetry[tlmk])))
+                        else:
+                            self.tlm_hdf.create_dataset(tlmk, data=[[self.telemetry[tlmk]]],
+                                                        chunks=True, maxshape=(None, 1))
+                    except:
+                        print("WRITE TLM ERROR in ", tlmk, "\nData: ", self.telemetry[tlmk])
+                else:
+                    if type(self.telemetry[tlmk]) is list:
+                        self.tlm_hdf[tlmk].resize((self.tlm_hdf[tlmk].shape[0] +
+                                                   np.array([self.tlm_hdf[tlmk]]).shape[0]), axis=0)
+                        self.tlm_hdf[tlmk][-np.array([self.telemetry[tlmk]]).shape[0]:] = np.array([self.telemetry[tlmk]])
+                    else:
+                        self.tlm_hdf[tlmk].resize(self.tlm_hdf[tlmk].shape[0] + 1, axis=0)
+                        self.tlm_hdf[tlmk][-1] = self.telemetry[tlmk]
 
     def getTiles(self):
         try:
@@ -684,6 +757,11 @@ class Subrack(QtWidgets.QMainWindow):
             event.accept()
             self.stopThreads = True
             print("Stopping Threads")
+            if type(self.tlm_hdf) is not None:
+                try:
+                    self.tlm_hdf.close()
+                except:
+                    pass
             sleep(1)
 
 
