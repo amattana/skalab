@@ -107,6 +107,7 @@ class Live(QtWidgets.QMainWindow):
         self.stopThreads = False
         self.skipThreadPause = False
         self.ThreadPause = True
+        self.RunBusy = False
         self.live_data = []
         self.procRun = Thread(target=self.procRunDaq)
         self.procRun.start()
@@ -129,10 +130,11 @@ class Live(QtWidgets.QMainWindow):
 
     def load_events(self):
         # Live Plots Connections
-        self.wg.qbutton_connect.clicked.connect(lambda: self.station_connect())
+        self.wg.qbutton_connect.clicked.connect(lambda: self.connect())
         self.wg.qbutton_single.clicked.connect(lambda: self.doSingleAcquisition())
         self.wg.qbutton_run.clicked.connect(lambda: self.startContinuousAcquisition())
         self.wg.qbutton_stop.clicked.connect(lambda: self.stopContinuousAcquisition())
+        self.wg.qline_channels.textChanged.connect(lambda: self.channelsListModified())
 
         self.wg.qbutton_browse_data_directory.clicked.connect(lambda: self.browse_outdir())
         self.wg.qbutton_browse_station_config.clicked.connect(lambda: self.browse_config())
@@ -328,7 +330,7 @@ class Live(QtWidgets.QMainWindow):
         self.updateProfileCombo(current="")
         self.load_profile(self.wg.qcombo_profile.currentText())
 
-    def station_connect(self):
+    def connect(self):
         if not self.connected:
             # Load station configuration
             station.load_configuration_file(self.config_file)
@@ -356,7 +358,7 @@ class Live(QtWidgets.QMainWindow):
         else:
             self.disconnect()
 
-    def station_disconnect(self):
+    def disconnect(self):
         self.ThreadPause = True
         sleep(0.5)
         del self.tpm_station
@@ -372,13 +374,16 @@ class Live(QtWidgets.QMainWindow):
             if self.connected:
                 try:
                     if not self.ThreadPause:
+                        self.RunBusy = True
                         self.getAcquisition()
+                        sleep(0.2)
+                        # self.signalRun.emit()
+                        self.plotAcquisition()
+                        sleep(0.2)
+                        self.RunBusy = False
                 except:
                     print("Failed to get DAQ data!")
                     pass
-                sleep(0.2)
-                #self.signalRun.emit()
-                self.plotAcquisition()
                 cycle = 0.0
                 while cycle < (int(self.profile['App']['query_interval']) - 1) and not self.skipThreadPause:
                     sleep(0.5)
@@ -415,8 +420,9 @@ class Live(QtWidgets.QMainWindow):
         self.plotAcquisition()
 
     def plotAcquisition(self):
-        if not self.wg.qline_channels.text() == self.live_channels:
-            self.live_reformat_plots()
+        if not self.RunBusy:
+            if not self.wg.qline_channels.text() == self.live_channels:
+                self.reformat_plots()
 
         self.live_resolutions = 2 ** np.array(range(16)) * (800000.0 / 2 ** 15)
         self.live_rbw = int(closest(self.live_resolutions, float(self.wg.qline_rbw.text())))
@@ -460,16 +466,19 @@ class Live(QtWidgets.QMainWindow):
     def doSingleAcquisition(self):
         self.getAcquisition()
         self.plotAcquisition()
+        self.wg.qbutton_run.setEnabled(True)
 
     def startContinuousAcquisition(self):
         self.ThreadPause = False
         self.wg.qbutton_run.setEnabled(False)
         self.wg.qbutton_single.setEnabled(False)
+        self.wg.qline_channels.setEnabled(False)
 
     def stopContinuousAcquisition(self):
         self.ThreadPause = True
         self.wg.qbutton_single.setEnabled(True)
         self.wg.qbutton_run.setEnabled(True)
+        self.wg.qline_channels.setEnabled(True)
 
     def getAcquisition(self):
         if self.connected:
@@ -521,7 +530,11 @@ class Live(QtWidgets.QMainWindow):
             else:
                 print("ciao")
 
-    def live_reformat_plots(self):
+    def channelsListModified(self):
+        if not self.wg.qline_channels.text() == self.live_channels:
+            self.wg.qbutton_run.setEnabled(False)
+
+    def reformat_plots(self):
         try:
             new_input_list = []
             for i in self.wg.qline_channels.text().split(","):
@@ -534,7 +547,7 @@ class Live(QtWidgets.QMainWindow):
             del self.livePlots
             gc.collect()
             self.live_input_list = new_input_list
-            self.livePlots = MiniPlots(self.wg.qplot_spectra, len(self.live_input_list))
+            self.livePlots = MiniPlots(parent=self.wg.qplot_spectra, nplot=len(self.live_input_list))
             self.live_channels = self.wg.qline_channels.text()
         except ValueError:
             msgBox = QtWidgets.QMessageBox()

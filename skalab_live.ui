@@ -683,16 +683,6 @@
       </rect>
      </property>
     </widget>
-    <widget class="QWidget" name="qplot_spectrogram" native="true">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>180</y>
-       <width>1131</width>
-       <height>681</height>
-      </rect>
-     </property>
-    </widget>
     <widget class="QLabel" name="qlabel_time">
      <property name="geometry">
       <rect>
