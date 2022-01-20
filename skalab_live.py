@@ -113,20 +113,21 @@ class Live(QtWidgets.QMainWindow):
         self.procRun.start()
 
         self.config_file = config
-        self.show_live_spectra_grid = self.wg.qcheck_spectra_grid.isChecked()
+        self.show_rms = self.wg.qcheck_rms.isChecked()
+        self.show_spectra_grid = self.wg.qcheck_spectra_grid.isChecked()
 
-        self.live_resolutions = 2 ** np.array(range(16)) * (800000.0 / 2 ** 15)
-        self.live_rbw = int(closest(self.live_resolutions, float(self.wg.qline_rbw.text())))
-        self.live_avg = 2 ** self.live_rbw
-        self.live_nsamples = int(2 ** 15 / self.live_avg)
-        self.live_RBW = (self.live_avg * (400000.0 / 16384.0))
-        self.live_asse_x = np.arange(self.live_nsamples / 2 + 1) * self.live_RBW * 0.001
+        self.resolutions = 2 ** np.array(range(16)) * (800000.0 / 2 ** 15)
+        self.rbw = int(closest(self.resolutions, float(self.wg.qline_rbw.text())))
+        self.avg = 2 ** self.rbw
+        self.nsamples = int(2 ** 15 / self.avg)
+        self.RBW = (self.avg * (400000.0 / 16384.0))
+        self.asse_x = np.arange(self.nsamples / 2 + 1) * self.RBW * 0.001
 
         self.live_input_list = np.arange(1, 17)
         self.live_channels = self.wg.qline_channels.text()
 
-        self.live_xAxisRange = [float(self.wg.qline_spectra_band_from.text()), float(self.wg.qline_spectra_band_to.text())]
-        self.live_yAxisRange = [float(self.wg.qline_spectra_level_min.text()), float(self.wg.qline_spectra_level_max.text())]
+        self.xAxisRange = [float(self.wg.qline_spectra_band_from.text()), float(self.wg.qline_spectra_band_to.text())]
+        self.yAxisRange = [float(self.wg.qline_spectra_level_min.text()), float(self.wg.qline_spectra_level_max.text())]
 
     def load_events(self):
         # Live Plots Connections
@@ -424,12 +425,12 @@ class Live(QtWidgets.QMainWindow):
             if not self.wg.qline_channels.text() == self.live_channels:
                 self.reformat_plots()
 
-        self.live_resolutions = 2 ** np.array(range(16)) * (800000.0 / 2 ** 15)
-        self.live_rbw = int(closest(self.live_resolutions, float(self.wg.qline_rbw.text())))
-        self.live_avg = 2 ** self.live_rbw
-        self.live_nsamples = int(2 ** 15 / self.live_avg)
-        self.live_RBW = (self.live_avg * (400000.0 / 16384.0))
-        self.live_asse_x = np.arange(self.live_nsamples / 2 + 1) * self.live_RBW * 0.001
+        self.resolutions = 2 ** np.array(range(16)) * (800000.0 / 2 ** 15)
+        self.rbw = int(closest(self.resolutions, float(self.wg.qline_rbw.text())))
+        self.avg = 2 ** self.rbw
+        self.nsamples = int(2 ** 15 / self.avg)
+        self.RBW = (self.avg * (400000.0 / 16384.0))
+        self.asse_x = np.arange(self.nsamples / 2 + 1) * self.RBW * 0.001
 
         xAxisRange = (float(self.wg.qline_spectra_band_from.text()),
                       float(self.wg.qline_spectra_band_to.text()))
@@ -444,23 +445,23 @@ class Live(QtWidgets.QMainWindow):
             self.livePlots.plotClear()
             for n, i in enumerate(self.live_input_list):
                 # Plot X Pol
-                spettro, rfpow = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 0, :],
-                                                self.live_nsamples)
-                self.livePlots.plotCurve(self.live_asse_x, spettro, n, xAxisRange=self.live_xAxisRange,
-                                         yAxisRange=self.live_yAxisRange, title="INPUT-%02d" % i,
-                                         xLabel="MHz", yLabel="dB", colore="b")  # , rfpower=rms,
-                # annotate_rms=self.show_rms, grid=self.show_spectra_grid, lw=lw,
-                # show_line=self.wg.play_qcheck_xpol_sp.isChecked(),
-                # rms_position=float(self.wg.play_qline_rms_pos.text()))
+                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 0, :],
+                                                self.nsamples)
+                self.livePlots.plotCurve(self.asse_x, spettro, n, xAxisRange=xAxisRange,
+                                         yAxisRange=yAxisRange, title="INPUT-%02d" % i,
+                                         xLabel="MHz", yLabel="dB", colore="b", rfpower=rms,
+                                         annotate_rms=self.show_rms, grid=self.show_spectra_grid, lw=lw,
+                                         show_line=self.wg.qcheck_xpol_sp.isChecked(),
+                                         rms_position=float(self.wg.qline_rms_pos.text()))
 
                 # Plot Y Pol
-                spettro, rfpow = calcolaspettro(
-                    self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 1, :], self.live_nsamples)
-                self.livePlots.plotCurve(self.live_asse_x, spettro, n, xAxisRange=self.live_xAxisRange,
-                                         yAxisRange=self.live_yAxisRange, colore="g")  # , rfpower=rms,
-                #  annotate_rms=self.show_rms, grid=self.show_spectra_grid, lw=lw,
-                #  show_line=self.wg.play_qcheck_ypol_sp.isChecked(),
-                #  rms_position=float(self.wg.play_qline_rms_pos.text()))
+                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 1, :],
+                                              self.nsamples)
+                self.livePlots.plotCurve(self.asse_x, spettro, n, xAxisRange=xAxisRange,
+                                         yAxisRange=yAxisRange, colore="g", rfpower=rms,
+                                         annotate_rms=self.show_rms, grid=self.show_spectra_grid, lw=lw,
+                                         show_line=self.wg.qcheck_ypol_sp.isChecked(),
+                                         rms_position=float(self.wg.qline_rms_pos.text()))
             self.livePlots.updatePlot()
 
     def doSingleAcquisition(self):
@@ -469,16 +470,27 @@ class Live(QtWidgets.QMainWindow):
         self.wg.qbutton_run.setEnabled(True)
 
     def startContinuousAcquisition(self):
-        self.ThreadPause = False
-        self.wg.qbutton_run.setEnabled(False)
-        self.wg.qbutton_single.setEnabled(False)
-        self.wg.qline_channels.setEnabled(False)
+        if self.connected:
+            self.ThreadPause = False
+            self.wg.qbutton_run.setEnabled(False)
+            self.wg.qbutton_single.setEnabled(False)
+            self.wg.qline_channels.setEnabled(False)
+            self.wg.qline_rbw.setEnabled(False)
+            self.wg.qline_spectra_level_min.setEnabled(False)
+            self.wg.qline_spectra_level_max.setEnabled(False)
+            self.wg.qline_spectra_band_from.setEnabled(False)
+            self.wg.qline_spectra_band_to.setEnabled(False)
 
     def stopContinuousAcquisition(self):
         self.ThreadPause = True
         self.wg.qbutton_single.setEnabled(True)
         self.wg.qbutton_run.setEnabled(True)
         self.wg.qline_channels.setEnabled(True)
+        self.wg.qline_rbw.setEnabled(True)
+        self.wg.qline_spectra_level_min.setEnabled(True)
+        self.wg.qline_spectra_level_max.setEnabled(True)
+        self.wg.qline_spectra_band_from.setEnabled(True)
+        self.wg.qline_spectra_band_to.setEnabled(True)
 
     def getAcquisition(self):
         if self.connected:
@@ -557,10 +569,10 @@ class Live(QtWidgets.QMainWindow):
 
     def live_show_spectra_grid(self, state):
         if state == Qt.Checked:
-            self.show_live_spectra_grid = True
+            self.show_spectra_grid = True
             self.livePlots.showGrid(show_grid=True)
         else:
-            self.show_live_spectra_grid = False
+            self.show_spectra_grid = False
             self.livePlots.showGrid(show_grid=False)
 
     def closeEvent(self, event):
