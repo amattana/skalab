@@ -16,8 +16,8 @@ __copyright__ = "Copyright 2022, Istituto di RadioAstronomia, Radiotelescopi di 
 __author__ = "Andrea Mattana"
 __credits__ = ["Andrea Mattana"]
 __license__ = "GPL"
-__version__ = "1.0.3"
-__release__ = "2022-01-15"
+__version__ = "1.0.4"
+__release__ = "2022-01-28"
 __maintainer__ = "Andrea Mattana"
 
 import gc
@@ -44,8 +44,6 @@ from pathlib import Path
 default_app_dir = str(Path.home()) + "/.skalab/"
 default_profile = "Default"
 profile_filename = "skalab.ini"
-
-sw_version = "1.0"
 
 COLORI = ["b", "g"]
 

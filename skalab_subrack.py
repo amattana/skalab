@@ -8,14 +8,12 @@ import numpy as np
 import configparser
 from PyQt5 import QtWidgets, uic, QtCore, QtGui
 from hardware_client import WebHardwareClient
-from skalab_utils import BarPlot, ChartPlots, colors, dt_to_timestamp, ts_to_datestring, parse_profile
+from skalab_utils import BarPlot, ChartPlots, colors, dt_to_timestamp, ts_to_datestring, parse_profile, COLORI
 from threading import Thread
 from time import sleep
 import datetime
 from pathlib import Path
 import h5py
-
-COLORI = ["b", "g", "k", "r", "orange", "magenta", "darkgrey", "turquoise"]
 
 MgnTraces = ['board_temperatures', 'backplane_temperatures']
 default_app_dir = str(Path.home()) + "/.skalab/"

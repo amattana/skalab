@@ -12,12 +12,11 @@ import numpy as np
 from PyQt5 import QtWidgets, uic, QtCore, QtGui
 from PyQt5.QtCore import Qt
 import pydaq.daq_receiver as daq
-from skalab_utils import MiniPlots, calcolaspettro, closest, MyDaq, get_if_name, parse_profile, ts_to_datestring, dt_to_timestamp
-from pyaavs.station import Station, load_station_configuration
+from skalab_utils import MiniPlots, calcolaspettro, closest, MyDaq, get_if_name, BarPlot, ChartPlots
+from skalab_utils import parse_profile, ts_to_datestring, dt_to_timestamp, Archive, COLORI
+from pyaavs.station import Station
 from pyaavs import station
 from threading import Thread
-
-COLORI = ["b", "g"]
 
 default_app_dir = str(Path.home()) + "/.skalab/"
 default_profile = "Default"
@@ -74,7 +73,8 @@ def moving_average(xx, w):
 class Live(QtWidgets.QMainWindow):
     """ Main UI Window class """
     # Signal for Slots
-    signalRun = QtCore.pyqtSignal()
+    #signalRun = QtCore.pyqtSignal()
+    signalTemp = QtCore.pyqtSignal()
 
     def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936]):
         """ Initialise main window """
@@ -91,8 +91,20 @@ class Live(QtWidgets.QMainWindow):
         self.profile_file = ""
         self.load_profile(self.profile_name)
 
-        # Populate the playback plots for the Live Spectra
+        # Populate the plots for the Live Spectra
         self.livePlots = MiniPlots(parent=self.wg.qplot_spectra, nplot=16)
+        self.tempBoardPlots = BarPlot(parent=self.wg.qplot_temps_board, size=(3.65, 2.12), xlim=[0, 9],
+                                      ylabel="Celsius (deg)", xrotation=0, xlabel="Board",
+                                      ylim=[20, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(9))
+        self.tempFpga1Plots = BarPlot(parent=self.wg.qplot_temps_fpga1, size=(3.65, 2.12), xlim=[0, 9],
+                                      ylabel="Celsius (deg)", xrotation=0, xlabel="FPGA1",
+                                      ylim=[20, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(9))
+        self.tempFpga2Plots = BarPlot(parent=self.wg.qplot_temps_fpga2, size=(3.65, 2.12), xlim=[0, 9],
+                                      ylabel="Celsius (deg)", xrotation=0, xlabel="FPGA2",
+                                      ylim=[20, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(9))
+        self.plotChart = ChartPlots(parent=self.wg.qplot_chart, ntraces=8, xlabel="time samples", ylim=[20, 120],
+                                    ylabel="Board Temp (deg)", size=(11.2, 4), xlim=[0, 200])
+        self.data_charts = {}
 
         self.show()
         self.load_events()
@@ -103,14 +115,21 @@ class Live(QtWidgets.QMainWindow):
         self.station_configuration = {}
         self.tpm_nic_name = ""
         self.mydaq = None
+        self.temp_path = ""
+        self.temp_fname = ""
+        self.temp_file = None
+        self.temperatures = []
 
         self.stopThreads = False
         self.skipThreadPause = False
         self.ThreadPause = True
+        self.ThreadTempPause = True
         self.RunBusy = False
         self.live_data = []
         self.procRun = Thread(target=self.procRunDaq)
         self.procRun.start()
+        self.procTemp = Thread(target=self.procReadTemps)
+        self.procTemp.start()
 
         self.config_file = config
         self.show_rms = self.wg.qcheck_rms.isChecked()
@@ -128,6 +147,7 @@ class Live(QtWidgets.QMainWindow):
 
         self.xAxisRange = [float(self.wg.qline_spectra_band_from.text()), float(self.wg.qline_spectra_band_to.text())]
         self.yAxisRange = [float(self.wg.qline_spectra_level_min.text()), float(self.wg.qline_spectra_level_max.text())]
+        self.check_spectra(self.wg.qradio_spectra)
 
     def load_events(self):
         # Live Plots Connections
@@ -143,6 +163,11 @@ class Live(QtWidgets.QMainWindow):
         self.wg.qbutton_saveas.clicked.connect(lambda: self.save_as_profile())
         self.wg.qbutton_save.clicked.connect(lambda: self.save_profile(this_profile=self.profile_name))
         self.wg.qbutton_delete.clicked.connect(lambda: self.delete_profile(self.wg.qcombo_profile.currentText()))
+
+        self.wg.qradio_spectra.toggled.connect(lambda: self.check_spectra(self.wg.qradio_spectra))
+        self.wg.qradio_rms.toggled.connect(lambda: self.check_rms(self.wg.qradio_rms))
+        self.wg.qradio_temps.toggled.connect(lambda: self.check_temps(self.wg.qradio_temps))
+        self.wg.qcombo_chart.currentIndexChanged.connect(lambda: self.switchChart())
 
     def load_profile(self, profile):
         self.profile = {}
@@ -160,9 +185,55 @@ class Live(QtWidgets.QMainWindow):
         self.wg.qline_profile_interval.setText(self.profile['App']['query_interval'])
         self.wg.qline_configfile.setText(self.profile['App']['station_config'])
         self.wg.qline_output_dir.setText(self.profile['App']['data_path'])
+        self.wg.qline_temperatures_path.setText(self.profile['App']['temperatures_path'])
         # Overriding Configuration File with parameters
         self.updateProfileCombo(current=profile)
         self.populate_table_profile()
+
+    def check_spectra(self, b):
+        if b.isChecked():
+            # Show only spectra plot
+            self.wg.qplot_rms.hide()
+            self.wg.qplot_temps.hide()
+            self.wg.qplot_spectra.show()
+            # Show only spectra ctrl
+            #self.wg.ctrl_rms.hide()
+            #self.wg.ctrl_temps.hide()
+            self.wg.ctrl_spectra.show()
+            # Show only spectra tstamp
+            self.wg.qlabel_tstamp_spectra.show()
+            self.wg.qlabel_tstamp_temp.hide()
+
+    def check_rms(self, b):
+        if b.isChecked():
+            # Show only spectra plot
+            self.wg.qplot_rms.show()
+            self.wg.qplot_temps.hide()
+            self.wg.qplot_spectra.hide()
+            # Show only spectra ctrl
+            #self.wg.ctrl_rms.show()
+            #self.wg.ctrl_temps.hide()
+            self.wg.ctrl_spectra.hide()
+            # Show only spectra tstamp
+            self.wg.qlabel_tstamp_spectra.hide()
+            self.wg.qlabel_tstamp_temp.hide()
+
+    def check_temps(self, b):
+        if b.isChecked():
+            # Show only spectra plot
+            self.wg.qplot_rms.hide()
+            self.wg.qplot_temps.show()
+            self.wg.qplot_spectra.hide()
+            # Show only spectra ctrl
+            #self.wg.ctrl_rms.hide()
+            #self.wg.ctrl_temps.show()
+            self.wg.ctrl_spectra.hide()
+            # Show only spectra tstamp
+            self.wg.qlabel_tstamp_spectra.hide()
+            self.wg.qlabel_tstamp_temp.show()
+
+    def switchChart(self):
+        self.drawCharts()
 
     def browse_outdir(self):
         fd = QtWidgets.QFileDialog()
@@ -249,6 +320,10 @@ class Live(QtWidgets.QMainWindow):
             conf['App']['data_path'] = prodict['App']['data_path']
         else:
             conf['App']['data_path'] = ""
+        if 'App' in prodict.keys() and 'temperatures_path' in prodict['App'].keys():
+            conf['App']['temperatures_path'] = prodict['App']['temperatures_path']
+        else:
+            conf['App']['temperatures_path'] = ""
         if 'App' in prodict.keys() and 'query_interval' in prodict['App'].keys():
             conf['App']['query_interval'] = prodict['App']['query_interval']
         else:
@@ -350,18 +425,25 @@ class Live(QtWidgets.QMainWindow):
                 self.wg.qbutton_connect.setText("ONLINE")
                 self.connected = True
                 self.setupDAQ()
-
+                self.setupArchiveTemperatures()
+                self.ThreadTempPause = False
             except:
                 #self.wg.qlabel_connection.setText("ERROR: Unable to connect to the TPMs Station. Retry...")
                 self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
                 self.wg.qbutton_connect.setText("OFFLINE")
+                self.ThreadTempPause = True
                 self.connected = False
+                if self.temp_file is not None:
+                    self.closeTemp()
         else:
             self.disconnect()
 
     def disconnect(self):
+        self.ThreadTempPause = True
         self.ThreadPause = True
         sleep(0.5)
+        if self.temp_file is not None:
+            self.closeTemp()
         del self.tpm_station
         gc.collect()
         self.closeDAQ()
@@ -394,6 +476,52 @@ class Live(QtWidgets.QMainWindow):
                 break
             sleep(1)
 
+    def procReadTemps(self):
+        while True:
+            if self.connected:
+                try:
+                    if not self.ThreadTempPause:
+                        self.readTemperatures()
+                        sleep(0.2)
+                        #print("LETTE, SGN EMIT()")
+                        #self.signalTemp.emit()
+                        self.updateTempPlot()
+                except:
+                    print("Failed to get Temperatures data!")
+                    pass
+                cycle = 0.0
+                while cycle < 3:
+                    sleep(0.5)
+                    cycle = cycle + 0.5
+                #self.skipThreadPause = False
+            if self.stopThreads:
+                self.closeTemp()
+                break
+            sleep(1)
+
+    def readTemperatures(self):
+        timestamp = dt_to_timestamp(datetime.datetime.utcnow())
+        self.wg.qlabel_tstamp_temp.setText(ts_to_datestring(timestamp))
+        if self.temp_file is not None:
+            self.temp_file.write(name="timestamp", data=timestamp)
+        self.temperatures = []
+        for n, tile in enumerate(self.tpm_station.tiles):
+            k = ("TPM-%02d" % (n + 1))
+            tris = [tile.get_temperature(), tile.get_fpga0_temperature(), tile.get_fpga1_temperature()]
+            self.temperatures += [tris]
+            if self.temp_file is not None:
+                self.temp_file.write(name=("TPM-%02d" % (n + 1)), data=tris)
+            if k not in self.data_charts.keys():
+                self.data_charts[k] = [[np.nan, np.nan, np.nan]] * 201
+            self.data_charts[k] = self.data_charts[k][1:] + [tris]
+
+            #print("TPM-%02d Temperatures: Board %3.1f,\tFPGA-0 %3.1f,\tFPGA-1 %3.1f" %
+            #      (n + 1, tris[0], tris[1], tris[2]))
+
+    def closeTemp(self):
+        if self.temp_file is not None:
+            self.temp_file.close()
+
     def setupDAQ(self):
         self.tpm_nic_name = get_if_name(self.station_configuration['network']['lmc']['lmc_ip'])
         if self.tpm_nic_name == "":
@@ -407,6 +535,23 @@ class Live(QtWidgets.QMainWindow):
         del self.mydaq
         gc.collect()
 
+    def setupArchiveTemperatures(self):
+        if self.connected:
+            self.temp_path = self.profile['App']['temperatures_path']
+            if not self.temp_path == "":
+                if not self.temp_path[-1] == "/":
+                    self.temp_path = self.temp_path + "/"
+                self.temp_fname = datetime.datetime.strftime(datetime.datetime.utcnow(),
+                                                             "%Y-%m-%d_%H%M%S_StationTemperatures.h5")
+                self.temp_file = Archive(hfile=self.temp_path + self.temp_fname, mode='a')
+            else:
+                msgBox = QtWidgets.QMessageBox()
+                msgBox.setText("Warning: No path defined to save Auxiliary data (Temperatures). "
+                               "\nThis data will not be saved in this session.")
+                msgBox.setWindowTitle("Warning!")
+                msgBox.setIcon(QtWidgets.QMessageBox.Warning)
+                msgBox.exec_()
+
     def setupNewTilesIPs(self, newTiles):
         if self.connected:
             self.station_disconnect()
@@ -415,10 +560,52 @@ class Live(QtWidgets.QMainWindow):
 
     def runAcquisition(self):
         self.live_data = self.mydaq.execute()
-        self.wg.qlabel_tstamp.setText(ts_to_datestring(dt_to_timestamp(datetime.datetime.utcnow())))
+        self.wg.qlabel_tstamp_spectra.setText(ts_to_datestring(dt_to_timestamp(datetime.datetime.utcnow())))
 
     def updatePlots(self):
         self.plotAcquisition()
+
+    def updateTempPlot(self):
+        # Draw Bars
+        #print("TEMPERATURE: ", self.temperatures)
+        if not self.temperatures == []:
+            if len(self.temperatures) == len(self.tpm_station.tiles):
+                for i in range(len(self.tpm_station.tiles)):
+                    self.tempBoardPlots.plotBar(data=float(self.temperatures[i][0]), bar=i, color=COLORI[i])
+                    self.tempFpga1Plots.plotBar(data=float(self.temperatures[i][1]), bar=i, color=COLORI[i])
+                    self.tempFpga2Plots.plotBar(data=float(self.temperatures[i][2]), bar=i, color=COLORI[i])
+                self.tempBoardPlots.set_xlabel("Board")
+                self.tempFpga1Plots.set_xlabel("FPGA1")
+                self.tempFpga2Plots.set_xlabel("FPGA2")
+            else:
+                self.tempBoardPlots.set_xlabel("Error Reading Temps from TPMs!")
+                self.tempFpga1Plots.set_xlabel("Error Reading Temps from TPMs!")
+                self.tempFpga2Plots.set_xlabel("Error Reading Temps from TPMs!")
+        else:
+            self.tempBoardPlots.set_xlabel("No data available!")
+            self.tempFpga1Plots.set_xlabel("No data available!")
+            self.tempFpga2Plots.set_xlabel("No data available!")
+        self.tempBoardPlots.updatePlot()
+        self.tempFpga1Plots.updatePlot()
+        self.tempFpga2Plots.updatePlot()
+        # Draw Charts
+        self.drawCharts()
+
+    def drawCharts(self):
+        self.plotChart.set_xlabel("time sample")
+        # Draw selected chart
+        if self.wg.qcombo_chart.currentIndex() == 0:
+            self.plotChart.set_ylabel("TPM Board Temperatures (deg)")
+        elif self.wg.qcombo_chart.currentIndex() == 1:
+            self.plotChart.set_ylabel("TPM FPGA1 Temperatures (deg)")
+        elif self.wg.qcombo_chart.currentIndex() == 2:
+            self.plotChart.set_ylabel("TPM FPGA2 Temperatures (deg)")
+        # Chart: TPM Temperatures
+        self.plotChart.set_ylim([20, 120])
+        for i in range(len(self.data_charts.keys())):
+            self.plotChart.plotCurve(data=np.array(self.data_charts["TPM-%02d" % (i + 1)]).transpose()[
+                self.wg.qcombo_chart.currentIndex()], trace=i, color=COLORI[i])
+        self.plotChart.updatePlot()
 
     def plotAcquisition(self):
         if not self.RunBusy:
@@ -595,10 +782,72 @@ if __name__ == "__main__":
     parser = OptionParser(usage="usage: %station_live [options]")
     parser.add_option("--config", action="store", dest="config",
                       type="str", default=None, help="Configuration file [default: None]")
-    (conf, args) = parser.parse_args(argv[1:])
+    parser.add_option("--nogui", action="store_true", dest="nogui",
+                      default=False, help="Do not show GUI")
+    parser.add_option("--temperatures", action="store_true", dest="temperatures",
+                      default=False, help="Acquire and save temperatures")
+    parser.add_option("--profile", action="store", dest="profile",
+                      type="str", default="Default", help="Live Profile file to load")
+    (opt, args) = parser.parse_args(argv[1:])
 
-    app = QtWidgets.QApplication(sys.argv)
-    window = Live(config=conf.config, uiFile="skalab_live.ui")
-    #window.signalRun.connect(window.updatePlots())
+    if not opt.nogui:
+        app = QtWidgets.QApplication(sys.argv)
+        window = Live(config=opt.config, uiFile="skalab_live.ui")
+        window.signalTemp.connect(window.updateTempPlot)
+        sys.exit(app.exec_())
+    else:
+        profile = []
+        fullpath = default_app_dir + opt.profile + "/" + profile_filename
+        if not os.path.exists(fullpath):
+            print("\nThe Live Profile does not exist.\n")
+        else:
+            print("Loading Live Profile: " + opt.profile + " (" + fullpath + ")")
+            profile = parse_profile(fullpath)
+            profile_name = profile
+            profile_file = fullpath
+            if not opt.config == "":
+                station_config = opt.config
+            else:
+                station_config = profile['App']['station_config']
+            if not station_config == "":
+                station.load_configuration_file(station_config)
+                # Create station
+                tpm_station = Station(station.configuration)
+                # Connect station (program, initialise and configure if required)
+                tpm_station.connect()
 
-    sys.exit(app.exec_())
+                if opt.temperatures:
+                    temp_path = ""
+                    if "temperatures_path" in profile['App'].keys():
+                        temp_path = profile['App']['temperatures_path']
+                    if not temp_path == "":
+                        if not temp_path[-1] == "/":
+                            temp_path = temp_path + "/"
+                        fname = datetime.datetime.strftime(datetime.datetime.utcnow(),
+                                                           "%Y-%m-%d_%H%M%S_StationTemperatures.h5")
+                        temp_file = Archive(hfile=temp_path + fname, mode='a')
+                        while True:
+                            tstamp = dt_to_timestamp(datetime.datetime.utcnow())
+                            temp_file.write(name="timestamp", data=tstamp)
+                            try:
+                                for n, tile in enumerate(tpm_station.tiles):
+                                    tris = [tile.get_temperature(),  tile.get_fpga0_temperature(),
+                                            tile.get_fpga1_temperature()]
+                                    temp_file.write(name=("TPM-%02d" % (n + 1)), data=tris)
+                                    print("TPM-%02d Temperatures: Board %3.1f,\tFPGA-0 %3.1f,\tFPGA-1 %3.1f" %
+                                          (n + 1, tris[0], tris[1], tris[2]))
+                                sleep(1)
+                            except KeyboardInterrupt:
+                                print("\n\nTerminated by the user.\n\n")
+                                temp_file.close()
+                                print("File closed: ", temp_path + fname, "\n")
+                                break
+                            except:
+                                print("ERROR SAVING TEMPERATURES!")
+                                temp_file.close()
+                                print("File closed: ", temp_path + fname, "\n")
+                                break
+                    else:
+                        print("There is no any temperatures path specified in the profile file.\n")
+            else:
+                print("The profile File doesn't have a Station Configuration File.\n")

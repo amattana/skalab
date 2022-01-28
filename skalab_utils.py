@@ -2,6 +2,8 @@ import glob
 import datetime
 import subprocess
 import calendar
+
+import h5py
 import numpy as np
 import configparser
 from matplotlib.figure import Figure
@@ -12,6 +14,7 @@ sys.path.append("../../pyaavs/tests/")
 from pydaq.persisters import *
 from get_nic import getnic
 
+COLORI = ["b", "g", "k", "r", "orange", "magenta", "darkgrey", "turquoise"]
 
 def parse_profile(config=""):
     confparser = configparser.ConfigParser()
@@ -752,3 +755,49 @@ class ChartPlots(QtWidgets.QWidget):
     def plotClear(self):
         # Reset the plot landscape
         self.canvas.ax.clear()
+
+
+class Archive:
+    def __init__(self, hfile, mode='a'):
+        self.hfile = h5py.File(hfile, mode)
+        self.open = True
+
+    def keys(self):
+        return self.hfile.keys()
+
+    def len(self, name, field=-1):
+        if name in self.keys():
+            if field == -1:
+                return len(self.hfile[name])
+            else:
+                if field < self.hfile[name].shape[1]:
+                    return len(self.read(name, field))
+                else:
+                    return -1
+        else:
+            return None
+
+    def write(self, name, data):
+        if type(data) is not list:
+            if name not in self.hfile.keys():
+                self.hfile.create_dataset(name, data=[[data]], chunks=True, maxshape=(None, 1))
+            else:
+                self.hfile[name].resize(self.hfile[name].shape[0] + 1, axis=0)
+                self.hfile[name][-1] = [data]
+        else:
+            if name not in self.hfile.keys():
+                self.hfile.create_dataset(name, data=[data], chunks=True,  maxshape=(None, len(data)))
+            else:
+                self.hfile[name].resize((self.hfile[name].shape[0] + np.array([data]).shape[0]), axis=0)
+                self.hfile[name][-np.array([data]).shape[0]:] = np.array([data])
+
+    def read(self, name, field=0):
+        if self.hfile[name].shape[1] == 1:
+            return self.hfile[name][:].reshape(len(self.hfile[name][:])).tolist()
+        else:
+            return self.hfile[name][:].transpose()[field].tolist()
+
+    def close(self):
+        self.hfile.close()
+        self.open = False
+
