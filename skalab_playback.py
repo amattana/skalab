@@ -1,15 +1,24 @@
 #!/usr/bin/env python
+import shutil
 import sys
 import os
 import gc
 import glob
+from pathlib import Path
+
+import configparser
 import numpy as np
-from PyQt5 import QtWidgets, uic
+from PyQt5 import QtWidgets, uic, QtCore, QtGui
 from PyQt5.QtCore import Qt
-from skalab_utils import dB2Linear, linear2dB, MiniPlots, read_data, dircheck, findtiles, calc_disk_usage, calcolaspettro, closest
+from skalab_utils import dB2Linear, linear2dB, MiniPlots, read_data, dircheck, findtiles, calc_disk_usage, \
+    calcolaspettro, closest, parse_profile
 from pyaavs import station
 from pydaq.persisters import FileDAQModes, RawFormatFileManager
 COLORI = ["b", "g"]
+
+default_app_dir = str(Path.home()) + "/.skalab/"
+default_profile = "Default"
+profile_filename = "playback.ini"
 
 # import warnings
 # warnings.filterwarnings('ignore')
@@ -64,16 +73,20 @@ def moving_average(xx, w):
 class Playback(QtWidgets.QMainWindow):
     """ Main UI Window class """
 
-    def __init__(self, config="", uiFile="", profile="Default"):
+    def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936]):
         """ Initialise main window """
         super(Playback, self).__init__()
         # Load window file
         self.wg = uic.loadUi(uiFile)
         self.setCentralWidget(self.wg)
-        self.resize(1180, 910)
+        self.resize(size[0], size[1])
 
         self.profile_name = profile
+        if self.profile_name == "":
+            self.profile_name = "Default"
+        self.profile = {}
         self.profile_file = ""
+        self.load_profile(self.profile_name)
 
         # Populate the playback plots for the spectra, and power data
         self.miniPlots = MiniPlots(parent=self.wg.qplot_spectra, nplot=16)
@@ -175,6 +188,12 @@ class Playback(QtWidgets.QMainWindow):
         self.wg.qcheck_ypol_sp.stateChanged.connect(self.cb_show_yline)
         self.wg.qcheck_rms.stateChanged.connect(self.cb_show_rms)
 
+        self.wg.qbutton_load_profile.clicked.connect(lambda: self.load())
+        self.wg.qbutton_browse_station_config.clicked.connect(lambda: self.browse_config())
+        self.wg.qbutton_saveas_profile.clicked.connect(lambda: self.save_as_profile())
+        self.wg.qbutton_save_profile.clicked.connect(lambda: self.save_profile(this_profile=self.profile_name))
+        self.wg.qbutton_delete_profile.clicked.connect(lambda: self.delete_profile(self.wg.qcombo_profile.currentText()))
+
     def setup_config(self):
         if not self.config_file == "":
             station.load_configuration_file(self.config_file)
@@ -201,7 +220,26 @@ class Playback(QtWidgets.QMainWindow):
             if n in tpm_list:
                 self.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (n + 1, i))
 
+    def load_profile(self, profile):
+        self.profile = {}
+        fullpath = default_app_dir + profile + "/" + profile_filename
+        if os.path.exists(fullpath):
+            print("Loading Playback Profile: " + profile + " (" + fullpath + ")")
+        else:
+            print("\nThe Playback Profile does not exist.\nGenerating a new one in "
+                  + fullpath + "\n")
+            self.make_profile(profile=profile, prodict={})
+        self.profile = parse_profile(fullpath)
+        self.profile_name = profile
+        self.profile_file = fullpath
+        self.wg.qline_configuration_file.setText(self.profile_file)
+        self.wg.qline_configfile.setText(self.profile['App']['station_config'])
+        # Overriding Configuration File with parameters
+        self.updateProfileCombo(current=profile)
+        self.populate_table_profile()
+
     def browse_data_folder(self):
+        #if self.
         fd = QtWidgets.QFileDialog()
         fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
         options = fd.options()
@@ -786,6 +824,121 @@ class Playback(QtWidgets.QMainWindow):
         self.yAxisRange = [float(self.wg.qline_level_min.text()), float(self.wg.qline_level_max.text())]
         self.miniPlots.set_y_limits(self.yAxisRange)
         self.wg.qbutton_apply.setEnabled(False)
+
+    def load(self):
+        self.load_profile(self.wg.qcombo_profile.currentText())
+
+    def browse_config(self):
+        fd = QtWidgets.QFileDialog()
+        fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
+        options = fd.options()
+        self.config_file = fd.getOpenFileName(self, caption="Select a Station Config File...",
+                                              directory="/opt/aavs/config/", options=options)[0]
+        self.wg.qline_configfile.setText(self.config_file)
+
+    def populate_table_profile(self):
+        self.wg.qtable_conf.clearSpans()
+        self.wg.qtable_conf.setGeometry(QtCore.QRect(640, 20, 481, 171))
+        self.wg.qtable_conf.setObjectName("qtable_conf")
+        self.wg.qtable_conf.setColumnCount(1)
+        self.wg.qtable_conf.setWordWrap(True)
+
+        total_rows = 1
+        for i in self.profile.sections():
+            total_rows = total_rows + len(self.profile[i]) + 1
+        self.wg.qtable_conf.setRowCount(total_rows + 1)
+
+        item = QtWidgets.QTableWidgetItem("Profile: " + self.profile_name)
+        item.setTextAlignment(QtCore.Qt.AlignCenter)
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        item.setFont(font)
+        item.setFlags(QtCore.Qt.ItemIsEnabled)
+        self.wg.qtable_conf.setHorizontalHeaderItem(0, item)
+
+        item = QtWidgets.QTableWidgetItem(" ")
+        item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        item.setFlags(QtCore.Qt.ItemIsEnabled)
+        self.wg.qtable_conf.setVerticalHeaderItem(0, item)
+
+        q = 1
+        for i in self.profile.sections():
+            item = QtWidgets.QTableWidgetItem("[" + i + "]")
+            item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+            item.setFlags(QtCore.Qt.ItemIsEnabled)
+            font = QtGui.QFont()
+            font.setBold(True)
+            font.setWeight(75)
+            item.setFont(font)
+            self.wg.qtable_conf.setVerticalHeaderItem(q, item)
+            q = q + 1
+            for k in self.profile[i]:
+                item = QtWidgets.QTableWidgetItem(k)
+                item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+                item.setFlags(QtCore.Qt.ItemIsEnabled)
+                self.wg.qtable_conf.setVerticalHeaderItem(q, item)
+                item = QtWidgets.QTableWidgetItem(self.profile[i][k])
+                item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+                item.setFlags(QtCore.Qt.ItemIsEnabled)
+                self.wg.qtable_conf.setItem(q, 0, item)
+                q = q + 1
+            item = QtWidgets.QTableWidgetItem(" ")
+            item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+            item.setFlags(QtCore.Qt.ItemIsEnabled)
+            self.wg.qtable_conf.setVerticalHeaderItem(q, item)
+            q = q + 1
+
+        #self.wg.qtable_conf.horizontalHeader().setStretchLastSection(True)
+        self.wg.qtable_conf.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        #self.wg.qtable_conf.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.wg.qtable_conf.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+
+    def make_profile(self, profile: str, prodict: dict):
+        conf = configparser.ConfigParser()
+        conf['App'] = {}
+        if 'App' in prodict.keys() and 'station_config' in prodict['App'].keys():
+            conf['App']['station_config'] = prodict['App']['station_config']
+        else:
+            conf['App']['station_config'] = ""
+
+        if not os.path.exists(default_app_dir):
+            os.makedirs(default_app_dir)
+        conf_path = default_app_dir + profile
+        if not os.path.exists(conf_path):
+            os.makedirs(conf_path)
+        conf_path = conf_path + "/" + profile_filename
+        with open(conf_path, 'w') as configfile:
+            conf.write(configfile)
+
+    def updateProfileCombo(self, current):
+        profiles = []
+        for d in os.listdir(default_app_dir):
+            if os.path.exists(default_app_dir + "/" + d + "/" + profile_filename):
+                profiles += [d]
+        if profiles:
+            self.wg.qcombo_profile.clear()
+            for n, p in enumerate(profiles):
+                self.wg.qcombo_profile.addItem(p)
+                if current == p:
+                    self.wg.qcombo_profile.setCurrentIndex(n)
+
+    def save_profile(self, this_profile, reload=True):
+        self.make_profile(profile=this_profile,
+                          prodict={'App': {'station_config': self.wg.qline_configfile.text()}})
+        if reload:
+            self.load_profile(profile=this_profile)
+
+    def save_as_profile(self):
+        text, ok = QtWidgets.QInputDialog.getText(self, 'Profiles', 'Enter a Profile name:')
+        if ok:
+            self.save_profile(this_profile=text)
+
+    def delete_profile(self, profile):
+        if os.path.exists(default_app_dir + profile):
+            shutil.rmtree(default_app_dir + profile)
+        self.updateProfileCombo(current="")
+        self.load_profile(self.wg.qcombo_profile.currentText())
 
     def closeEvent(self, event):
         result = QtWidgets.QMessageBox.question(self,

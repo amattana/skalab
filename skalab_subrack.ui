@@ -35,7 +35,7 @@
        <x>890</x>
        <y>830</y>
        <width>241</width>
-       <height>31</height>
+       <height>41</height>
       </rect>
      </property>
      <property name="layoutDirection">
@@ -876,7 +876,7 @@
        <x>480</x>
        <y>830</y>
        <width>371</width>
-       <height>31</height>
+       <height>41</height>
       </rect>
      </property>
      <property name="layoutDirection">

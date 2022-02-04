@@ -16,6 +16,7 @@ from get_nic import getnic
 
 COLORI = ["b", "g", "k", "r", "orange", "magenta", "darkgrey", "turquoise"]
 
+
 def parse_profile(config=""):
     confparser = configparser.ConfigParser()
     confparser.read(config)
@@ -621,6 +622,12 @@ class BarPlot(QtWidgets.QWidget):
         self.xrotation = xrotation
         self.show()
         self.bars = self.canvas.ax.bar(np.arange(xlim[-1]-1) + 1, np.zeros(xlim[-1]-1), 0.8, color='b')
+
+    def reinit(self, nbar=8):
+        del self.bars
+        self.bars = self.canvas.ax.bar(np.arange(8 * (((nbar - 1) // 8) + 1)) + 1, np.zeros(8 * (((nbar - 1) // 8) + 1)),
+                                       (0.8 / (((nbar - 1) // 8) + 1)), color='b')
+        self.updatePlot()
 
     def set_xlabel(self, label):
         self.canvas.ax.set_xlabel(label)

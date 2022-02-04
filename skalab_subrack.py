@@ -337,7 +337,7 @@ class Subrack(QtWidgets.QMainWindow):
     def updateProfileCombo(self, current):
         profiles = []
         for d in os.listdir(default_app_dir):
-            if os.path.exists(default_app_dir + "/" + d + "/subrack.ini"):
+            if os.path.exists(default_app_dir + "/" + d + "/" + profile_filename):
                 profiles += [d]
         if profiles:
             self.wg.qcombo_profile.clear()

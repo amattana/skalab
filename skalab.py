@@ -16,8 +16,8 @@ __copyright__ = "Copyright 2022, Istituto di RadioAstronomia, Radiotelescopi di 
 __author__ = "Andrea Mattana"
 __credits__ = ["Andrea Mattana"]
 __license__ = "GPL"
-__version__ = "1.0.4"
-__release__ = "2022-01-28"
+__version__ = "1.0.5"
+__release__ = "2022-02-04"
 __maintainer__ = "Andrea Mattana"
 
 import gc
@@ -144,7 +144,7 @@ class SkaLab(QtWidgets.QMainWindow):
 
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabPlayIndex, True)
         self.wgPlayLayout = QtWidgets.QVBoxLayout()
-        self.wgPlay = Playback(self.config_file, "skalab_playback.ui", profile=self.profile['App']['playback'])
+        self.wgPlay = Playback(self.config_file, "skalab_playback.ui", size=[1190, 936], profile=self.profile['App']['playback'])
         self.wgPlayLayout.addWidget(self.wgPlay)
         self.wg.qwPlay.setLayout(self.wgPlayLayout)
 
@@ -295,8 +295,8 @@ class SkaLab(QtWidgets.QMainWindow):
                 tpm_ip_list = list(station.configuration['tiles'])
                 tpm_ip_from_subrack = self.wgSubrack.getTiles()
                 if tpm_ip_from_subrack:
-                    tpm_ip_from_subrack = [x for x in tpm_ip_from_subrack if not x == '0']
-                    if not len(tpm_ip_list) == len(tpm_ip_from_subrack):
+                    tpm_ip_from_subrack_short = [x for x in tpm_ip_from_subrack if not x == '0']
+                    if not len(tpm_ip_list) == len(tpm_ip_from_subrack_short):
                         msgBox = QtWidgets.QMessageBox()
                         message = "STATION\nOne or more TPMs forming the station are OFF\nPlease check the power!"
                         msgBox.setText(message)
@@ -305,15 +305,15 @@ class SkaLab(QtWidgets.QMainWindow):
                         details = "STATION IP LIST FROM CONFIG FILE (%d): " % len(tpm_ip_list)
                         for i in tpm_ip_list:
                             details += "\n%s" % i
-                        details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(tpm_ip_from_subrack)
-                        for i in tpm_ip_from_subrack:
+                        details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(tpm_ip_from_subrack_short)
+                        for i in tpm_ip_from_subrack_short:
                             details += "\n%s" % i
                         msgBox.setDetailedText(details)
                         msgBox.exec_()
                         print(self.wgSubrack.telemetry)
                         return
                     else:
-                        if not np.array_equal(tpm_ip_list, tpm_ip_from_subrack):
+                        if not np.array_equal(tpm_ip_list, tpm_ip_from_subrack_short):
                             msgBox = QtWidgets.QMessageBox()
                             message = "STATION\nIPs provided by the SubRack are different from what defined in the " \
                                       "config file.\nINIT will use the new assigned IPs."
@@ -323,12 +323,12 @@ class SkaLab(QtWidgets.QMainWindow):
                             details = "STATION IP LIST FROM CONFIG FILE (%d): " % len(tpm_ip_list)
                             for i in tpm_ip_list:
                                 details += "\n%s" % i
-                            details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(tpm_ip_from_subrack)
-                            for i in tpm_ip_from_subrack:
+                            details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(tpm_ip_from_subrack_short)
+                            for i in tpm_ip_from_subrack_short:
                                 details += "\n%s" % i
                             msgBox.setDetailedText(details)
                             msgBox.exec_()
-                            station.configuration['tiles'] = list(tpm_ip_from_subrack)
+                            station.configuration['tiles'] = list(tpm_ip_from_subrack_short)
                             self.wgLive.setupNewTilesIPs(list(tpm_ip_from_subrack))
                 for tpm_ip in station.configuration['tiles']:
                     try:

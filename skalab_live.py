@@ -159,11 +159,12 @@ class Live(QtWidgets.QMainWindow):
 
         self.wg.qbutton_browse_data_directory.clicked.connect(lambda: self.browse_outdir())
         self.wg.qbutton_browse_station_config.clicked.connect(lambda: self.browse_config())
-        self.wg.qcheck_spectra_grid.stateChanged.connect(self.live_show_spectra_grid)
+        self.wg.qbutton_load.clicked.connect(lambda: self.load())
         self.wg.qbutton_saveas.clicked.connect(lambda: self.save_as_profile())
         self.wg.qbutton_save.clicked.connect(lambda: self.save_profile(this_profile=self.profile_name))
         self.wg.qbutton_delete.clicked.connect(lambda: self.delete_profile(self.wg.qcombo_profile.currentText()))
 
+        self.wg.qcheck_spectra_grid.stateChanged.connect(self.live_show_spectra_grid)
         self.wg.qradio_spectra.toggled.connect(lambda: self.check_spectra(self.wg.qradio_spectra))
         self.wg.qradio_rms.toggled.connect(lambda: self.check_rms(self.wg.qradio_rms))
         self.wg.qradio_temps.toggled.connect(lambda: self.check_temps(self.wg.qradio_temps))
@@ -378,7 +379,7 @@ class Live(QtWidgets.QMainWindow):
     def updateProfileCombo(self, current):
         profiles = []
         for d in os.listdir(default_app_dir):
-            if os.path.exists(default_app_dir + "/" + d + "/live.ini"):
+            if os.path.exists(default_app_dir + "/" + d + "/" + profile_filename):
                 profiles += [d]
         if profiles:
             self.wg.qcombo_profile.clear()
@@ -386,6 +387,15 @@ class Live(QtWidgets.QMainWindow):
                 self.wg.qcombo_profile.addItem(p)
                 if current == p:
                     self.wg.qcombo_profile.setCurrentIndex(n)
+
+    def load(self):
+        if not self.connected:
+            self.load_profile(self.wg.qcombo_profile.currentText())
+        else:
+            msgBox = QtWidgets.QMessageBox()
+            msgBox.setText("Please switch to OFFLINE first!")
+            msgBox.setWindowTitle("Error!")
+            msgBox.exec_()
 
     def save_profile(self, this_profile, reload=True):
         self.make_profile(profile=this_profile,
@@ -423,6 +433,9 @@ class Live(QtWidgets.QMainWindow):
                 #self.wg.qlabel_connection.setText("Connected")
                 self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")
                 self.wg.qbutton_connect.setText("ONLINE")
+                self.tempBoardPlots.reinit(len(self.tpm_station.tiles))
+                self.tempFpga1Plots.reinit(len(self.tpm_station.tiles))
+                self.tempFpga2Plots.reinit(len(self.tpm_station.tiles))
                 self.connected = True
                 self.setupDAQ()
                 self.setupArchiveTemperatures()
@@ -554,9 +567,10 @@ class Live(QtWidgets.QMainWindow):
 
     def setupNewTilesIPs(self, newTiles):
         if self.connected:
-            self.station_disconnect()
-        self.newTilesIPs = newTiles
-        self.station_configuration['tiles'] = newTiles
+            self.disconnect()
+        self.newTilesIPs = [x for x in newTiles if not x == '0']
+        self.station_configuration['tiles'] = self.newTilesIPs
+        self.updateComboIps(newTiles)
 
     def runAcquisition(self):
         self.live_data = self.mydaq.execute()
@@ -696,12 +710,12 @@ class Live(QtWidgets.QMainWindow):
             msgBox.setIcon(QtWidgets.QMessageBox.Critical)
             msgBox.exec_()
 
-    def live_tpm_update(self, tpm_list=[]):
+    def updateComboIps(self, tpm_list=list):
         # Update TPM list
         self.wg.qcombo_tpm.clear()
-        for n, i in enumerate(station.configuration['tiles']):
-            if n in tpm_list:
-                self.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (n + 1, i))
+        for nn, i in enumerate(tpm_list):
+            if not i == "0":
+                self.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (nn + 1, i))
 
     def export_data(self):
         if self.wg.play_qradio_spectrogram.isChecked():
