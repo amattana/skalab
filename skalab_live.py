@@ -547,8 +547,8 @@ class Live(QtWidgets.QMainWindow):
                         self.readTemperatures()
                         sleep(0.2)
                         #print("LETTE, SGN EMIT()")
-                        #self.signalTemp.emit()
-                        self.updateTempPlot()
+                        self.signalTemp.emit()
+                        #self.updateTempPlot()
                 except:
                     print("Failed to get Temperatures data!")
                     pass
@@ -571,8 +571,8 @@ class Live(QtWidgets.QMainWindow):
                         #print(self.rms)
                         sleep(0.2)
                         #print("LETTE, SGN EMIT()")
-                        #self.signalRms.emit()
-                        self.updateRms()
+                        self.signalRms.emit()
+                        #self.updateRms()
                 except:
                     print("Failed to get RMS data!")
                     pass
