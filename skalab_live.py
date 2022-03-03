@@ -116,6 +116,8 @@ class Live(QtWidgets.QMainWindow):
         self.preadu = Preadu(parent=self.qw_preadu, debug=0, board_type=0)
         self.wg.ctrl_preadu.hide()
         self.data_charts = {}
+        self.qw_rms = []
+        self.qp_rms = []
 
         self.show()
         self.load_events()
@@ -222,6 +224,7 @@ class Live(QtWidgets.QMainWindow):
             # Show only spectra tstamp
             self.wg.qlabel_tstamp_spectra.show()
             self.wg.qlabel_tstamp_temp.hide()
+            self.wg.qlabel_tstamp_rms.hide()
             self.qw_preadu.hide()
 
     def check_rms(self, b):
@@ -238,6 +241,7 @@ class Live(QtWidgets.QMainWindow):
             # Show only spectra tstamp
             self.wg.qlabel_tstamp_spectra.hide()
             self.wg.qlabel_tstamp_temp.hide()
+            self.wg.qlabel_tstamp_rms.show()
             self.qw_preadu.hide()
 
     def check_temps(self, b):
@@ -253,6 +257,7 @@ class Live(QtWidgets.QMainWindow):
             self.wg.ctrl_preadu.hide()
             # Show only spectra tstamp
             self.wg.qlabel_tstamp_spectra.hide()
+            self.wg.qlabel_tstamp_rms.hide()
             self.wg.qlabel_tstamp_temp.show()
             self.qw_preadu.hide()
 
@@ -270,6 +275,7 @@ class Live(QtWidgets.QMainWindow):
         # Show only spectra tstamp
         self.wg.qlabel_tstamp_spectra.hide()
         self.wg.qlabel_tstamp_temp.hide()
+        self.wg.qlabel_tstamp_rms.show()
         self.qw_preadu.show()
         self.preadu_read()
 
@@ -485,11 +491,11 @@ class Live(QtWidgets.QMainWindow):
                 self.tempFpga1Plots.reinit(len(self.tpm_station.tiles))
                 self.tempFpga2Plots.reinit(len(self.tpm_station.tiles))
                 self.connected = True
+                self.setupRms()
                 self.setupDAQ()
                 self.setupArchiveTemperatures()
                 self.ThreadTempPause = False
                 self.preadu.set_tpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
-
             except:
                 #self.wg.qlabel_connection.setText("ERROR: Unable to connect to the TPMs Station. Retry...")
                 self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
@@ -690,6 +696,26 @@ class Live(QtWidgets.QMainWindow):
                 msgBox.setIcon(QtWidgets.QMessageBox.Warning)
                 msgBox.exec_()
 
+    def setupRms(self):
+        w = self.wg.qplot_rms.geometry().width()
+        h = self.wg.qplot_rms.geometry().height()
+        s = int(np.ceil(np.sqrt(len(self.station_configuration['tiles']))))
+        width = w / s
+        height = h / s
+        if not self.qw_rms == []:
+            for t in range(len(self.qw_rms)):
+                self.qw_rms[t].deleteLater()
+                self.qp_rms[t].deleteLater()
+        self.qw_rms = []
+        self.qp_rms = []
+        for t in range(len(self.station_configuration['tiles'])):
+            self.qw_rms += [QtWidgets.QWidget(self.wg.qplot_rms)]
+            self.qw_rms[t].setGeometry(QtCore.QRect(width * (t % s), height * int((t / s)), width, height))
+            title = self.wg.qcombo_tpm.itemText(t)
+            self.qp_rms += [BarPlot(parent=self.qw_rms[t], size=((width/100), (height/100)), xlim=[0, 33],
+                                    ylabel="ADU RMS", xrotation=90, xlabel=title, ylim=[0, 40],
+                                    yticks=np.arange(0, 50, 10), xticks=np.arange(33), fsize=10-s)]
+
     def setupNewTilesIPs(self, newTiles):
         if self.connected:
             self.disconnect()
@@ -702,7 +728,13 @@ class Live(QtWidgets.QMainWindow):
         self.wg.qlabel_tstamp_spectra.setText(ts_to_datestring(dt_to_timestamp(datetime.datetime.utcnow())))
 
     def updateRms(self):
-        self.preadu.updateRms(self.rms[self.wg.qcombo_tpm.currentIndex()])
+        if self.connected:
+            self.wg.qlabel_tstamp_rms.setText(ts_to_datestring(dt_to_timestamp(datetime.datetime.utcnow())))
+            self.preadu.updateRms(self.rms[self.wg.qcombo_tpm.currentIndex()])
+            for t in range(len(self.station_configuration['tiles'])):
+                for i in range(32):
+                    self.qp_rms[t].plotBar(self.rms[t][i], i, ['b', 'g'][i % 2])
+                self.qp_rms[t].updatePlot()
 
     def updatePlots(self):
         self.plotAcquisition()
@@ -710,28 +742,29 @@ class Live(QtWidgets.QMainWindow):
     def updateTempPlot(self):
         # Draw Bars
         #print("TEMPERATURE: ", self.temperatures)
-        if not self.temperatures == []:
-            if len(self.temperatures) == len(self.tpm_station.tiles):
-                for i in range(len(self.tpm_station.tiles)):
-                    self.tempBoardPlots.plotBar(data=float(self.temperatures[i][0]), bar=i, color=COLORI[i])
-                    self.tempFpga1Plots.plotBar(data=float(self.temperatures[i][1]), bar=i, color=COLORI[i])
-                    self.tempFpga2Plots.plotBar(data=float(self.temperatures[i][2]), bar=i, color=COLORI[i])
-                self.tempBoardPlots.set_xlabel("Board")
-                self.tempFpga1Plots.set_xlabel("FPGA1")
-                self.tempFpga2Plots.set_xlabel("FPGA2")
+        if self.connected:
+            if not self.temperatures == []:
+                if len(self.temperatures) == len(self.tpm_station.tiles):
+                    for i in range(len(self.tpm_station.tiles)):
+                        self.tempBoardPlots.plotBar(data=float(self.temperatures[i][0]), bar=i, color=COLORI[i])
+                        self.tempFpga1Plots.plotBar(data=float(self.temperatures[i][1]), bar=i, color=COLORI[i])
+                        self.tempFpga2Plots.plotBar(data=float(self.temperatures[i][2]), bar=i, color=COLORI[i])
+                    self.tempBoardPlots.set_xlabel("Board")
+                    self.tempFpga1Plots.set_xlabel("FPGA1")
+                    self.tempFpga2Plots.set_xlabel("FPGA2")
+                else:
+                    self.tempBoardPlots.set_xlabel("Error Reading Temps from TPMs!")
+                    self.tempFpga1Plots.set_xlabel("Error Reading Temps from TPMs!")
+                    self.tempFpga2Plots.set_xlabel("Error Reading Temps from TPMs!")
             else:
-                self.tempBoardPlots.set_xlabel("Error Reading Temps from TPMs!")
-                self.tempFpga1Plots.set_xlabel("Error Reading Temps from TPMs!")
-                self.tempFpga2Plots.set_xlabel("Error Reading Temps from TPMs!")
-        else:
-            self.tempBoardPlots.set_xlabel("No data available!")
-            self.tempFpga1Plots.set_xlabel("No data available!")
-            self.tempFpga2Plots.set_xlabel("No data available!")
-        self.tempBoardPlots.updatePlot()
-        self.tempFpga1Plots.updatePlot()
-        self.tempFpga2Plots.updatePlot()
-        # Draw Charts
-        self.drawCharts()
+                self.tempBoardPlots.set_xlabel("No data available!")
+                self.tempFpga1Plots.set_xlabel("No data available!")
+                self.tempFpga2Plots.set_xlabel("No data available!")
+            self.tempBoardPlots.updatePlot()
+            self.tempFpga1Plots.updatePlot()
+            self.tempFpga2Plots.updatePlot()
+            # Draw Charts
+            self.drawCharts()
 
     def drawCharts(self):
         self.plotChart.set_xlabel("time sample")

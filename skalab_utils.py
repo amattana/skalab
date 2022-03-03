@@ -584,19 +584,19 @@ class MyDaq:
         self.daq.stop_daq()
 
 
-
 class BarCanvas(FigureCanvas):
-    def __init__(self, dpi=100, size=(11, 5.3), xticks=[0, 1, 2, 3, 4, 5, 6, 7, 8],
+    def __init__(self, dpi=100, size=(11, 5.3), xticks=[0, 1, 2, 3, 4, 5, 6, 7, 8], xrotation=0, fsize=8,
                  yticks=[0, 2, 4, 6, 8, 10], xlim=[0, 10], ylim=[0, 40], xlabel="x", ylabel="y"):
         self.dpi = dpi
         self.fig = Figure(size, dpi=self.dpi)#, facecolor='white')
+        #self.fig = Figure(dpi=self.dpi)#, facecolor='white')
         self.fig.set_tight_layout(True)
         self.ax = self.fig.add_subplot(1, 1, 1)
-        self.ax.tick_params(axis='both', which='both', labelsize=8)
+        self.ax.tick_params(axis='both', which='both', labelsize=fsize)
         self.ax.set_ylim(ylim)
         self.ax.set_xlim(xlim)
         self.ax.set_xticks(np.arange(1, len(xticks)))
-        self.ax.set_xticklabels(xticks[1:])
+        self.ax.set_xticklabels(xticks[1:], rotation=xrotation, fontsize=fsize)
         self.ax.set_yticks(yticks)
         self.ax.set_xlabel(xlabel)
         self.ax.set_ylabel(ylabel)
@@ -609,17 +609,17 @@ class BarCanvas(FigureCanvas):
 
 class BarPlot(QtWidgets.QWidget):
     """ Class encapsulating a matplotlib plot"""
-    def __init__(self, parent=None, size=(11, 5.3), xlabel="TPM", ylabel="Volt", xlim=[0, 10], ylim=[0, 9],
+    def __init__(self, parent=None, size=(11, 5.3), xlabel="TPM", ylabel="Volt", xlim=[0, 10], ylim=[0, 9], fsize=8,
                  xticks=[0, 1, 2, 3, 4, 5, 6, 7], yticks=[0, 2, 4, 6, 8, 10], xrotation=0):
         QtWidgets.QWidget.__init__(self, parent)
+        self.xrotation = xrotation
         """ Class initialiser """
-        self.canvas = BarCanvas(dpi=100, size=size, xticks=xticks, yticks=yticks,
+        self.canvas = BarCanvas(dpi=100, size=size, xticks=xticks, yticks=yticks, xrotation=self.xrotation, fsize=fsize,
                                 xlim=xlim, ylim=ylim, ylabel=ylabel, xlabel=xlabel)  # create canvas that will hold our plot
         self.updateGeometry()
         self.vbl = QtWidgets.QVBoxLayout()
         self.vbl.addWidget(self.canvas)
         self.setLayout(self.vbl)
-        self.xrotation = xrotation
         self.show()
         self.bars = self.canvas.ax.bar(np.arange(xlim[-1]-1) + 1, np.zeros(xlim[-1]-1), 0.8, color='b')
 
@@ -807,4 +807,3 @@ class Archive:
     def close(self):
         self.hfile.close()
         self.open = False
-
