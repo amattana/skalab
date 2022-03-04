@@ -1004,4 +1004,6 @@ class Preadu(object):
         for num in range(self.inputs):
             self.records[num]['rms'].setText("%d" % int(round(rms[self.chan_remap[num]])))
             power = 10 * np.log10(np.power((rms[self.chan_remap[num]] * (1.7 / 256.)), 2) / 400.) + 30 + 12
+            if power == (-np.inf):
+                power = -60
             self.records[num]['power'].setText("%3.1f" % power)

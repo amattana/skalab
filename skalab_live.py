@@ -133,6 +133,7 @@ class Live(QtWidgets.QMainWindow):
         self.temp_file = None
         self.temperatures = []
         self.rms = []
+        self.dsa = []
 
         self.stopThreads = False
         self.skipThreadPause = False
@@ -165,6 +166,15 @@ class Live(QtWidgets.QMainWindow):
         self.yAxisRange = [float(self.wg.qline_spectra_level_min.text()), float(self.wg.qline_spectra_level_max.text())]
         self.check_spectra(self.wg.qradio_spectra)
 
+        w = self.wg.qplot_rms.geometry().width()
+        h = self.wg.qplot_rms.geometry().height()
+        self.qwRmsMain = QtWidgets.QWidget(self.wg.qplot_rms)
+        self.qwRmsMain.setGeometry(QtCore.QRect(0, 0, w, h))
+        self.qwRmsMainLayout = QtWidgets.QVBoxLayout(self.qwRmsMain)
+        self.qwRms = QtWidgets.QWidget()
+        self.qwRms.setGeometry(QtCore.QRect(0, 0, w, h))
+        self.qwRmsMainLayout.insertWidget(0, self.qwRms)
+
     def load_events(self):
         # Live Plots Connections
         self.wg.qbutton_connect.clicked.connect(lambda: self.connect())
@@ -181,6 +191,7 @@ class Live(QtWidgets.QMainWindow):
         self.wg.qbutton_preadu_setup.clicked.connect(lambda: self.preadu_setup(self.wg.qcombo_preadu_version.currentIndex()))
         self.wg.qbutton_equalize.clicked.connect(lambda: self.equalization())
         self.wg.qline_channels.textChanged.connect(lambda: self.channelsListModified())
+        self.wg.qbutton_rms_apply.clicked.connect(lambda: self.customizeRms())
 
         self.wg.qcheck_spectra_grid.stateChanged.connect(self.live_show_spectra_grid)
         self.wg.qradio_spectra.toggled.connect(lambda: self.check_spectra(self.wg.qradio_spectra))
@@ -221,6 +232,7 @@ class Live(QtWidgets.QMainWindow):
             #self.wg.ctrl_temps.hide()
             self.wg.ctrl_spectra.show()
             self.wg.ctrl_preadu.hide()
+            self.wg.ctrl_rms.hide()
             # Show only spectra tstamp
             self.wg.qlabel_tstamp_spectra.show()
             self.wg.qlabel_tstamp_temp.hide()
@@ -238,6 +250,7 @@ class Live(QtWidgets.QMainWindow):
             #self.wg.ctrl_temps.hide()
             self.wg.ctrl_spectra.hide()
             self.wg.ctrl_preadu.hide()
+            self.wg.ctrl_rms.show()
             # Show only spectra tstamp
             self.wg.qlabel_tstamp_spectra.hide()
             self.wg.qlabel_tstamp_temp.hide()
@@ -255,6 +268,7 @@ class Live(QtWidgets.QMainWindow):
             #self.wg.ctrl_temps.show()
             self.wg.ctrl_spectra.hide()
             self.wg.ctrl_preadu.hide()
+            self.wg.ctrl_rms.hide()
             # Show only spectra tstamp
             self.wg.qlabel_tstamp_spectra.hide()
             self.wg.qlabel_tstamp_rms.hide()
@@ -270,6 +284,7 @@ class Live(QtWidgets.QMainWindow):
         #self.wg.ctrl_rms.hide()
         #self.wg.ctrl_temps.show()
         self.wg.ctrl_spectra.hide()
+        self.wg.ctrl_rms.hide()
         self.wg.ctrl_preadu.show()
 
         # Show only spectra tstamp
@@ -491,11 +506,14 @@ class Live(QtWidgets.QMainWindow):
                 self.tempFpga1Plots.reinit(len(self.tpm_station.tiles))
                 self.tempFpga2Plots.reinit(len(self.tpm_station.tiles))
                 self.connected = True
+
                 self.setupRms()
                 self.setupDAQ()
                 self.setupArchiveTemperatures()
                 self.ThreadTempPause = False
+                self.readDSA()
                 self.preadu.set_tpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
+
             except:
                 #self.wg.qlabel_connection.setText("ERROR: Unable to connect to the TPMs Station. Retry...")
                 self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
@@ -600,6 +618,12 @@ class Live(QtWidgets.QMainWindow):
             self.rms = rms
         pass
 
+    def readDSA(self):
+        self.dsa = []
+        for t in self.tpm_station.tiles:
+            self.preadu.set_tpm(t)
+            self.dsa += [self.preadu.read_dsa()]
+
     def equalization(self):
         if self.connected:
             self.ThreadTempPause = True
@@ -636,11 +660,14 @@ class Live(QtWidgets.QMainWindow):
                         for i in range(len(RMS[b])):
                             rms = RMS[b][self.preadu.chan_remap[i]]
                             power = 10 * np.log10(np.power((rms * (1.7 / 256.)), 2) / 400.) + 30 + 12
+                            if power == (-np.inf):
+                                power = -30
                             dsa[i] = bound(int(round(dsa[i] + (power - target))))
                         self.preadu.write_dsa(dsa)
                         time.sleep(0.2)
             self.wg.qbutton_equalize.setEnabled(True)
             self.wg.qbutton_equalize.setStyleSheet("")
+            self.readDSA()
             self.ThreadTempPause = False
 
     def readTemperatures(self):
@@ -697,24 +724,47 @@ class Live(QtWidgets.QMainWindow):
                 msgBox.exec_()
 
     def setupRms(self):
+        item = self.qwRmsMainLayout.itemAt(0)
+        widget = item.widget()
+        widget.deleteLater()
+
         w = self.wg.qplot_rms.geometry().width()
         h = self.wg.qplot_rms.geometry().height()
+        self.qwRms = QtWidgets.QWidget()
+        self.qwRms.setGeometry(QtCore.QRect(0, 0, w, h))
+
         s = int(np.ceil(np.sqrt(len(self.station_configuration['tiles']))))
-        width = w / s
+        width = (w - 20) / s
         height = h / s
-        if not self.qw_rms == []:
-            for t in range(len(self.qw_rms)):
-                self.qw_rms[t].deleteLater()
-                self.qp_rms[t].deleteLater()
         self.qw_rms = []
         self.qp_rms = []
         for t in range(len(self.station_configuration['tiles'])):
-            self.qw_rms += [QtWidgets.QWidget(self.wg.qplot_rms)]
+            self.qw_rms += [QtWidgets.QWidget(self.qwRms)]
             self.qw_rms[t].setGeometry(QtCore.QRect(width * (t % s), height * int((t / s)), width, height))
             title = self.wg.qcombo_tpm.itemText(t)
             self.qp_rms += [BarPlot(parent=self.qw_rms[t], size=((width/100), (height/100)), xlim=[0, 33],
                                     ylabel="ADU RMS", xrotation=90, xlabel=title, ylim=[0, 40],
-                                    yticks=np.arange(0, 50, 10), xticks=np.arange(33), fsize=10-s)]
+                                    yticks=np.arange(0, 50, 10), xticks=np.arange(33), fsize=10-s, markersize=10-s)]
+        self.qwRmsMainLayout.insertWidget(0, self.qwRms)
+        self.qwRms.show()
+
+    def customizeRms(self):
+        for t in range(len(self.qw_rms)):
+            if self.wg.qradio_rms_adu.isChecked():
+                self.qp_rms[t].showBars()
+                self.qp_rms[t].hideMarkers()
+                self.qp_rms[t].set_yticks(np.arange(0, 45, 5))
+                self.qp_rms[t].set_ylabel(" ADU RMS ")
+            elif self.wg.qradio_rms_power.isChecked():
+                self.qp_rms[t].hideBars()
+                self.qp_rms[t].showMarkers()
+                self.qp_rms[t].set_ylabel(" Power (dBm) ")
+                self.qp_rms[t].set_yticks(np.arange(-35, 15, 5))
+            else:
+                self.qp_rms[t].showBars()
+                self.qp_rms[t].hideMarkers()
+                self.qp_rms[t].set_yticks(np.arange(0, 36, 4))
+                self.qp_rms[t].set_ylabel(" PreADU DSA (dB) ")
 
     def setupNewTilesIPs(self, newTiles):
         if self.connected:
@@ -732,8 +782,19 @@ class Live(QtWidgets.QMainWindow):
             self.wg.qlabel_tstamp_rms.setText(ts_to_datestring(dt_to_timestamp(datetime.datetime.utcnow())))
             self.preadu.updateRms(self.rms[self.wg.qcombo_tpm.currentIndex()])
             for t in range(len(self.station_configuration['tiles'])):
+                powers = []
                 for i in range(32):
-                    self.qp_rms[t].plotBar(self.rms[t][i], i, ['b', 'g'][i % 2])
+                    if self.wg.qradio_rms_adu.isChecked():
+                        self.qp_rms[t].plotBar(self.rms[t][i], i, ['b', 'g'][i % 2])
+                    elif self.wg.qradio_rms_dsa.isChecked():
+                        self.qp_rms[t].plotBar(self.dsa[t][i], i, 'g')
+                    with np.errstate(divide='ignore', invalid='ignore'):
+                        power = 10 * np.log10(np.power((self.rms[t][i] * (1.7 / 256.)), 2) / 400.) + 30 + 12
+                    if power == -np.inf:
+                        power = -60
+                    powers += [power]
+                if self.wg.qradio_rms_power.isChecked():
+                    self.qp_rms[t].markers.set_ydata(powers)
                 self.qp_rms[t].updatePlot()
 
     def updatePlots(self):

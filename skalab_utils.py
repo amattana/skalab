@@ -610,7 +610,7 @@ class BarCanvas(FigureCanvas):
 class BarPlot(QtWidgets.QWidget):
     """ Class encapsulating a matplotlib plot"""
     def __init__(self, parent=None, size=(11, 5.3), xlabel="TPM", ylabel="Volt", xlim=[0, 10], ylim=[0, 9], fsize=8,
-                 xticks=[0, 1, 2, 3, 4, 5, 6, 7], yticks=[0, 2, 4, 6, 8, 10], xrotation=0):
+                 xticks=[0, 1, 2, 3, 4, 5, 6, 7], yticks=[0, 2, 4, 6, 8, 10], xrotation=0, markersize=6):
         QtWidgets.QWidget.__init__(self, parent)
         self.xrotation = xrotation
         """ Class initialiser """
@@ -622,20 +622,50 @@ class BarPlot(QtWidgets.QWidget):
         self.setLayout(self.vbl)
         self.show()
         self.bars = self.canvas.ax.bar(np.arange(xlim[-1]-1) + 1, np.zeros(xlim[-1]-1), 0.8, color='b')
+        #self.line, = self.canvas.ax.plot(np.arange(xlim[-1]-1) + 1, np.zeros(xlim[-1]-1), color='b')
+        self.markers, = self.canvas.ax.plot(np.arange(xlim[-1]-1) + 1, np.zeros(xlim[-1]-1), linestyle='None',
+                                            marker="s", markersize=markersize)
+        self.markers.set_visible(False)
 
     def reinit(self, nbar=8):
         del self.bars
         self.bars = self.canvas.ax.bar(np.arange(8 * (((nbar - 1) // 8) + 1)) + 1, np.zeros(8 * (((nbar - 1) // 8) + 1)),
                                        (0.8 / (((nbar - 1) // 8) + 1)), color='b')
+        del self.markers
+        self.markers, = self.canvas.ax.plot(np.arange(nbar) + 1, np.zeros(nbar), linestyle='None', marker="s",
+                                            markersize=10)
+        self.markers.set_visible(False)
         self.updatePlot()
+
+    def showMarkers(self):
+        self.markers.set_visible(True)
+
+    def showBars(self):
+        for b in self.bars:
+            b.set_visible(True)
+
+    def hideMarkers(self):
+        self.markers.set_visible(False)
+
+    def hideBars(self):
+        for b in self.bars:
+            b.set_visible(False)
 
     def set_xlabel(self, label):
         self.canvas.ax.set_xlabel(label)
+
+    def set_ylabel(self, label):
+        self.canvas.ax.set_ylabel(label)
 
     def set_xticklabels(self, labels):
         self.canvas.ax.set_xlim([0, len(labels) + 1])
         self.canvas.ax.set_xticks(np.arange(1, len(labels) + 1))
         self.canvas.ax.set_xticklabels(labels)
+        self.updatePlot()
+
+    def set_yticks(self, yticks):
+        self.canvas.ax.set_ylim([yticks[0], yticks[-1]])
+        self.canvas.ax.set_yticks(yticks)
         self.updatePlot()
 
     def plotBar(self, data, bar, color):
