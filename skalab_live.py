@@ -191,7 +191,10 @@ class Live(QtWidgets.QMainWindow):
         self.wg.qbutton_preadu_setup.clicked.connect(lambda: self.preadu_setup(self.wg.qcombo_preadu_version.currentIndex()))
         self.wg.qbutton_equalize.clicked.connect(lambda: self.equalization())
         self.wg.qline_channels.textChanged.connect(lambda: self.channelsListModified())
-        self.wg.qbutton_rms_apply.clicked.connect(lambda: self.customizeRms())
+
+        self.wg.qradio_rms_adu.toggled.connect(lambda: self.customizeRms())
+        self.wg.qradio_rms_power.toggled.connect(lambda: self.customizeRms())
+        self.wg.qradio_rms_dsa.toggled.connect(lambda: self.customizeRms())
 
         self.wg.qcheck_spectra_grid.stateChanged.connect(self.live_show_spectra_grid)
         self.wg.qradio_spectra.toggled.connect(lambda: self.check_spectra(self.wg.qradio_spectra))
@@ -199,6 +202,7 @@ class Live(QtWidgets.QMainWindow):
         self.wg.qradio_temps.toggled.connect(lambda: self.check_temps(self.wg.qradio_temps))
         self.wg.qradio_preadu.toggled.connect(lambda: self.check_preadu())
         self.wg.qcombo_chart.currentIndexChanged.connect(lambda: self.switchChart())
+        self.wg.qcombo_tpm.currentIndexChanged.connect(lambda: self.updatePreadu())
 
     def load_profile(self, profile):
         self.profile = {}
@@ -256,6 +260,9 @@ class Live(QtWidgets.QMainWindow):
             self.wg.qlabel_tstamp_temp.hide()
             self.wg.qlabel_tstamp_rms.show()
             self.qw_preadu.hide()
+            if self.connected:
+                print("READING DSA")
+                self.readDSA()
 
     def check_temps(self, b):
         if b.isChecked():
@@ -301,6 +308,10 @@ class Live(QtWidgets.QMainWindow):
     def preadu_setup(self, version):
         print("Setting preadu board version: %d" % version)
         self.preadu.set_preadu_version(version)
+
+    def updatePreadu(self):
+        if self.connected:
+            self.preadu.set_tpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
 
     def switchChart(self):
         self.drawCharts()
@@ -620,9 +631,12 @@ class Live(QtWidgets.QMainWindow):
 
     def readDSA(self):
         self.dsa = []
+        #print(self.dsa)
         for t in self.tpm_station.tiles:
             self.preadu.set_tpm(t)
             self.dsa += [self.preadu.read_dsa()]
+        #print(self.dsa)
+        self.preadu.set_tpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
 
     def equalization(self):
         if self.connected:
@@ -743,13 +757,15 @@ class Live(QtWidgets.QMainWindow):
             self.qw_rms[t].setGeometry(QtCore.QRect(width * (t % s), height * int((t / s)), width, height))
             title = self.wg.qcombo_tpm.itemText(t)
             self.qp_rms += [BarPlot(parent=self.qw_rms[t], size=((width/100), (height/100)), xlim=[0, 33],
-                                    ylabel="ADU RMS", xrotation=90, xlabel=title, ylim=[0, 40],
-                                    yticks=np.arange(0, 50, 10), xticks=np.arange(33), fsize=10-s, markersize=10-s)]
+                                    ylabel="ADU RMS", xrotation=90, xlabel="ADU Input Number", ylim=[0, 40],
+                                    yticks=np.arange(0, 50, 10), xticks=(np.arange(33)-1), fsize=10-s, markersize=10-s)]
         self.qwRmsMainLayout.insertWidget(0, self.qwRms)
         self.qwRms.show()
 
     def customizeRms(self):
+        self.readDSA()
         for t in range(len(self.qw_rms)):
+            self.qp_rms[t].setTitle(self.wg.qcombo_tpm.itemText(t))
             if self.wg.qradio_rms_adu.isChecked():
                 self.qp_rms[t].showBars()
                 self.qp_rms[t].hideMarkers()
@@ -765,6 +781,8 @@ class Live(QtWidgets.QMainWindow):
                 self.qp_rms[t].hideMarkers()
                 self.qp_rms[t].set_yticks(np.arange(0, 36, 4))
                 self.qp_rms[t].set_ylabel(" PreADU DSA (dB) ")
+            self.qp_rms[t].set_xlabel(self.wg.qcombo_rms_label.currentText())
+        self.updateRms()
 
     def setupNewTilesIPs(self, newTiles):
         if self.connected:
@@ -785,11 +803,11 @@ class Live(QtWidgets.QMainWindow):
                 powers = []
                 for i in range(32):
                     if self.wg.qradio_rms_adu.isChecked():
-                        self.qp_rms[t].plotBar(self.rms[t][i], i, ['b', 'g'][i % 2])
+                        self.qp_rms[t].plotBar(self.rms[t][self.preadu.chan_remap[i]], i, ['b', 'g'][i % 2])
                     elif self.wg.qradio_rms_dsa.isChecked():
                         self.qp_rms[t].plotBar(self.dsa[t][i], i, 'g')
                     with np.errstate(divide='ignore', invalid='ignore'):
-                        power = 10 * np.log10(np.power((self.rms[t][i] * (1.7 / 256.)), 2) / 400.) + 30 + 12
+                        power = 10 * np.log10(np.power((self.rms[t][self.preadu.chan_remap[i]] * (1.7 / 256.)), 2) / 400.) + 30 + 12
                     if power == -np.inf:
                         power = -60
                     powers += [power]

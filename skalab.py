@@ -17,7 +17,7 @@ __author__ = "Andrea Mattana"
 __credits__ = ["Andrea Mattana"]
 __license__ = "GPL"
 __version__ = "1.0.6"
-__release__ = "2022-03-04"
+__release__ = "2022-03-06"
 __maintainer__ = "Andrea Mattana"
 
 import gc

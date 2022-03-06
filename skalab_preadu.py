@@ -631,18 +631,18 @@ class Preadu(object):
         self.label_bottom.setAlignment(QtCore.Qt.AlignCenter)
         self.label_bottom.setText("PRE-ADU TOP (RIGHT)") #+self.tpm_config['preadu_r'])
 
-        table_names = "# Code      Attenuation               Bands             Rx      Fibre          RMS         dBm"
+        table_names = "ADU#  Code      Attenuation               Bands             Rx      Fibre          RMS         dBm"
         self.label_legend_1 = QtWidgets.QLabel(parent)
-        self.label_legend_1.setGeometry(QtCore.QRect(44, 55, 500, 31))
+        self.label_legend_1.setGeometry(QtCore.QRect(14, 55, 500, 31))
         self.label_legend_1.setText(table_names)
         self.label_legend_2 = QtWidgets.QLabel(parent)
-        self.label_legend_2.setGeometry(QtCore.QRect(614, 55, 500, 31))
+        self.label_legend_2.setGeometry(QtCore.QRect(584, 55, 500, 31))
         self.label_legend_2.setText(table_names)
         self.label_legend_3 = QtWidgets.QLabel(parent)
-        self.label_legend_3.setGeometry(QtCore.QRect(44, 335, 500, 31))
+        self.label_legend_3.setGeometry(QtCore.QRect(14, 335, 500, 31))
         self.label_legend_3.setText(table_names)
         self.label_legend_4 = QtWidgets.QLabel(parent)
-        self.label_legend_4.setGeometry(QtCore.QRect(614, 335, 500, 31))
+        self.label_legend_4.setGeometry(QtCore.QRect(584, 335, 500, 31))
         self.label_legend_4.setText(table_names)
 
         self.frame_all = QtWidgets.QFrame(parent)
@@ -855,6 +855,7 @@ class Preadu(object):
             regs = self.read_configuration()
             for i in range(32):
                 dsa[i] += self.preadu.get_rx_attenuation(i)
+                #print(i, dsa[i])
         return dsa
 
     # def write_configuration(self):
@@ -923,6 +924,7 @@ class Preadu(object):
 
     def set_tpm(self, tpm):
         self.tpm = tpm
+        #print("PREADU SET IP: ", tpm.get_ip())
         self.preadu_val = self.read_configuration()
         self.updateForm()
 
@@ -948,7 +950,7 @@ class Preadu(object):
 
     def adjustControls(self, board_type=0):
         if self.board_type == 0:
-            table_names = "# Code      Attenuation          Fibre           RMS           dBm"
+            table_names = "ADU#  Code      Attenuation          Fibre           RMS           dBm"
             self.label_legend_1.setText(table_names)
             self.label_legend_2.setText(table_names)
             self.label_legend_3.setText(table_names)
@@ -972,7 +974,7 @@ class Preadu(object):
                 self.records[i]['power'].setGeometry((10 + 350 + (((i & 8) >> 3) * TABLE_HSPACE)),
                                                   pos.y(), pos.width(), pos.height())
         else:
-            table_names = "# Code      Attenuation               Bands             Rx      Fibre          RMS         dBm"
+            table_names = "ADU#  Code      Attenuation               Bands             Rx      Fibre          RMS         dBm"
             self.label_legend_1.setText(table_names)
             self.label_legend_2.setText(table_names)
             self.label_legend_3.setText(table_names)
