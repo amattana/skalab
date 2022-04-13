@@ -14,7 +14,7 @@ sys.path.append("../../pyaavs/tests/")
 from pydaq.persisters import *
 from get_nic import getnic
 
-COLORI = ["b", "g", "k", "r", "orange", "magenta", "darkgrey", "turquoise"]
+COLORI = ["b", "g", "k", "r", "orange", "magenta", "darkgrey", "turquoise"] * 4
 
 
 def parse_profile(config=""):
@@ -27,7 +27,7 @@ def dt_to_timestamp(d):
     return calendar.timegm(d.timetuple())
 
 
-def ts_to_datestring(tstamp, formato="%Y-%m-%d %H:%M:%S"):
+def ts_to_datestring(tstamp, formato="%Y-%m-%d %H:%M:%S UTC"):
     return datetime.datetime.strftime(datetime.datetime.utcfromtimestamp(tstamp), formato)
 
 
@@ -54,6 +54,13 @@ def colors(name):
         return "background-color: rgb(0, 0, 0); color: rgb(252, 233, 79)"
     elif name == "black_on_grey":
         return ""
+
+
+def getTextFromFile(fname):
+    if os.path.exists(fname):
+        with open(fname) as f:
+            text = f.read()
+        return text
 
 
 class MiniCanvas(FigureCanvas):
@@ -106,13 +113,33 @@ class MiniPlots(QtWidgets.QWidget):
                   titlesize=10, rfpower=0, annotate_rms=False, rms_position=-20, grid=False, show_line=True, lw=1, markersize=1):
         """ Plot the data as a curve"""
         self.titlesize = titlesize
+        from_scratch = True
         if len(data) != 0:
-            line, = self.canvas.ax[int(ant)].plot(assex, data, color=colore, lw=lw, markersize=markersize, marker=".")
-            self.plots[int(ant)][colore + 'line'] = line
-            self.plots[int(ant)][colore + 'line'].set_visible(show_line)
-            if not xAxisRange == None:
+            if (colore + 'line') in self.plots[int(ant)].keys():
+                if len(self.plots[int(ant)][colore + 'line'].get_ydata()) == len(data):
+                    self.plots[int(ant)][colore + 'line'].set_ydata(data)
+                    from_scratch = False
+            if from_scratch:
+                line, = self.canvas.ax[int(ant)].plot(assex, data, color=colore, lw=lw, markersize=markersize, marker=".")
+                self.plots[int(ant)][colore + 'line'] = line
+                self.plots[int(ant)][colore + 'line'].set_visible(show_line)
+                if colore == "b":
+                    ann = self.canvas.ax[ant].annotate("%3.1f" % rfpower + " dBm",
+                                                       (xAxisRange[0] + 20, rms_position),
+                                                       fontsize=(titlesize - 2), color=colore)
+                else:
+                    ann = self.canvas.ax[ant].annotate("%3.1f" % rfpower + " dBm",
+                                                       (xAxisRange[1] - 130, rms_position),
+                                                       fontsize=(titlesize - 2), color=colore)
+                self.plots[int(ant)][colore + 'rms'] = ann
+                self.plots[int(ant)][colore + 'rmsvalue'] = rfpower
+                self.plots[int(ant)]['xAxisRange'] = xAxisRange
+                self.plots[int(ant)]['yAxisRange'] = yAxisRange
+                self.plots[int(ant)][colore + 'show_rms'] = annotate_rms
+                self.plots[int(ant)][colore + 'show_rms_pos'] = rms_position
+            if xAxisRange is not None:
                 self.canvas.ax[ant].set_xlim(xAxisRange)
-            if not yAxisRange == None:
+            if yAxisRange is not None:
                 self.canvas.ax[ant].set_ylim(yAxisRange)
             if not title == "":
                 self.canvas.ax[ant].set_title(title, fontsize=titlesize)
@@ -122,20 +149,6 @@ class MiniPlots(QtWidgets.QWidget):
                 self.canvas.ax[ant].set_ylabel(yLabel, fontsize=titlesize)
             if grid:
                 self.canvas.ax[ant].grid(grid)
-            if colore == "b":
-                ann = self.canvas.ax[ant].annotate("%3.1f" % rfpower + " dBm",
-                                                   (xAxisRange[0] + 20, rms_position),
-                                                   fontsize=(titlesize - 2), color=colore)
-            else:
-                ann = self.canvas.ax[ant].annotate("%3.1f" % rfpower + " dBm",
-                                                   (xAxisRange[1] - 130, rms_position),
-                                                   fontsize=(titlesize - 2), color=colore)
-            self.plots[int(ant)][colore + 'rms'] = ann
-            self.plots[int(ant)][colore + 'rmsvalue'] = rfpower
-            self.plots[int(ant)]['xAxisRange'] = xAxisRange
-            self.plots[int(ant)]['yAxisRange'] = yAxisRange
-            self.plots[int(ant)][colore + 'show_rms'] = annotate_rms
-            self.plots[int(ant)][colore + 'show_rms_pos'] = rms_position
             if show_line:
                 self.plots[int(ant)][colore + 'rms'].set_visible(annotate_rms)
             else:
@@ -358,7 +371,9 @@ def calc_disk_usage(directory=".", pattern="*.hdf5"):
     except:
         return "0 MB"
 
-COLOR = ['b', 'g']
+COLOR = ['b', 'g'] * 16
+
+
 # Define default configuration
 configuration = {'tiles': None,
                  'time_delays': None,
@@ -498,29 +513,40 @@ def calcSpectra(vett):
     return np.real(spettro)
 
 
-def calcolaspettro(dati, nsamples=32768):
-    n = int(nsamples)  # split and average number, from 128k to 16 of 8k # aavs1 federico
-    sp = [dati[x:x + n] for x in range(0, len(dati), n)]
-    mediato = np.zeros(len(calcSpectra(sp[0])))
-    for k in sp:
-        singolo = calcSpectra(k)
-        mediato[:] += singolo
-    mediato[:] /= (2 ** 15 / nsamples)  # federico
-    with np.errstate(divide='ignore', invalid='ignore'):
-        mediato[:] = 20 * np.log10(mediato / 127.0)
-    d = np.array(dati, dtype=np.float64)
-    adu_rms = np.sqrt(np.mean(np.power(d, 2), 0))
-    volt_rms = adu_rms * (1.7 / 256.)
-    with np.errstate(divide='ignore', invalid='ignore'):
-        power_adc = 10 * np.log10(np.power(volt_rms, 2) / 400.) + 30
-    power_rf = power_adc + 12
-    return mediato, power_rf
+def decodeChannelList(stringa="1-16"):
+    new_list = []
+    for i in stringa.split(","):
+        if "-" in i:
+            for a in range(int(i.split("-")[0]), int(i.split("-")[1]) + 1):
+                new_list += [a]
+        else:
+            new_list += [int(i)]
+    return new_list
+
+
+# def calcolaspettro(dati, nsamples=32768):
+#     n = int(nsamples)  # split and average number, from 128k to 16 of 8k # aavs1 federico
+#     sp = [dati[x:x + n] for x in range(0, len(dati), n)]
+#     mediato = np.zeros(len(calcSpectra(sp[0])))
+#     for k in sp:
+#         singolo = calcSpectra(k)
+#         mediato[:] += singolo
+#     mediato[:] /= (2 ** 15 / nsamples)  # federico
+#     with np.errstate(divide='ignore', invalid='ignore'):
+#         mediato[:] = 20 * np.log10(mediato / 127.0)
+#     d = np.array(dati, dtype=np.float64)
+#     adu_rms = np.sqrt(np.mean(np.power(d, 2), 0))
+#     volt_rms = adu_rms * (1.7 / 256.)
+#     with np.errstate(divide='ignore', invalid='ignore'):
+#         power_adc = 10 * np.log10(np.power(volt_rms, 2) / 400.) + 30
+#     power_rf = power_adc + 12
+#     return mediato, power_rf
 
 
 def get_if_name(lmc_ip):
     #print("Scan for TPM Network interface...")
     tpm_nic = ""
-    interfaces = getnic.interfaces()
+    interfaces = os.listdir('/sys/class/net/') # getnic.interfaces() replaced!
     for i in interfaces:
         if 'inet4' in getnic.ipaddr([i])[i].keys():
             if lmc_ip in getnic.ipaddr([i])[i]['inet4']:
@@ -530,16 +556,16 @@ def get_if_name(lmc_ip):
 
 
 class MyDaq:
-    def __init__(self, mydaq, eth_nic, station, n_of_tiles):
+    def __init__(self, mydaq, eth_nic, station, n_of_tiles, directory="/storage/daq/tmp/"):
         self.daq = mydaq
         self.nof_tiles = n_of_tiles
         self.daq_config = {
             'receiver_interface': eth_nic,  # CHANGE THIS if required
-            'directory': "/storage/daq/tmp/",  # CHANGE THIS if required
+            'directory': directory,  # CHANGE THIS if required
+            'nof_tiles': n_of_tiles,
             'nof_beam_channels': 384,
             'nof_beam_samples': 42,
-            'receiver_frame_size': 9000,
-            'nof_tiles': n_of_tiles
+            'receiver_frame_size': 9000
         }
 
         self.station = station
@@ -564,7 +590,13 @@ class MyDaq:
     def execute(self):
         # Start whichever consumer is required and provide callback
         self.data_received = 0
-        self.station.send_raw_data()
+        #print("Send Raw Data Request...")
+        if self.station.tiles[0].tpm_version() == "tpm_v1_2":
+            self.station.send_raw_data()
+        else:
+            for i in range(self.nof_tiles):
+                self.station.tiles[i].send_raw_data(seconds=0.02)
+            #self.station.send_raw_data()
         while not self.data_received == self.nof_tiles:
             time.sleep(0.1)
         self.get_data()
@@ -576,9 +608,8 @@ class MyDaq:
             raw_file = RawFormatFileManager(root_path=self.daq_config['directory'], daq_mode=FileDAQModes.Burst)
             data, timestamps = raw_file.read_data(tile_id=i, antennas=range(16), polarizations=[0, 1], n_samples=32 * 1024)
             self.data += [data[self.antenna_mapping, :, :].transpose((0, 1, 2))]
-            #print("LEN DATA: %d" % len(data))
-            #print("LEN GLOBAL: %d" % len(self.data))
-
+            #print("TILE-%02d, INPUT CHANNEL LEN DATA: %d" % (i, len(data)))
+            #print("TILE-%02d, GLOBAL LEN: %d" % (i, len(self.data)))
 
     def close(self):
         self.daq.stop_daq()
@@ -586,7 +617,7 @@ class MyDaq:
 
 class BarCanvas(FigureCanvas):
     def __init__(self, dpi=100, size=(11, 5.3), xticks=[0, 1, 2, 3, 4, 5, 6, 7, 8], xrotation=0, fsize=8,
-                 yticks=[0, 2, 4, 6, 8, 10], xlim=[0, 10], ylim=[0, 40], xlabel="x", ylabel="y"):
+                 yticks=[0, 2, 4, 6, 8, 10], xlim=[0, 10], ylim=[0, 40], xlabel="x", ylabel="y", labelpad=10):
         self.dpi = dpi
         self.fig = Figure(size, dpi=self.dpi)#, facecolor='white')
         #self.fig = Figure(dpi=self.dpi)#, facecolor='white')
@@ -598,7 +629,7 @@ class BarCanvas(FigureCanvas):
         self.ax.set_xticks(np.arange(1, len(xticks)))
         self.ax.set_xticklabels(xticks[1:], rotation=xrotation, fontsize=fsize)
         self.ax.set_yticks(yticks)
-        self.ax.set_xlabel(xlabel)
+        self.ax.set_xlabel(xlabel, labelpad=labelpad)
         self.ax.set_ylabel(ylabel)
         self.ax.grid()
 
@@ -610,49 +641,66 @@ class BarCanvas(FigureCanvas):
 class BarPlot(QtWidgets.QWidget):
     """ Class encapsulating a matplotlib plot"""
     def __init__(self, parent=None, size=(11, 5.3), xlabel="TPM", ylabel="Volt", xlim=[0, 10], ylim=[0, 9], fsize=8,
-                 xticks=[0, 1, 2, 3, 4, 5, 6, 7], yticks=[0, 2, 4, 6, 8, 10], xrotation=0, markersize=6):
+                 xticks=[0, 1, 2, 3, 4, 5, 6, 7], yticks=[0, 2, 4, 6, 8, 10], xrotation=0, markersize=6, labelpad=10):
         QtWidgets.QWidget.__init__(self, parent)
         self.xrotation = xrotation
         """ Class initialiser """
         self.canvas = BarCanvas(dpi=100, size=size, xticks=xticks, yticks=yticks, xrotation=self.xrotation, fsize=fsize,
-                                xlim=xlim, ylim=ylim, ylabel=ylabel, xlabel=xlabel)  # create canvas that will hold our plot
+                                xlim=xlim, ylim=ylim, ylabel=ylabel, xlabel=xlabel, labelpad=labelpad)  # create canvas that will hold our plot
         self.updateGeometry()
         self.vbl = QtWidgets.QVBoxLayout()
         self.vbl.addWidget(self.canvas)
         self.setLayout(self.vbl)
         self.show()
         self.bars = self.canvas.ax.bar(np.arange(xlim[-1]-1) + 1, np.zeros(xlim[-1]-1), 0.8, color='b')
-        #self.line, = self.canvas.ax.plot(np.arange(xlim[-1]-1) + 1, np.zeros(xlim[-1]-1), color='b')
-        self.markers, = self.canvas.ax.plot(np.arange(xlim[-1]-1) + 1, np.zeros(xlim[-1]-1), linestyle='None',
-                                            marker="s", markersize=markersize)
-        self.markers.set_visible(False)
+        self.markersize = markersize
+        self.markers = []
+        for pol in range(2):
+            markers, = self.canvas.ax.plot(np.arange(0, xlim[-1]-1, 2) + 1 + pol, np.zeros(int((xlim[-1]-1)/2)),
+                                           linestyle='None', marker="s", markersize=self.markersize)
+            markers.set_visible(False)
+            self.markers += [markers]
 
     def reinit(self, nbar=8):
         del self.bars
         self.bars = self.canvas.ax.bar(np.arange(8 * (((nbar - 1) // 8) + 1)) + 1, np.zeros(8 * (((nbar - 1) // 8) + 1)),
                                        (0.8 / (((nbar - 1) // 8) + 1)), color='b')
         del self.markers
-        self.markers, = self.canvas.ax.plot(np.arange(nbar) + 1, np.zeros(nbar), linestyle='None', marker="s",
-                                            markersize=10)
-        self.markers.set_visible(False)
+        self.markers = []
+        if nbar > 1:
+            for pol in range(2):
+                markers, = self.canvas.ax.plot(np.arange(0, nbar, 2) + 1 + pol, np.zeros(int(nbar/2)),
+                                               linestyle='None', marker="s", markersize=self.markersize)
+                markers.set_visible(False)
+                self.markers += [markers]
+        else:
+            markers, = self.canvas.ax.plot(np.arange(nbar) + 1, np.zeros(nbar), linestyle='None', marker="s",
+                                           markersize=self.markersize)
+            markers.set_visible(False)
+            self.markers += [markers]
         self.updatePlot()
 
     def showMarkers(self):
-        self.markers.set_visible(True)
+        for pol in range(2):
+            self.markers[pol].set_visible(True)
 
     def showBars(self):
         for b in self.bars:
             b.set_visible(True)
 
     def hideMarkers(self):
-        self.markers.set_visible(False)
+        for pol in range(2):
+            self.markers[pol].set_visible(False)
 
     def hideBars(self):
         for b in self.bars:
             b.set_visible(False)
 
-    def set_xlabel(self, label):
-        self.canvas.ax.set_xlabel(label)
+    def setTitle(self, title):
+        self.canvas.ax.set_title(title)
+
+    def set_xlabel(self, label, labelpad=10):
+        self.canvas.ax.set_xlabel(label, labelpad=labelpad)
 
     def set_ylabel(self, label):
         self.canvas.ax.set_ylabel(label)
@@ -787,7 +835,7 @@ class ChartPlots(QtWidgets.QWidget):
 
     def updatePlot(self):
         self.canvas.draw()
-        self.show()
+        #self.show()
 
     def plotClear(self):
         # Reset the plot landscape

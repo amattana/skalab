@@ -16,8 +16,8 @@ __copyright__ = "Copyright 2022, Istituto di RadioAstronomia, Radiotelescopi di 
 __author__ = "Andrea Mattana"
 __credits__ = ["Andrea Mattana"]
 __license__ = "GPL"
-__version__ = "1.0.6"
-__release__ = "2022-03-06"
+__version__ = "1.0.7"
+__release__ = "2022-03-04"
 __maintainer__ = "Andrea Mattana"
 
 import gc
@@ -38,7 +38,7 @@ from pyfabil.base.definitions import LibraryError, BoardError, PluginError, Inst
 from skalab_live import Live
 from skalab_playback import Playback
 from skalab_subrack import Subrack
-from skalab_utils import parse_profile
+from skalab_utils import parse_profile, getTextFromFile
 from pathlib import Path
 
 default_app_dir = str(Path.home()) + "/.skalab/"
@@ -186,6 +186,7 @@ class SkaLab(QtWidgets.QMainWindow):
         self.rms = {}
         if self.config_file:
             self.setup_config()
+        self.populate_help()
 
     def load_events(self):
         self.wg.qbutton_browse.clicked.connect(lambda: self.browse_config())
@@ -244,6 +245,13 @@ class SkaLab(QtWidgets.QMainWindow):
                 self.wg.qcombo_profiles.addItem(p)
                 if current == p:
                     self.wg.qcombo_profiles.setCurrentIndex(n)
+
+    def populate_help(self, uifile="skalab_main.ui"):
+        with open(uifile) as f:
+            data = f.readlines()
+        helpkeys = [d[d.rfind('name="Help_'):].split('"')[1] for d in data if 'name="Help_' in d]
+        for k in helpkeys:
+            self.wg.findChild(QtWidgets.QTextEdit, k).setText(getTextFromFile(k.replace("_", "/")+".html"))
 
     def browse_config(self):
         fd = QtWidgets.QFileDialog()
@@ -377,14 +385,15 @@ class SkaLab(QtWidgets.QMainWindow):
                     if self.tpm_station.properly_formed_station:
                         self.wg.qbutton_station_init.setStyleSheet("background-color: rgb(78, 154, 6);")
 
-                        # ByPass the MCU temperature controls
-                        for tile in self.tpm_station.tiles:
-                            tile[0x90000034] = 0xBADC0DE
-                            tile[0x30000518] = 1
-                            time.sleep(0.1)
-                        time.sleep(1)
-                        print("MCU Controls Hacked with \nVal 0xBADC0DE in Reg 0x90000034,"
-                              "\nVal 0x0000001 in Reg 0x30000518")
+                        if not self.tpm_station.tiles[0].tpm_version() == "tpm_v1_2":
+                            # ByPass the MCU temperature controls on TPM 1.6
+                            for tile in self.tpm_station.tiles:
+                                tile[0x90000034] = 0xBADC0DE
+                                tile[0x30000518] = 1
+                                time.sleep(0.1)
+                            time.sleep(1)
+                            print("MCU Controls Hacked with \nVal 0xBADC0DE in Reg 0x90000034,"
+                                  "\nVal 0x0000001 in Reg 0x30000518")
 
                         # Switch On the PreADUs
                         for tile in self.tpm_station.tiles:
@@ -633,7 +642,7 @@ class SkaLab(QtWidgets.QMainWindow):
             self.wgLive.stopThreads = True
             self.wgSubrack.stopThreads = True
             self.stopThreads = True
-
+            time.sleep(1)
             if self.wg.qradio_autosave.isChecked():
                 self.save_profile(this_profile=self.profile_name, reload=False)
 

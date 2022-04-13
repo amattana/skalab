@@ -8,7 +8,8 @@ import numpy as np
 import configparser
 from PyQt5 import QtWidgets, uic, QtCore, QtGui
 from hardware_client import WebHardwareClient
-from skalab_utils import BarPlot, ChartPlots, colors, dt_to_timestamp, ts_to_datestring, parse_profile, COLORI
+from skalab_utils import BarPlot, ChartPlots, colors, dt_to_timestamp
+from skalab_utils import ts_to_datestring, parse_profile, COLORI, getTextFromFile
 from threading import Thread
 from time import sleep
 import datetime
@@ -172,6 +173,9 @@ class Subrack(QtWidgets.QMainWindow):
 
         self.wg.qplot_chart_tpm.setVisible(False)
 
+        self.populate_help()
+
+
     def load_events(self):
         self.wg.qbutton_connect.clicked.connect(lambda: self.connect())
         for n, t in enumerate(self.qbutton_tpm):
@@ -189,6 +193,13 @@ class Subrack(QtWidgets.QMainWindow):
             self.fans[i]['manual'].clicked.connect(lambda state, g=i: self.cmdSetFanManual(fan_id=g))
             self.fans[i]['auto'].clicked.connect(lambda state, g=i: self.cmdSetFanAuto(fan_id=g))
             self.fans[i]['slider'].valueChanged.connect(lambda state, g=i: self.cmdSetFanSpeed(fan_id=g))
+
+    def populate_help(self, uifile="skalab_subrack.ui"):
+        with open(uifile) as f:
+            data = f.readlines()
+        helpkeys = [d[d.rfind('name="Help_'):].split('"')[1] for d in data if 'name="Help_' in d]
+        for k in helpkeys:
+            self.wg.findChild(QtWidgets.QTextEdit, k).setText(getTextFromFile(k.replace("_", "/")+".html"))
 
     def cmdSwitchTpm(self, slot):
         if self.connected:

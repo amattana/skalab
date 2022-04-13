@@ -10,8 +10,8 @@ import configparser
 import numpy as np
 from PyQt5 import QtWidgets, uic, QtCore, QtGui
 from PyQt5.QtCore import Qt
-from skalab_utils import dB2Linear, linear2dB, MiniPlots, read_data, dircheck, findtiles, calc_disk_usage, \
-    calcolaspettro, closest, parse_profile
+from skalab_utils import dB2Linear, linear2dB, MiniPlots, read_data, dircheck, findtiles, calc_disk_usage
+from skalab_utils import calcolaspettro, closest, parse_profile, getTextFromFile, moving_average
 from pyaavs import station
 from pydaq.persisters import FileDAQModes, RawFormatFileManager
 COLORI = ["b", "g"]
@@ -66,9 +66,6 @@ configuration = {'tiles': None,
                     }
                  }
 
-
-def moving_average(xx, w):
-    return np.convolve(xx, np.ones(w), 'valid') / w
 
 class Playback(QtWidgets.QMainWindow):
     """ Main UI Window class """
@@ -162,6 +159,7 @@ class Playback(QtWidgets.QMainWindow):
         self.wg.ctrl_raw.hide()
         self.wg.ctrl_rms.hide()
         self.wg.ctrl_spectra.show()
+        self.populate_help()
 
     def load_events(self):
         self.wg.qbutton_browse.clicked.connect(lambda: self.browse_data_folder())
@@ -213,8 +211,17 @@ class Playback(QtWidgets.QMainWindow):
             msgBox.setWindowTitle("Error!")
             msgBox.exec_()
 
-    def play_tpm_update(self, tpm_list=[]):
+    def populate_help(self, uifile="skalab_playback.ui"):
+        with open(uifile) as f:
+            data = f.readlines()
+        helpkeys = [d[d.rfind('name="Help_'):].split('"')[1] for d in data if 'name="Help_' in d]
+        for k in helpkeys:
+            self.wg.findChild(QtWidgets.QTextEdit, k).setText(getTextFromFile(k.replace("_", "/")+".html"))
+
+    def play_tpm_update(self, tpm_list=None):
         # Update TPM list
+        if tpm_list is None:
+            tpm_list = []
         self.wg.qcombo_tpm.clear()
         for n, i in enumerate(station.configuration['tiles']):
             if n in tpm_list:

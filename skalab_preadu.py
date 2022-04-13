@@ -1,5 +1,6 @@
 import gc
 import struct
+import time
 
 import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui
@@ -161,24 +162,7 @@ def font_normal():
     font = QtGui.QFont()
     return font
 
-#
-# def read_preadu_regs(Tpm):
-#     reg_values = Tpm.bsp.preadu_rd128(0)
-#     reg_values += Tpm.bsp.preadu_rd128(1)
-#     return reg_values
-#
-#
-# def write_preadu_regs(Tpm, conf):
-#     Tpm.bsp.preadu_wr128(0, conf[0:4])
-#     time.sleep(0.2)
-#     Tpm.bsp.preadu_wr128(1, conf[4:8])
-#     time.sleep(0.2)
-#     reg_values = Tpm.bsp.preadu_rd128(0)
-#     time.sleep(0.2)
-#     reg_values += Tpm.bsp.preadu_rd128(1)
-#     return reg_values
-#
-#
+
 def read_routing_table():
     mappa = []
     f_map = open(SIGNALS_MAP_FILENAME)
@@ -209,6 +193,8 @@ class InafSkaOpticalRx:
         self.bit_string['b7'] = "Attenuation 16dB"
 
         self.value = 4 + 128  # LowPassFilter, 16 dB of attenuation
+        self.version = "OF-Rx"
+        self.sn = 0
 
     def print_bit_description(self):
         for k in sorted(self.bit_string.keys()):
@@ -219,6 +205,9 @@ class InafSkaOpticalRx:
 
     def get_attenuation(self):
         return (self.value & 0b11111000) >> 3
+
+    def code2att(self, code):
+        return (code & 0b11111000) >> 3
 
     def set_hipass(self):
         self.value = (self.value & 0b11111001) + 2
@@ -274,6 +263,8 @@ class InafSkaRfRx:
         self.bit_string['b7'] = "Attenuation 16dB"
 
         self.value = 16 + 128  # LowPassFilter, 16 dB of attenuation
+        self.version = "RF-Rx"
+        self.sn = 0
 
     def print_bit_description(self):
         for k in sorted(self.bit_string.keys()):
@@ -295,6 +286,14 @@ class InafSkaRfRx:
         a += ((self.value & 0b100000) >> 5) * 8
         a += ((self.value & 0b1000000) >> 6) * 1
         a += ((self.value & 0b10000000) >> 7) * 16
+        return a
+
+    def code2att(self, code):
+        a = ((code & 0b10) >> 1) * 2
+        a += ((code & 0b1000) >> 3) * 4
+        a += ((code & 0b100000) >> 5) * 8
+        a += ((code & 0b1000000) >> 6) * 1
+        a += ((code & 0b10000000) >> 7) * 16
         return a
 
     def set_hipass(self):
@@ -394,6 +393,9 @@ class preAduRf:
         self.rx += [InafSkaRfRx()]
         self.rx += [InafSkaOpticalRx()]
 
+        for i in range(32):
+            self.rx[i].sn = i
+
     def set_rx_attenuation(self, nrx, att):
         self.rx[nrx].set_attenuation(bound(att))
 
@@ -487,8 +489,13 @@ class preAduSadino:
         self.rx += [InafSkaRfRx()]
         self.rx += [InafSkaOpticalRx()]
 
+        for i in range(32):
+            self.rx[i].sn = i
+
     def set_rx_attenuation(self, nrx, att):
+        #print("PRIMA\t", nrx, self.rx[nrx].sn, self.rx[nrx].version, "DSA", self.rx[nrx].get_attenuation(), "OLD VALUE", self.rx[nrx].value, "SET DSA", att)
         self.rx[nrx].set_attenuation(bound(att))
+        #print(" DOPO\t", nrx, self.rx[nrx].sn, self.rx[nrx].version, "DSA", self.rx[nrx].get_attenuation(), "NEW VALUE", self.rx[nrx].value)
 
     def get_rx_attenuation(self, nrx):
         return self.rx[nrx].get_attenuation()
@@ -523,6 +530,7 @@ class preAduOptRx:
         self.rx = []
         for i in range(self.nof_rx):
             self.rx += [InafSkaOpticalRx()]
+            self.rx[i].sn = i
 
     def set_rx_attenuation(self, nrx, att):
         self.rx[nrx].set_attenuation(bound(att))
@@ -557,6 +565,8 @@ class Preadu(object):
         self.board_type = board_type
         self.debug = debug
         self.tpm = tpm
+        self.Busy = False  # UCP Communication Token
+
         self.inputs = CHANNELS
         if self.board_type == 0:
             self.preadu = preAduOptRx()
@@ -567,14 +577,6 @@ class Preadu(object):
         else:
             self.preadu = preAduSadino()
             print("SADino preADU with Mixed RF and Optical Rxs selected")
-
-        self.preadu_val = np.zeros(32).astype(np.uint8)
-        if self.debug == 0:
-            # print("Read pre-ADU Registers...")
-            self.preadu_val = self.read_configuration()
-        else:
-            self.preadu_val = [0xa1a1a1a1, 0xa1a1a1a1, 0xa1a1a1a1, 0xa1a1a1a1,
-                               0xa1a1a1a1, 0xa1a1a1a1, 0xa1a1a1a1, 0xa1a1a1a1]
 
         self.spi_remap = [23, 22, 21, 20, 19, 18, 17, 16,
                            7,  6,  5,  4,  3,  2,  1,  0,
@@ -633,22 +635,20 @@ class Preadu(object):
 
         table_names = "ADU#  Code      Attenuation               Bands             Rx      Fibre          RMS         dBm"
         self.label_legend_1 = QtWidgets.QLabel(parent)
-        self.label_legend_1.setGeometry(QtCore.QRect(14, 55, 500, 31))
+        self.label_legend_1.setGeometry(QtCore.QRect(14, 55, 560, 31))
         self.label_legend_1.setText(table_names)
         self.label_legend_2 = QtWidgets.QLabel(parent)
-        self.label_legend_2.setGeometry(QtCore.QRect(584, 55, 500, 31))
+        self.label_legend_2.setGeometry(QtCore.QRect(584, 55, 560, 31))
         self.label_legend_2.setText(table_names)
         self.label_legend_3 = QtWidgets.QLabel(parent)
-        self.label_legend_3.setGeometry(QtCore.QRect(14, 335, 500, 31))
+        self.label_legend_3.setGeometry(QtCore.QRect(14, 335, 560, 31))
         self.label_legend_3.setText(table_names)
         self.label_legend_4 = QtWidgets.QLabel(parent)
-        self.label_legend_4.setGeometry(QtCore.QRect(584, 335, 500, 31))
+        self.label_legend_4.setGeometry(QtCore.QRect(584, 335, 560, 31))
         self.label_legend_4.setText(table_names)
 
         self.frame_all = QtWidgets.QFrame(parent)
         self.frame_all.setGeometry(QtCore.QRect(180, 635, 640, 40))
-        #self.frame_all.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        #self.frame_all.setFrameShadow(QtWidgets.QFrame.Raised)
         self.label_all = QtWidgets.QLabel(self.frame_all)
         self.label_all.setGeometry(QtCore.QRect(5, 10, 200, 21))
         self.label_all.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
@@ -674,8 +674,6 @@ class Preadu(object):
         self.button_discard.setGeometry(QtCore.QRect(900, 640, 90, 31))
         self.button_apply = QtWidgets.QPushButton(parent)
         self.button_apply.setGeometry(QtCore.QRect(1020, 640, 90, 31))
-        #self.button_test = QtWidgets.QPushButton(parent)
-        #self.button_test.setGeometry(QtCore.QRect(1120, 640, 90, 31))
 
         self.button_discard.setText("Discard")
         self.button_decrease.setText("-")
@@ -683,7 +681,6 @@ class Preadu(object):
         self.button_rfon.setText("RF ON")
         self.button_rfoff.setText("RF OFF")
         self.button_apply.setText("Apply")
-        #self.button_test.setText("TEST")
 
         rf_map = read_routing_table()
         self.records = []
@@ -693,22 +690,16 @@ class Preadu(object):
         self.label_comments = QtWidgets.QLabel(parent)
         self.label_comments.setGeometry(QtCore.QRect(20, 630, DIALOG_WIDTH - 20, 21))
         self.label_comments.setAlignment(QtCore.Qt.AlignCenter)
-        # self.label_comments.setText("Pre-ADU configuration for TPM:  s/n " + self.tpm_config['serial'] + "   (IP: " +
-        #                             self.tpm_config['ipaddr'] + ")")
-
         self.adjustControls(self.board_type)
         self.connections()
-        if self.tpm is not None:
-            self.preadu_val = self.read_configuration()
-        self.updateForm()
 
     def connections(self):
-        self.button_discard.clicked.connect(self.discard)
+        self.button_discard.clicked.connect(self.reload)
+        self.button_apply.clicked.connect(lambda: self.apply_configuration())
         self.button_decrease.clicked.connect(lambda: self.decreaseAll())
         self.button_increase.clicked.connect(lambda: self.increaseAll())
         self.button_rfon.clicked.connect(lambda: self.rfonAll())
         self.button_rfoff.clicked.connect(lambda: self.rfoffAll())
-        self.button_apply.clicked.connect(lambda: self.write_configuration())
         #self.button_test.clicked.connect(lambda: self.test_configuration())
         for group in range(self.inputs):
             self.records[group]['minus'].clicked.connect(lambda state, g=group: self.action_minus(g))
@@ -721,7 +712,8 @@ class Preadu(object):
     def updateForm(self):
         for num in range(self.inputs):
             # SPI Register Value
-            register_value = int(self.preadu_val[self.spi_remap[num]])
+            #register_value = int(self.preadu_val[self.spi_remap[num]])
+            register_value = int(self.preadu.rx[num].value)
             self.preadu.rx[num].value = register_value
             self.records[num]['reg_val'] = register_value
             self.records[num]['value'].setText(str(hex(register_value))[2:])
@@ -737,7 +729,6 @@ class Preadu(object):
                 print(format(num, '02d'), format(self.preadu.rx[num].value, '08b'), "ATT:",
                       self.preadu.rx[num].get_attenuation(), ", LO:", self.preadu.rx[num].is_lopass(),
                       ", HI:", self.preadu.rx[num].is_hipass(), ", RF-ENABLED: ", self.preadu.rx[num].is_terminated())
-        #print(self.preadu_val)
 
     def set_hi(self):
         for num in range(self.inputs):
@@ -831,102 +822,62 @@ class Preadu(object):
             self.records[num]['value'].setText(hex(self.preadu.rx[num].value)[2:])
             self.records[num]['text'].setText(str(self.preadu.rx[num].get_attenuation()))
 
-    def read_configuration(self):
-        if self.tpm is not None:
-            #print("Reading PreADU Configuration...")
-            values = np.zeros(32).astype(np.uint8)
-            self.tpm.tpm.tpm_preadu[0].read_configuration()  # TOP
-            self.tpm.tpm.tpm_preadu[1].read_configuration()  # BOTTOM
-            remap = list(np.flip(np.arange(8)) + 8) + list(np.arange(8)) + list(np.flip(np.arange(8))) + list(
-                np.arange(8) + 8)
-            for i in range(32):
-                values[self.spi_remap[i]] += [
-                    self.tpm.tpm.tpm_preadu[(((i + 8) // 8) % 2)].channel_filters[remap[i]]]
-                self.preadu.rx[i].value = int(values[self.spi_remap[i]])  # read from Alessio, update into local obj
-            return values
-        else:
-            return np.zeros(32).astype(np.uint8)
-        # for n in range(len(values)):
-        #     print(self.chan_remap[n], hex(values[self.chan_remap[n]]))
-
-    def read_dsa(self):
-        dsa = np.zeros(32).astype(np.uint8)
-        if self.tpm is not None:
-            regs = self.read_configuration()
-            for i in range(32):
-                dsa[i] += self.preadu.get_rx_attenuation(i)
-                #print(i, dsa[i])
-        return dsa
-
-    # def write_configuration(self):
-    #     if self.tpm is not None:
-    #         try:
-    #             new_values = []
-    #             for i in range(CHANNELS):
-    #                 new_values += [int("0x" + self.records[i]['value'].text(), 16)]
-    #             g = 0
-    #             for preadu in [1, 0]:
-    #                 for i in range(16):
-    #                     self.tpm.tpm.tpm_preadu[preadu].channel_filters[i] = new_values[self.spi_remap[g]]
-    #                     g = g + 1
-    #             #print("Writing PreADU Configuration...")
-    #             for preadu in [1, 0]:
-    #                 self.tpm.tpm.tpm_preadu[preadu].write_configuration()
-    #         except:
-    #             print("FAILED TO PROGRAM THE PREADU (check PyFabil)")
-    #             pass
-    #         self.preadu_val = self.read_configuration(self.tpm)
-    #         self.updateForm()
-
-    def test_configuration(self):
-        new_values = np.arange(32) * 8
-        g = 0
-        for preadu in [1, 0]:
-            for i in range(16):
-                self.tpm.tpm.tpm_preadu[preadu].channel_filters[i] = new_values[self.spi_remap[g]]
-                g = g + 1
-        for preadu in [1, 0]:
-            self.tpm.tpm.tpm_preadu[preadu].write_configuration()
-        self.preadu_val = self.read_configuration()
-        self.updateForm()
+    def readConfiguration(self, tpm=None):
+        if tpm is None:
+            tpm = self.tpm
+        while self.Busy:
+            time.sleep(0.2)
+        self.Busy = True
+        tpm.tpm.tpm_preadu[0].read_configuration()  # TOP
+        tpm.tpm.tpm_preadu[1].read_configuration()  # BOTTOM
+        remap = list(np.flip(np.arange(8)) + 8) + list(np.arange(8)) + list(np.flip(np.arange(8))) + list(
+            np.arange(8) + 8)
+        preaduConf = []
         for i in range(32):
-            print(i, self.preadu.get_rx_attenuation(i))
+            value = tpm.tpm.tpm_preadu[(((i + 8) // 8) % 2)].channel_filters[remap[i]]
+            preaduConf += [{'id': i,
+                            'sn': "n/a",
+                            'code': value,
+                            'dsa': self.preadu.rx[i].code2att(value),
+                            'version': self.preadu.rx[i].version}]
+        self.Busy = False
+        return preaduConf
 
-    def write_dsa(self, dsa):
-        for i in range(CHANNELS):
-            self.preadu.set_rx_attenuation(i, dsa[i])
-        new_values = []
-        for i in range(CHANNELS):
-            new_values += [self.preadu.rx[i].value]
-        self.write_configuration(new_values)
+    def apply_configuration(self):
+        if self.tpm is not None:
+            new_values = []
+            for i in range(CHANNELS):
+                new_values += [int("0x" + self.records[i]['value'].text(), 16)]
+            self.write_configuration(new_values)
 
     def write_configuration(self, new_values=None):
         if self.tpm is not None:
-            try:
-                if new_values is None:
-                    new_values = []
-                    for i in range(CHANNELS):
-                        new_values += [int("0x" + self.records[i]['value'].text(), 16)]
-                g = 0
-                for preadu in [1, 0]:
-                    for i in range(16):
-                        self.tpm.tpm.tpm_preadu[preadu].channel_filters[i] = new_values[self.spi_remap[g]]
-                        g = g + 1
-                #print("Writing PreADU Configuration...")
-                for preadu in [1, 0]:
-                    self.tpm.tpm.tpm_preadu[preadu].write_configuration()
-            except:
-                print("FAILED TO PROGRAM THE PREADU (check PyFabil)")
-                pass
-            #if new_values is None:
-            self.preadu_val = self.read_configuration()
-            self.updateForm()
+            if new_values is None:
+                new_values = []
+                for i in range(CHANNELS):
+                    new_values += [self.preadu.rx[i].value]
+            g = 0
+            while self.Busy:
+                time.sleep(0.2)
+            self.Busy = True
+            for preadu in [1, 0]:
+                for i in range(16):
+                    self.tpm.tpm.tpm_preadu[preadu].channel_filters[i] = new_values[self.spi_remap[g]]
+                    g = g + 1
+            for preadu in [1, 0]:
+                self.tpm.tpm.tpm_preadu[preadu].write_configuration()
+            self.Busy = False
+            self.reload()
 
-    def set_tpm(self, tpm):
-        self.tpm = tpm
-        #print("PREADU SET IP: ", tpm.get_ip())
-        self.preadu_val = self.read_configuration()
+    def reload(self):
+        conf = self.readConfiguration()
+        for i in range(32):
+            self.preadu.rx[i].value = conf[i]['code']
         self.updateForm()
+
+    def setTpm(self, tpm):
+        self.tpm = tpm
+        self.reload()
 
     def set_preadu_version(self, board_type=0):
         del self.preadu
@@ -944,9 +895,8 @@ class Preadu(object):
         elif self.board_type == 3:
             self.preadu = preAduSadino()
             print("PreADU 2.0b (RF SADino) with Mixed RF and Optical Rxs selected")
-        self.preadu_val = self.read_configuration()
         self.adjustControls(board_type)
-        self.updateForm()
+        self.reload()
 
     def adjustControls(self, board_type=0):
         if self.board_type == 0:
@@ -968,13 +918,14 @@ class Preadu(object):
                 pos = self.records[i]['rms'].geometry()
                 wdt = pos.width()
                 self.records[i]['rms'].setGeometry(10 + 290 + (((i & 8) >> 3) * TABLE_HSPACE),
-                                                  pos.y(), pos.width(), pos.height())
+                                                   pos.y(), pos.width(), pos.height())
                 pos = self.records[i]['power'].geometry()
                 wdt = pos.width()
                 self.records[i]['power'].setGeometry((10 + 350 + (((i & 8) >> 3) * TABLE_HSPACE)),
-                                                  pos.y(), pos.width(), pos.height())
+                                                     pos.y(), pos.width(), pos.height())
         else:
-            table_names = "ADU#  Code      Attenuation               Bands             Rx      Fibre          RMS         dBm"
+            table_names = "ADU#  Code      Attenuation               Bands"
+            table_names += "             Rx      Fibre          RMS         dBm"
             self.label_legend_1.setText(table_names)
             self.label_legend_2.setText(table_names)
             self.label_legend_3.setText(table_names)
@@ -992,20 +943,17 @@ class Preadu(object):
                 pos = self.records[i]['rms'].geometry()
                 wdt = pos.width()
                 self.records[i]['rms'].setGeometry(10 + 430 + (((i & 8) >> 3) * TABLE_HSPACE),
-                                                  pos.y(), pos.width(), pos.height())
+                                                   pos.y(), pos.width(), pos.height())
                 pos = self.records[i]['power'].geometry()
                 wdt = pos.width()
                 self.records[i]['power'].setGeometry((10 + 480 + (((i & 8) >> 3) * TABLE_HSPACE)),
-                                                  pos.y(), pos.width(), pos.height())
-
-    def discard(self):
-        self.preadu_val = self.read_configuration()
-        self.updateForm()
+                                                     pos.y(), pos.width(), pos.height())
 
     def updateRms(self, rms):
         for num in range(self.inputs):
-            self.records[num]['rms'].setText("%d" % int(round(rms[self.chan_remap[num]])))
-            power = 10 * np.log10(np.power((rms[self.chan_remap[num]] * (1.7 / 256.)), 2) / 400.) + 30 + 12
+            self.records[num]['rms'].setText("%d" % int(round(rms[num])))
+            with np.errstate(divide='ignore', invalid='ignore'):
+                power = 10 * np.log10(np.power((rms[num] * (1.7 / 256.)), 2) / 400.) + 30 + 12
             if power == (-np.inf):
                 power = -60
             self.records[num]['power'].setText("%3.1f" % power)
