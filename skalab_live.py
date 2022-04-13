@@ -769,16 +769,20 @@ class Live(QtWidgets.QMainWindow):
                                                                       sample_offset=-1)
         #print("TStamp", timestamps[0][0])
         if not timestamps[0][0] == self.monitorPrecTstamp or forcePlot:
+            self.wg.qlabel_tstamp_int_spectra.setText(ts_to_datestring(timestamps[0][0]))
             for i in range(16):
                 # Plot X Pol
                 spettro = monitorData[:, remap[i], 0, -1]
+                with np.errstate(divide='ignore'):
+                    spettro = 10 * np.log10(np.array(spettro))
                 self.monitorPlots.plotCurve(self.monitor_asse_x, spettro, i, xAxisRange=[1, 400],
                                             yAxisRange=[0, 40], title="INPUT-%02d" % i,
                                             xLabel="MHz", yLabel="dB", colore="b", grid=True, lw=1,
                                             show_line=self.wg.qcheck_xpol_sp.isChecked())
-
                 # Plot Y Pol
                 spettro = monitorData[:, remap[i], 1, -1]
+                with np.errstate(divide='ignore'):
+                    spettro = 10 * np.log10(np.array(spettro))
                 self.monitorPlots.plotCurve(self.monitor_asse_x, spettro, i, xAxisRange=[1, 400],
                                             yAxisRange=[0, 40], colore="g", grid=True, lw=1,
                                             show_line=self.wg.qcheck_ypol_sp.isChecked())
