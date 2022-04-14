@@ -101,6 +101,26 @@
        <string>TPM Voltages</string>
       </property>
      </item>
+     <item>
+      <property name="text">
+       <string>Power Supply Fan Speeds</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Power Supply Powers</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Power Supply Currents</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Power Supply Voltages</string>
+      </property>
+     </item>
     </widget>
     <widget class="QWidget" name="qplot_chart_tpm" native="true">
      <property name="geometry">

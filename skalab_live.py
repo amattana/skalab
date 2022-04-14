@@ -407,6 +407,11 @@ class Live(QtWidgets.QMainWindow):
         self.preadu.set_preadu_version(version)
         #self.readDsaConfiguration()
 
+    def switchTpm(self):
+        if self.connected:
+            self.updatePreadu()
+            self.plotMonitor(forcePlot=True)
+
     def updatePreadu(self):
         if self.connected:
             self.preadu.setTpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
@@ -585,7 +590,7 @@ class Live(QtWidgets.QMainWindow):
                                            'station_config': self.wg.qline_configfile.text(),
                                            'query_interval': self.wg.qline_profile_interval.text(),
                                            'temperatures_path': self.wg.qline_temperatures_path.text(),
-                                           'integrated_spectra_path': self.wg.qline_ntegrated_spectra_path.text()}})
+                                           'integrated_spectra_path': self.wg.qline_integrated_spectra_path.text()}})
         if reload:
             self.load_profile(profile=this_profile)
 
@@ -719,15 +724,16 @@ class Live(QtWidgets.QMainWindow):
                         "receiver_ports": int_data_port,
                         "nof_tiles": nof_tiles,
                         'directory': self.wg.qline_integrated_spectra_path.text()}
-                    #print(daq_config)
-                    self.monitor_daq = monit_daq
-                    self.monitor_daq.populate_configuration(daq_config)
-                    self.monitor_daq.initialise_daq()
-                    self.monitor_daq.start_integrated_channel_data_consumer()
-                    time.sleep(2 * 8 * float(self.tpm_station.configuration['station']['channel_integration_time']))
-                    self.monitor_file_manager = ChannelFormatFileManager(root_path=self.wg.qline_integrated_spectra_path.text(),
-                                                                         daq_mode=FileDAQModes.Integrated)
-                    self.initMonitor = False
+                    if os.path.exists(self.wg.qline_integrated_spectra_path.text()):
+                        self.monitor_daq = monit_daq
+                        self.monitor_daq.populate_configuration(daq_config)
+                        self.monitor_daq.initialise_daq()
+                        self.monitor_daq.start_integrated_channel_data_consumer()
+                        time.sleep(2 * 8 * float(self.tpm_station.configuration['station']['channel_integration_time']))
+                        self.monitor_file_manager = ChannelFormatFileManager(root_path=self.wg.qline_integrated_spectra_path.text(),
+                                                                             daq_mode=FileDAQModes.Integrated)
+                        self.initMonitor = False
+
                 try:
                     if not self.ThreadTempPause:
                         while self.commBusy:
@@ -763,31 +769,32 @@ class Live(QtWidgets.QMainWindow):
             sleep(1)
 
     def plotMonitor(self, forcePlot=False):
-        remap = [0, 1, 2, 3, 8, 9, 10, 11, 15, 14, 13, 12, 7, 6, 5, 4]
-        monitorData, timestamps = self.monitor_file_manager.read_data(tile_id=self.wg.qcombo_tpm.currentIndex(),
-                                                                      n_samples=1,
-                                                                      sample_offset=-1)
-        #print("TStamp", timestamps[0][0])
-        if not timestamps[0][0] == self.monitorPrecTstamp or forcePlot:
-            self.wg.qlabel_tstamp_int_spectra.setText(ts_to_datestring(timestamps[0][0]))
-            for i in range(16):
-                # Plot X Pol
-                spettro = monitorData[:, remap[i], 0, -1]
-                with np.errstate(divide='ignore'):
-                    spettro = 10 * np.log10(np.array(spettro))
-                self.monitorPlots.plotCurve(self.monitor_asse_x, spettro, i, xAxisRange=[1, 400],
-                                            yAxisRange=[0, 40], title="INPUT-%02d" % i,
-                                            xLabel="MHz", yLabel="dB", colore="b", grid=True, lw=1,
-                                            show_line=self.wg.qcheck_xpol_sp.isChecked())
-                # Plot Y Pol
-                spettro = monitorData[:, remap[i], 1, -1]
-                with np.errstate(divide='ignore'):
-                    spettro = 10 * np.log10(np.array(spettro))
-                self.monitorPlots.plotCurve(self.monitor_asse_x, spettro, i, xAxisRange=[1, 400],
-                                            yAxisRange=[0, 40], colore="g", grid=True, lw=1,
-                                            show_line=self.wg.qcheck_ypol_sp.isChecked())
-            self.monitorPlots.updatePlot()
-            self.monitorPrecTstamp = timestamps[0][0]
+        if self.monitor_daq is not None:
+            remap = [0, 1, 2, 3, 8, 9, 10, 11, 15, 14, 13, 12, 7, 6, 5, 4]
+            monitorData, timestamps = self.monitor_file_manager.read_data(tile_id=self.wg.qcombo_tpm.currentIndex(),
+                                                                          n_samples=1,
+                                                                          sample_offset=-1)
+            #print("TStamp", timestamps[0][0])
+            if not timestamps[0][0] == self.monitorPrecTstamp or forcePlot:
+                self.wg.qlabel_tstamp_int_spectra.setText(ts_to_datestring(timestamps[0][0]))
+                for i in range(16):
+                    # Plot X Pol
+                    spettro = monitorData[:, remap[i], 0, -1]
+                    with np.errstate(divide='ignore'):
+                        spettro = 10 * np.log10(np.array(spettro))
+                    self.monitorPlots.plotCurve(self.monitor_asse_x, spettro, i, xAxisRange=[1, 400],
+                                                yAxisRange=[0, 40], title="INPUT-%02d" % i,
+                                                xLabel="MHz", yLabel="dB", colore="b", grid=True, lw=1,
+                                                show_line=True)
+                    # Plot Y Pol
+                    spettro = monitorData[:, remap[i], 1, -1]
+                    with np.errstate(divide='ignore'):
+                        spettro = 10 * np.log10(np.array(spettro))
+                    self.monitorPlots.plotCurve(self.monitor_asse_x, spettro, i, xAxisRange=[1, 400],
+                                                yAxisRange=[0, 40], colore="g", grid=True, lw=1,
+                                                show_line=True)
+                self.monitorPlots.updatePlot()
+                self.monitorPrecTstamp = timestamps[0][0]
 
     def readRms(self):
         if self.connected:

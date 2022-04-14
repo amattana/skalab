@@ -82,6 +82,7 @@ def populateFans(frame):
         fan['slider'].setTickPosition(QtWidgets.QSlider.TicksBothSides)
         fan['slider'].setTickInterval(20)
         fan['slider'].setObjectName("verticalSlider_%d" % i)
+        fan['sliderPressed'] = False
 
         fan['manual'] = QtWidgets.QPushButton(frame)
         fan['manual'].setGeometry(QtCore.QRect(55 + 60 * i, 213, 31, 21))
@@ -192,7 +193,9 @@ class Subrack(QtWidgets.QMainWindow):
         for i in range(4):
             self.fans[i]['manual'].clicked.connect(lambda state, g=i: self.cmdSetFanManual(fan_id=g))
             self.fans[i]['auto'].clicked.connect(lambda state, g=i: self.cmdSetFanAuto(fan_id=g))
-            self.fans[i]['slider'].valueChanged.connect(lambda state, g=i: self.cmdSetFanSpeed(fan_id=g))
+            #self.fans[i]['slider'].valueChanged.connect(lambda state, g=i: self.cmdSetFanSpeed(fan_id=g))
+            self.fans[i]['slider'].sliderPressed.connect(lambda g=i: self.sliderPressed(fan_id=g))
+            self.fans[i]['slider'].sliderReleased.connect(lambda g=i: self.cmdSetFanSpeed(fan_id=g))
 
     def populate_help(self, uifile="skalab_subrack.ui"):
         with open(uifile) as f:
@@ -239,7 +242,11 @@ class Subrack(QtWidgets.QMainWindow):
             self.client.execute_command(command="set_subrack_fan_speed",
                                         parameters="%d,%d" % (fan_id + 1, int(self.fans[fan_id]['slider'].value())))
             #print("Set FAN SPEED %d on FAN #%d" % (int(self.fans[fan_id]['slider'].value()), fan_id + 1))
+            self.fans[fan_id]['sliderPressed'] = False
             self.skipThreadPause = True
+
+    def sliderPressed(self, fan_id):
+        self.fans[fan_id]['sliderPressed'] = True
 
     def populate_table_profile(self):
         self.wg.qtable_conf.clearSpans()
@@ -450,7 +457,7 @@ class Subrack(QtWidgets.QMainWindow):
                     self.plotChartMgn.plotCurve(data=self.data_charts[k][0::2], trace=(0 + n * 2), color=COLORI[(0 + n * 2)])
                     self.plotChartMgn.plotCurve(data=self.data_charts[k][1::2], trace=(1 + n * 2), color=COLORI[(1 + n * 2)])
             else:
-                self.plotChartMgn.set_xlabel("Subrack '" + MgnTraces[0] + "' and '" + MgnTraces[1] + "' not yet available.")
+                self.plotChartMgn.set_xlabel("Subrack attributes '" + MgnTraces[0] + "' and '" + MgnTraces[1] + "' not available.")
             self.plotChartMgn.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 1:
             # Chart: TPM Temperatures
@@ -460,7 +467,7 @@ class Subrack(QtWidgets.QMainWindow):
                 for i in range(8):
                     self.plotChartTpm.plotCurve(data=self.data_charts["tpms_temperatures_0"][i::8], trace=i, color=COLORI[i])
             else:
-                self.plotChartTpm.set_xlabel("Subrack 'tpms_temperatures_0' not yet available.")
+                self.plotChartTpm.set_xlabel("Subrack attribute 'tpms_temperatures_0' not available.")
             self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 2:
             # Chart: TPM Temperatures
@@ -470,7 +477,7 @@ class Subrack(QtWidgets.QMainWindow):
                 for i in range(8):
                     self.plotChartTpm.plotCurve(data=self.data_charts["tpms_temperatures_1"][i::8], trace=i, color=COLORI[i])
             else:
-                self.plotChartTpm.set_xlabel("Subrack 'tpms_temperatures_1' not yet available.")
+                self.plotChartTpm.set_xlabel("Subrack attribute 'tpms_temperatures_1' not available.")
             self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 3:
             # Chart: TPM Temperatures
@@ -480,7 +487,7 @@ class Subrack(QtWidgets.QMainWindow):
                 for i in range(8):
                     self.plotChartTpm.plotCurve(data=self.data_charts["tpms_temperatures_2"][i::8], trace=i, color=COLORI[i])
             else:
-                self.plotChartTpm.set_xlabel("Subrack 'tpms_temperatures_2' not yet available.")
+                self.plotChartTpm.set_xlabel("Subrack attribute 'tpms_temperatures_2' not available.")
             self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 4:
             # Chart: TPM Powers
@@ -490,7 +497,7 @@ class Subrack(QtWidgets.QMainWindow):
                 for i in range(8):
                     self.plotChartTpm.plotCurve(data=self.data_charts["tpm_powers"][i::8], trace=i, color=COLORI[i])
             else:
-                self.plotChartTpm.set_xlabel("Subrack 'tpm_powers' not yet available.")
+                self.plotChartTpm.set_xlabel("Subrack attribute 'tpm_powers' not available.")
             self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 5:
             # Chart: TPM Currents
@@ -500,7 +507,7 @@ class Subrack(QtWidgets.QMainWindow):
                 for i in range(8):
                     self.plotChartTpm.plotCurve(data=self.data_charts["tpm_currents"][i::8], trace=i, color=COLORI[i])
             else:
-                self.plotChartTpm.set_xlabel("Subrack 'tpm_currents' not yet available.")
+                self.plotChartTpm.set_xlabel("Subrack attribute 'tpm_currents' yet available.")
             self.plotChartTpm.updatePlot()
         elif self.wg.qcombo_chart.currentIndex() == 6:
             # Chart: TPM Voltages
@@ -510,7 +517,51 @@ class Subrack(QtWidgets.QMainWindow):
                 for i in range(8):
                     self.plotChartTpm.plotCurve(data=self.data_charts["tpm_voltages"][i::8], trace=i, color=COLORI[i])
             else:
-                self.plotChartTpm.set_xlabel("Subrack 'tpm_voltages' not yet available.")
+                self.plotChartTpm.set_xlabel("Subrack attribute 'tpm_voltages' not available.")
+            self.plotChartTpm.updatePlot()
+        elif self.wg.qcombo_chart.currentIndex() == 7:
+            # Chart: TPM Voltages
+            self.plotChartTpm.set_ylim([0, 50])
+            self.plotChartTpm.set_ylabel("Power Supply Fan Speed")
+            if "power_supply_fan_speeds" in self.data_charts.keys():
+                for i in range(2):
+                    self.plotChartTpm.plotCurve(data=self.data_charts["power_supply_fan_speeds"][i::2], trace=i,
+                                                color=COLORI[i])
+            else:
+                self.plotChartTpm.set_xlabel("Subrack attribute 'power_supply_fan_speeds' not available.")
+            self.plotChartTpm.updatePlot()
+        elif self.wg.qcombo_chart.currentIndex() == 8:
+            # Chart: TPM Voltages
+            self.plotChartTpm.set_ylim([0, 1200])
+            self.plotChartTpm.set_ylabel("Power Supply Powers")
+            if "power_supply_powers" in self.data_charts.keys():
+                for i in range(2):
+                    self.plotChartTpm.plotCurve(data=self.data_charts["power_supply_powers"][i::2], trace=i,
+                                                color=COLORI[i])
+            else:
+                self.plotChartTpm.set_xlabel("Subrack attribute 'power_supply_powers' not available.")
+            self.plotChartTpm.updatePlot()
+        elif self.wg.qcombo_chart.currentIndex() == 9:
+            # Chart: TPM Voltages
+            self.plotChartTpm.set_ylim([0, 100])
+            self.plotChartTpm.set_ylabel("Power Supply Currents")
+            if "power_supply_currents" in self.data_charts.keys():
+                for i in range(2):
+                    self.plotChartTpm.plotCurve(data=self.data_charts["power_supply_currents"][i::2], trace=i,
+                                                color=COLORI[i])
+            else:
+                self.plotChartTpm.set_xlabel("Subrack attribute 'power_supply_currents' not available.")
+            self.plotChartTpm.updatePlot()
+        elif self.wg.qcombo_chart.currentIndex() == 10:
+            # Chart: TPM Voltages
+            self.plotChartTpm.set_ylim([0, 15])
+            self.plotChartTpm.set_ylabel("Power Supply Voltages")
+            if "power_supply_voltages" in self.data_charts.keys():
+                for i in range(2):
+                    self.plotChartTpm.plotCurve(data=self.data_charts["power_supply_voltages"][i::2], trace=i,
+                                                color=COLORI[i])
+            else:
+                self.plotChartTpm.set_xlabel("Subrack attribute 'power_supply_voltages' not available.")
             self.plotChartTpm.updatePlot()
 
     def clearChart(self):
@@ -706,16 +757,16 @@ class Subrack(QtWidgets.QMainWindow):
                 except:
                     print("Failed to get Subrack Telemetry!")
                     pass
-                sleep(0.2)
+                sleep(0.1)
                 self.signalTlm.emit()
                 cycle = 0.0
-                while cycle < (int(self.profile['Device']['query_interval']) - 1) and not self.skipThreadPause:
-                    sleep(0.5)
-                    cycle = cycle + 0.5
+                while cycle < (float(self.wg.qline_profile_interval.text())) and not self.skipThreadPause:
+                    sleep(0.1)
+                    cycle = cycle + 0.1
                 self.skipThreadPause = False
             if self.stopThreads:
                 break
-            sleep(1)
+            sleep(0.5)
 
     def updateTlm(self):
         #self.wg.qlabel_message.setText("")
@@ -741,7 +792,8 @@ class Subrack(QtWidgets.QMainWindow):
         if 'subrack_fan_speeds' and 'subrack_fan_speeds_percent' in self.telemetry.keys():
             for i in range(4):
                 self.fans[i]['rpm'].setText("%d" % int(self.telemetry['subrack_fan_speeds'][i]))
-                self.fans[i]['slider'].setProperty("value", (int(self.telemetry['subrack_fan_speeds_percent'][i])))
+                if not self.fans[i]['sliderPressed']:
+                    self.fans[i]['slider'].setProperty("value", (int(self.telemetry['subrack_fan_speeds_percent'][i])))
                 if int(self.telemetry['subrack_fan_mode'][i]) == 1:
                     self.fans[i]['auto'].setStyleSheet(colors("black_on_green"))
                     self.fans[i]['manual'].setStyleSheet(colors("black_on_red"))
