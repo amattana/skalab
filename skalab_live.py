@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import datetime
+import glob
 import math
 import os
 import shutil
@@ -156,6 +157,7 @@ class Live(QtWidgets.QMainWindow):
         self.procRms.start()
         self.monitor_daq = None
         self.initMonitor = True
+        self.monitor_tstart = 0
         self.monitor_file_manager = None
         self.monitorPrecTstamp = 0
         self.monitor_asse_x = np.arange(512) * 400/512.
@@ -729,9 +731,13 @@ class Live(QtWidgets.QMainWindow):
                         self.monitor_daq.populate_configuration(daq_config)
                         self.monitor_daq.initialise_daq()
                         self.monitor_daq.start_integrated_channel_data_consumer()
-                        time.sleep(2 * 8 * float(self.tpm_station.configuration['station']['channel_integration_time']))
                         self.monitor_file_manager = ChannelFormatFileManager(root_path=self.wg.qline_integrated_spectra_path.text(),
                                                                              daq_mode=FileDAQModes.Integrated)
+                        self.monitor_tstart = dt_to_timestamp(datetime.datetime.utcnow())
+                        self.wg.qlabel_tstamp_int_spectra.setText("Started at " +
+                                                                  ts_to_datestring(self.monitor_tstart) +
+                                                                  " (Period: %3.1f secs)" %
+                                                                  (8 * float(self.tpm_station.configuration['station']['channel_integration_time'])))
                         self.initMonitor = False
 
                 try:
@@ -770,31 +776,37 @@ class Live(QtWidgets.QMainWindow):
 
     def plotMonitor(self, forcePlot=False):
         if self.monitor_daq is not None:
-            remap = [0, 1, 2, 3, 8, 9, 10, 11, 15, 14, 13, 12, 7, 6, 5, 4]
-            monitorData, timestamps = self.monitor_file_manager.read_data(tile_id=self.wg.qcombo_tpm.currentIndex(),
-                                                                          n_samples=1,
-                                                                          sample_offset=-1)
-            #print("TStamp", timestamps[0][0])
-            if not timestamps[0][0] == self.monitorPrecTstamp or forcePlot:
-                self.wg.qlabel_tstamp_int_spectra.setText(ts_to_datestring(timestamps[0][0]))
-                for i in range(16):
-                    # Plot X Pol
-                    spettro = monitorData[:, remap[i], 0, -1]
-                    with np.errstate(divide='ignore'):
-                        spettro = 10 * np.log10(np.array(spettro))
-                    self.monitorPlots.plotCurve(self.monitor_asse_x, spettro, i, xAxisRange=[1, 400],
-                                                yAxisRange=[0, 40], title="INPUT-%02d" % i,
-                                                xLabel="MHz", yLabel="dB", colore="b", grid=True, lw=1,
-                                                show_line=True)
-                    # Plot Y Pol
-                    spettro = monitorData[:, remap[i], 1, -1]
-                    with np.errstate(divide='ignore'):
-                        spettro = 10 * np.log10(np.array(spettro))
-                    self.monitorPlots.plotCurve(self.monitor_asse_x, spettro, i, xAxisRange=[1, 400],
-                                                yAxisRange=[0, 40], colore="g", grid=True, lw=1,
-                                                show_line=True)
-                self.monitorPlots.updatePlot()
-                self.monitorPrecTstamp = timestamps[0][0]
+            ipath = self.wg.qline_integrated_spectra_path.text()
+            if ipath[-1] != "/":
+                ipath += "/"
+            if glob.glob(ipath + "*channel_integ_*hdf5"):
+                remap = [0, 1, 2, 3, 8, 9, 10, 11, 15, 14, 13, 12, 7, 6, 5, 4]
+                monitorData, timestamps = self.monitor_file_manager.read_data(tile_id=self.wg.qcombo_tpm.currentIndex(),
+                                                                              n_samples=1,
+                                                                              sample_offset=-1)
+                if timestamps[0][0] - self.monitor_tstart >= (8 * float(self.tpm_station.configuration['station']['channel_integration_time'])):
+                    if not timestamps[0][0] == self.monitorPrecTstamp or forcePlot:
+                        self.wg.qlabel_tstamp_int_spectra.setText(ts_to_datestring(timestamps[0][0]) +
+                                                                  " (Period: %3.1f secs)" %
+                                                                  (8 * float(self.tpm_station.configuration['station']['channel_integration_time'])))
+                        for i in range(16):
+                            # Plot X Pol
+                            spettro = monitorData[:, remap[i], 0, -1]
+                            with np.errstate(divide='ignore'):
+                                spettro = 10 * np.log10(np.array(spettro))
+                            self.monitorPlots.plotCurve(self.monitor_asse_x, spettro, i, xAxisRange=[1, 400],
+                                                        yAxisRange=[0, 40], title="INPUT-%02d" % i,
+                                                        xLabel="MHz", yLabel="dB", colore="b", grid=True, lw=1,
+                                                        show_line=True)
+                            # Plot Y Pol
+                            spettro = monitorData[:, remap[i], 1, -1]
+                            with np.errstate(divide='ignore'):
+                                spettro = 10 * np.log10(np.array(spettro))
+                            self.monitorPlots.plotCurve(self.monitor_asse_x, spettro, i, xAxisRange=[1, 400],
+                                                        yAxisRange=[0, 40], colore="g", grid=True, lw=1,
+                                                        show_line=True)
+                        self.monitorPlots.updatePlot()
+                        self.monitorPrecTstamp = timestamps[0][0]
 
     def readRms(self):
         if self.connected:
@@ -1152,8 +1164,9 @@ class Live(QtWidgets.QMainWindow):
         self.avg = 2 ** self.rbw
         self.nsamples = int(2 ** 15 / self.avg)
         self.RBW = (self.avg * (400000.0 / 16384.0))
-        self.asse_x = np.arange(self.nsamples / 2 + 1) * self.RBW * 0.001
-
+        if not len(self.asse_x) == len(np.arange(self.nsamples / 2 + 1) * self.RBW * 0.001)
+            self.asse_x = np.arange(self.nsamples / 2 + 1) * self.RBW * 0.001
+            self.reformat_plots()
         xAxisRange = (float(self.wg.qline_spectra_band_from.text()),
                       float(self.wg.qline_spectra_band_to.text()))
         yAxisRange = (float(self.wg.qline_spectra_level_min.text()),
