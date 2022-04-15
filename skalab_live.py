@@ -1164,7 +1164,7 @@ class Live(QtWidgets.QMainWindow):
         self.avg = 2 ** self.rbw
         self.nsamples = int(2 ** 15 / self.avg)
         self.RBW = (self.avg * (400000.0 / 16384.0))
-        if not len(self.asse_x) == len(np.arange(self.nsamples / 2 + 1) * self.RBW * 0.001)
+        if not len(self.asse_x) == len(np.arange(self.nsamples / 2 + 1) * self.RBW * 0.001):
             self.asse_x = np.arange(self.nsamples / 2 + 1) * self.RBW * 0.001
             self.reformat_plots()
         xAxisRange = (float(self.wg.qline_spectra_band_from.text()),
