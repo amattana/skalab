@@ -705,6 +705,9 @@ class BarPlot(QtWidgets.QWidget):
     def set_ylabel(self, label):
         self.canvas.ax.set_ylabel(label)
 
+    def set_ylim(self, ylim):
+        self.canvas.ax.set_ylim(ylim)
+
     def set_xticklabels(self, labels):
         self.canvas.ax.set_xlim([0, len(labels) + 1])
         self.canvas.ax.set_xticks(np.arange(1, len(labels) + 1))

@@ -20,7 +20,7 @@ TABLE_VSPACE = 30
 DIALOG_WIDTH = 850
 DIALOG_HEIGHT = 720
 
-SIGNALS_MAP_FILENAME = "signals_map.txt"
+SIGNALS_MAP_FILENAME = "SignalMap/signals_map.txt"
 
 
 def bound(value, low=0, high=31):
@@ -122,7 +122,7 @@ def create_record(Dialog, rf_map):
     idx = int(rf_map[0])
     rec['reg_val'] = 0
     rec['label'] = create_label(Dialog, 10 + 20 + (((idx & 8) >> 3) * TABLE_HSPACE),
-                                90 + ((idx & 7) * TABLE_VSPACE) + (((idx & 16) >> 4) * 280), rf_map[0] + ":")
+                                90 + ((idx & 7) * TABLE_VSPACE) + (((idx & 16) >> 4) * 280), rf_map[0].strip() + ":")
     rec['value'] = create_label(Dialog, 10 + 45 + (((idx & 8) >> 3) * TABLE_HSPACE),
                                 90 + ((idx & 7) * TABLE_VSPACE) + (((idx & 16) >> 4) * 280), "0")
     rec['text'] = create_text(Dialog, 10 + 80 + (((idx & 8) >> 3) * TABLE_HSPACE),
@@ -136,9 +136,9 @@ def create_record(Dialog, rf_map):
     rec['hi'] = create_flag(Dialog, 10 + 260 + (((idx & 8) >> 3) * TABLE_HSPACE),
                             90 + ((idx & 7) * TABLE_VSPACE) + (((idx & 16) >> 4) * 280), "yellow", "HI")
     rec['rf'] = create_flag(Dialog, 10 + 310 + (((idx & 8) >> 3) * TABLE_HSPACE),
-                            90 + ((idx & 7) * TABLE_VSPACE) + (((idx & 16) >> 4) * 280), "green", rf_map[1])
+                            90 + ((idx & 7) * TABLE_VSPACE) + (((idx & 16) >> 4) * 280), "green", rf_map[1].strip())
     rec['of'] = create_flag(Dialog, 10 + 360 + (((idx & 8) >> 3) * TABLE_HSPACE),
-                            90 + ((idx & 7) * TABLE_VSPACE) + (((idx & 16) >> 4) * 280), "cyan", rf_map[2])
+                            90 + ((idx & 7) * TABLE_VSPACE) + (((idx & 16) >> 4) * 280), "cyan", rf_map[2].strip())
     rec['rms'] = create_label(Dialog, 10 + 430 + (((idx & 8) >> 3) * TABLE_HSPACE),
                                 90 + ((idx & 7) * TABLE_VSPACE) + (((idx & 16) >> 4) * 280), "----", width=30)
     rec['power'] = create_label(Dialog, 10 + 480 + (((idx & 8) >> 3) * TABLE_HSPACE),
@@ -163,21 +163,22 @@ def font_normal():
     return font
 
 
-def read_routing_table():
+def read_routing_table(map_file):
     mappa = []
-    f_map = open(SIGNALS_MAP_FILENAME)
+    f_map = open(map_file)
     input_list = f_map.readlines()
-    for i in range(CHANNELS):
-        mappa += [[input_list[i].split(":")[0], input_list[i].split(":")[1].split()[0],
-                   input_list[i].split(":")[1].split()[1]]]
+    for i in input_list:
+        if not'#' in i[:2] and not " " in i[0]:
+            if len(i.split(",")) > 2:
+                mappa += [i.split(",")]
     f_map.close()
     return mappa
 
 
-class InafSkaOpticalRx:
+class AAVSOpticalRx:
     '''
     INAF SKA Optical Receiver
-    (SKA-AAVS)
+    (SKA-AAVS1)
 
     LSB - No 50Ohm,PA,PB,1dB,2dB,4dB,8dB,16dB - MSB
     '''
@@ -192,8 +193,10 @@ class InafSkaOpticalRx:
         self.bit_string['b6'] = "Attenuation 8dB"
         self.bit_string['b7'] = "Attenuation 16dB"
 
-        self.value = 4 + 128  # LowPassFilter, 16 dB of attenuation
-        self.version = "OF-Rx"
+        self._value_ = 4 + 128  # LowPassFilter, 16 dB of attenuation
+        self.version = "AAVS1 OF-Rx"
+        self.type = "RF-X"
+        self.fw_map = {'preadu_id': 0, 'channel': 0}
         self.sn = 0
 
     def print_bit_description(self):
@@ -201,43 +204,95 @@ class InafSkaOpticalRx:
             print(k, ":", self.bit_string[k])
 
     def set_attenuation(self, att):
-        self.value = (self.value & 0b111) + (att << 3)
+        self._value_ = (self._value_ & 0b111) + (att << 3)
 
     def get_attenuation(self):
-        return (self.value & 0b11111000) >> 3
+        return (self._value_ & 0b11111000) >> 3
 
     def code2att(self, code):
         return (code & 0b11111000) >> 3
 
     def set_hipass(self):
-        self.value = (self.value & 0b11111001) + 2
+        self._value_ = (self._value_ & 0b11111001) + 2
 
     def is_hipass(self):
-        if (self.value & 0b10) == 2:
+        if (self._value_ & 0b10) == 2:
             return True
         else:
             return False
 
     def set_lopass(self):
-        self.value = (self.value & 0b11111001) + 4
+        self._value_ = (self._value_ & 0b11111001) + 4
 
     def is_lopass(self):
-        if (self.value & 0b100) == 4:
+        if (self._value_ & 0b100) == 4:
             return True
         else:
             return False
 
     def terminate(self):
-        self.value = (self.value & 0b11111110) + 1
+        self._value_ = (self._value_ & 0b11111110) + 1
 
     def is_terminated(self):
-        if self.value & 1:
+        if self._value_ & 1:
             return True
         else:
             return False
 
     def rf_enable(self):
-        self.value = (self.value & 0b11111110)
+        self._value_ = (self._value_ & 0b11111110)
+
+    def get_reg_value(self):
+        return self._value_
+
+    def set_reg_value(self, value):
+        self._value_ = value
+
+
+class NewSKAOpticalRx:
+    '''
+    INAF NEW SKA Optical Receiver
+    (SKA-AAVS3 for TPM 1.6)
+
+    No 50 Ohm Termination Capability, Only one pass-band filter (50-350MHz)
+
+    LSB - *,*,*,1dB,2dB,4dB,8dB,16dB - MSB
+    '''
+    def __init__(self):
+        self.bit_string = {}
+        self.bit_string['b0'] = "Spare / Unused"
+        self.bit_string['b1'] = "Spare / Unused"
+        self.bit_string['b2'] = "Spare / Unused"
+        self.bit_string['b3'] = "Attenuation 1dB"
+        self.bit_string['b4'] = "Attenuation 2dB"
+        self.bit_string['b5'] = "Attenuation 4dB"
+        self.bit_string['b6'] = "Attenuation 8dB"
+        self.bit_string['b7'] = "Attenuation 16dB"
+
+        self._value_ = 0  # register value
+        self.version = "AAVS3 OF-Rx"
+        self.type = "RF-X"
+        self.fw_map = {'preadu_id': 0, 'channel': 0}
+        self.sn = 0
+
+    def print_bit_description(self):
+        for k in sorted(self.bit_string.keys()):
+            print(k, ":", self.bit_string[k])
+
+    def set_attenuation(self, att):
+        self._value_ = (self._value_ & 0b111) + (att << 3)
+
+    def get_attenuation(self):
+        return (self._value_ & 0b11111000) >> 3
+
+    def code2att(self, code):
+        return (code & 0b11111000) >> 3
+
+    def get_reg_value(self):
+        return self._value_
+
+    def set_reg_value(self, value):
+        self._value_ = value
 
 
 class InafSkaRfRx:
@@ -262,8 +317,10 @@ class InafSkaRfRx:
         self.bit_string['b6'] = "Attenuation 1dB"
         self.bit_string['b7'] = "Attenuation 16dB"
 
-        self.value = 16 + 128  # LowPassFilter, 16 dB of attenuation
+        self._value_ = 16 + 128  # LowPassFilter, 16 dB of attenuation
         self.version = "RF-Rx"
+        self.type = "RF-X"
+        self.fw_map = {'preadu_id': 0, 'channel': 0}
         self.sn = 0
 
     def print_bit_description(self):
@@ -272,20 +329,20 @@ class InafSkaRfRx:
 
     def set_attenuation(self, att):
         #print format(self.value, '08b'), att,
-        self.value = self.value & 0b00010101
-        self.value = self.value + ((att & 0b1) << 6)  # 1dB
-        self.value = self.value + (att & 0b10)  # 2dB
-        self.value = self.value + ((att & 0b100) << 1) # 4dB
-        self.value = self.value + ((att & 0b1000) << 2)  # 8dB
-        self.value = self.value + ((att & 0b10000) << 3)  # 16dB
+        self._value_ = self._value_ & 0b00010101
+        self._value_ = self._value_ + ((att & 0b1) << 6)  # 1dB
+        self._value_ = self._value_ + (att & 0b10)  # 2dB
+        self._value_ = self._value_ + ((att & 0b100) << 1) # 4dB
+        self._value_ = self._value_ + ((att & 0b1000) << 2)  # 8dB
+        self._value_ = self._value_ + ((att & 0b10000) << 3)  # 16dB
         #print format(self.value, '08b')
 
     def get_attenuation(self):
-        a = ((self.value & 0b10) >> 1) * 2
-        a += ((self.value & 0b1000) >> 3) * 4
-        a += ((self.value & 0b100000) >> 5) * 8
-        a += ((self.value & 0b1000000) >> 6) * 1
-        a += ((self.value & 0b10000000) >> 7) * 16
+        a = ((self._value_ & 0b10) >> 1) * 2
+        a += ((self._value_ & 0b1000) >> 3) * 4
+        a += ((self._value_ & 0b100000) >> 5) * 8
+        a += ((self._value_ & 0b1000000) >> 6) * 1
+        a += ((self._value_ & 0b10000000) >> 7) * 16
         return a
 
     def code2att(self, code):
@@ -297,34 +354,40 @@ class InafSkaRfRx:
         return a
 
     def set_hipass(self):
-        self.value = (self.value & 0b11101011) + 4
+        self._value_ = (self._value_ & 0b11101011) + 4
 
     def is_hipass(self):
-        if (self.value & 0b100) == 4:
+        if (self._value_ & 0b100) == 4:
             return True
         else:
             return False
 
     def set_lopass(self):
-        self.value = (self.value & 0b11101011) + 16
+        self._value_ = (self._value_ & 0b11101011) + 16
 
     def is_lopass(self):
-        if (self.value & 0b10000) == 16:
+        if (self._value_ & 0b10000) == 16:
             return True
         else:
             return False
 
     def terminate(self):
-        self.value = (self.value & 0b11111110) + 1
+        self._value_ = (self._value_ & 0b11111110) + 1
 
     def is_terminated(self):
-        if self.value & 1:
+        if self._value_ & 1:
             return True
         else:
             return False
 
     def rf_enable(self):
-        self.value = (self.value & 0b11111110)
+        self._value_ = (self._value_ & 0b11111110)
+
+    def get_reg_value(self):
+        return self._value_
+
+    def set_reg_value(self, value):
+        self._value_ = value
 
 
 class preAduRf:
@@ -354,47 +417,52 @@ class preAduRf:
         self.rx = []
 
         # TPM input fibres 1-4, ADU Input 0-7
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
 
         # TPM input fibres 5-8, ADU Input 16-23
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
 
         # TPM input fibres 16-13, ADU Input 8-15
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
 
         # TPM input fibres 12-09, ADU Input 24-31
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
 
         for i in range(32):
             self.rx[i].sn = i
+
+        self.spi_remap = [23, 22, 21, 20, 19, 18, 17, 16,
+                          7, 6, 5, 4, 3, 2, 1, 0,
+                          8, 9, 10, 11, 12, 13, 14, 15,
+                          24, 25, 26, 27, 28, 29, 30, 31]
 
     def set_rx_attenuation(self, nrx, att):
         self.rx[nrx].set_attenuation(bound(att))
@@ -419,6 +487,19 @@ class preAduRf:
     def set_all_rx_attenuation(self, att):
         for i in range(self.nof_rx):
             self.rx[i].set_attenuation(bound(att))
+
+    def get_register_value(self, nrx):
+        return self.rx[nrx].get_reg_value()
+
+    def set_register_value(self, nrx, value):
+        return self.rx[nrx].set_reg_value(value=value)
+
+    def set_spi_conf(self, nrx, preadu_id, channel):
+        self.rx[self.spi_remap[nrx]].fw_map['preadu_id'] = preadu_id
+        self.rx[self.spi_remap[nrx]].fw_map['channel'] = channel
+
+    def get_spi_conf(self, nrx):
+        return int(self.rx[self.spi_remap[nrx]].fw_map['preadu_id']), int(self.rx[self.spi_remap[nrx]].fw_map['channel'])
 
 
 class preAduSadino:
@@ -450,47 +531,52 @@ class preAduSadino:
         self.rx = []
 
         # TPM input fibres 1-4, ADU Input 0-7
-        self.rx += [InafSkaOpticalRx()]
-        self.rx += [InafSkaOpticalRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
 
         # TPM input fibres 16-13, ADU Input 8-15
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
-        self.rx += [InafSkaOpticalRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
 
         # TPM input fibres 5-8, ADU Input 16-23
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
 
         # TPM input fibres 12-09, ADU Input 24-31
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
         self.rx += [InafSkaRfRx()]
-        self.rx += [InafSkaOpticalRx()]
+        self.rx += [AAVSOpticalRx()]
 
         for i in range(32):
             self.rx[i].sn = i
+
+        self.spi_remap = [23, 22, 21, 20, 19, 18, 17, 16,
+                          7, 6, 5, 4, 3, 2, 1, 0,
+                          8, 9, 10, 11, 12, 13, 14, 15,
+                          24, 25, 26, 27, 28, 29, 30, 31]
 
     def set_rx_attenuation(self, nrx, att):
         #print("PRIMA\t", nrx, self.rx[nrx].sn, self.rx[nrx].version, "DSA", self.rx[nrx].get_attenuation(), "OLD VALUE", self.rx[nrx].value, "SET DSA", att)
@@ -518,110 +604,157 @@ class preAduSadino:
         for i in range(self.nof_rx):
             self.rx[i].set_attenuation(bound(att))
 
+    def get_register_value(self, nrx):
+        return self.rx[nrx].get_reg_value()
 
-class preAduOptRx:
+    def set_register_value(self, nrx, value):
+        return self.rx[nrx].set_reg_value(value=value)
+
+    def set_spi_conf(self, nrx, preadu_id, channel):
+        self.rx[self.spi_remap[nrx]].fw_map['preadu_id'] = preadu_id
+        self.rx[self.spi_remap[nrx]].fw_map['channel'] = channel
+
+    def get_spi_conf(self, nrx):
+        return int(self.rx[self.spi_remap[nrx]].fw_map['preadu_id']), int(self.rx[self.spi_remap[nrx]].fw_map['channel'])
+
+
+class preAduAAVS1:
     '''
-    A preADU board having INAF SKA optical receivers
+    A preADU board having INAF SKA optical WDM receivers
     The receiver bit mapping is the same for RF1 and RF2
-
+    SPI lane chain from Rx-01 to Rx-8
     '''
     def __init__(self):
         self.nof_rx = 32
         self.rx = []
         for i in range(self.nof_rx):
-            self.rx += [InafSkaOpticalRx()]
+            self.rx += [AAVSOpticalRx()]
             self.rx[i].sn = i
 
+        # self.spi_remap = [23, 22, 21, 20, 19, 18, 17, 16,
+        #                   7, 6, 5, 4, 3, 2, 1, 0,
+        #                   8, 9, 10, 11, 12, 13, 14, 15,
+        #                   24, 25, 26, 27, 28, 29, 30, 31]
+        self.spi_remap = np.arange(32)
+
     def set_rx_attenuation(self, nrx, att):
-        self.rx[nrx].set_attenuation(bound(att))
+        self.rx[self.spi_remap[nrx]].set_attenuation(bound(att))
 
     def get_rx_attenuation(self, nrx):
-        return self.rx[nrx].get_attenuation()
+        return self.rx[self.spi_remap[nrx]].get_attenuation()
 
     def set_rx_hi_filter(self, nrx):
-        self.rx[nrx].set_hipass()
+        self.rx[self.spi_remap[nrx]].set_hipass()
 
     def set_rx_lo_filter(self, nrx):
-        self.rx[nrx].set_lopass()
+        self.rx[self.spi_remap[nrx]].set_lopass()
 
     def set_all_hi_filter(self):
         for i in range(self.nof_rx):
-            self.rx[i].set_hipass()
+            self.rx[self.spi_remap[i]].set_hipass()
 
     def set_all_lo_filter(self):
         for i in range(self.nof_rx):
-            self.rx[i].set_lopass()
+            self.rx[self.spi_remap[i]].set_lopass()
 
     def set_all_rx_attenuation(self, att):
         for i in range(self.nof_rx):
-            self.rx[i].set_attenuation(bound(att))
+            self.rx[self.spi_remap[i]].set_attenuation(bound(att))
+
+    def get_register_value(self, nrx):
+        return self.rx[self.spi_remap[nrx]].get_reg_value()
+
+    def set_register_value(self, nrx, value):
+        return self.rx[self.spi_remap[nrx]].set_reg_value(value=value)
+
+    def set_spi_conf(self, nrx, preadu_id, channel):
+        self.rx[self.spi_remap[nrx]].fw_map['preadu_id'] = preadu_id
+        self.rx[self.spi_remap[nrx]].fw_map['channel'] = channel
+
+    def get_spi_conf(self, nrx):
+        return int(self.rx[self.spi_remap[nrx]].fw_map['preadu_id']), int(self.rx[self.spi_remap[nrx]].fw_map['channel'])
+
+
+class preAduAAVS3:
+    '''
+    A preADU board with embedded optical WDM receivers
+    The receiver bit mapping is the same for RF1 and RF2 and Ctrl only DSA
+    Reversed RF1-RF2 (RF connectors placed to the opposite layer)
+    Funny SPI lane trace (15-16-13-14-11-12-9-10-7-8-5-6-3-4-1-2)
+    It will be corrected in the next version
+    '''
+    def __init__(self):
+        self.nof_rx = 32
+        self.rx = []
+        for i in range(self.nof_rx):
+            self.rx += [NewSKAOpticalRx()]
+            self.rx[i].sn = i
+
+        self.spi_remap = [1, 0, 3, 2, 5, 4, 7, 6,
+                          17, 16, 19, 18, 21, 20, 23, 22,
+                          30, 31, 28, 29, 26, 27, 24, 25,
+                          14, 15, 12, 13, 10, 11, 8, 9]
+
+    # E' corretto che mappatura SPI appartenga alla classe PREADU di questo livello
+    # e che gli altri la utilizzino tramite lei
+    #
+    # Lettura e Scrittura qui devono essre coerenti
+
+    def set_rx_attenuation(self, nrx, att):
+        self.rx[self.spi_remap[nrx]].set_attenuation(bound(att))
+
+    def get_rx_attenuation(self, nrx):
+        return self.rx[self.spi_remap[nrx]].get_attenuation()
+
+    def set_all_rx_attenuation(self, att):
+        for i in range(self.nof_rx):
+            self.rx[self.spi_remap[i]].set_attenuation(bound(att))
+
+    def get_register_value(self, nrx):
+        return self.rx[self.spi_remap[nrx]].get_reg_value()
+
+    def set_register_value(self, nrx, value):
+        return self.rx[self.spi_remap[nrx]].set_reg_value(value=value)
+
+    def set_spi_conf(self, nrx, preadu_id, channel):
+        self.rx[self.spi_remap[nrx]].fw_map['preadu_id'] = preadu_id
+        self.rx[self.spi_remap[nrx]].fw_map['channel'] = channel
+
+    def get_spi_conf(self, nrx):
+        return int(self.rx[self.spi_remap[nrx]].fw_map['preadu_id']), int(self.rx[self.spi_remap[nrx]].fw_map['channel'])
 
 
 class Preadu(object):
-    def __init__(self, parent, tpm=None, board_type=0, debug=0):
+    def __init__(self, parent, tpm=None, board_version=3, debug=0):
         """ Initialise main window """
         super(Preadu, self).__init__()
 
-        self.board_type = board_type
+        self.board_version = board_version
         self.debug = debug
         self.tpm = tpm
         self.Busy = False  # UCP Communication Token
+        self.write_armed = False  # Tells the top layer (skalab_live) that a write operation is ready to go
 
         self.inputs = CHANNELS
-        if self.board_type == 0:
-            self.preadu = preAduOptRx()
-            print("PreADU with Optical Receivers selected")
-        elif self.board_type == 1:
+        self.rf_map = read_routing_table("./SignalMap/TPM_AAVS1.txt")
+        if self.board_version == 3:
+            self.preadu = preAduAAVS3()
+            self.rf_map = read_routing_table("./SignalMap/TPM_AAVS3.txt")
+            print("New PreADU with Embedded Optical WDM Receivers selected")
+        elif self.board_version == 2:
+            self.preadu = preAduAAVS1()
+            print("AAVS1 PreADU with Optical WDM Receivers selected")
+        elif self.board_version == 1:
             self.preadu = preAduRf()
             print("RF PreADU without optical receivers")
         else:
             self.preadu = preAduSadino()
             print("SADino preADU with Mixed RF and Optical Rxs selected")
 
-        self.spi_remap = [23, 22, 21, 20, 19, 18, 17, 16,
-                           7,  6,  5,  4,  3,  2,  1,  0,
-                           8,  9, 10, 11, 12, 13, 14, 15,
-                          24, 25, 26, 27, 28, 29, 30, 31]
+        for spimap in self.rf_map:
+            self.preadu.set_spi_conf(nrx=int(spimap[0]), preadu_id=int(spimap[3]), channel=int(spimap[4]))
 
-        self.chan_remap = [
-            15, 14, 13, 12, 11, 10, 9, 8,  # ok
-            17, 16, 19, 18, 21, 20, 23, 22,  # ok
-            31, 30, 29, 28, 27, 26, 25, 24,  # ok
-            1, 0, 3, 2, 5, 4, 7, 6,  # ok
-        ]
-
-        self.signal_map = {0: {'preadu_id': 1, 'channel': 14},
-                           1: {'preadu_id': 1, 'channel': 15},
-                           2: {'preadu_id': 1, 'channel': 12},
-                           3: {'preadu_id': 1, 'channel': 13},
-                           4: {'preadu_id': 1, 'channel': 10},
-                           5: {'preadu_id': 1, 'channel': 11},
-                           6: {'preadu_id': 1, 'channel': 8},
-                           7: {'preadu_id': 1, 'channel': 9},
-                           8: {'preadu_id': 0, 'channel': 0},
-                           9: {'preadu_id': 0, 'channel': 1},
-                           10: {'preadu_id': 0, 'channel': 2},
-                           11: {'preadu_id': 0, 'channel': 3},
-                           12: {'preadu_id': 0, 'channel': 4},
-                           13: {'preadu_id': 0, 'channel': 5},
-                           14: {'preadu_id': 0, 'channel': 6},
-                           15: {'preadu_id': 0, 'channel': 7},
-                           16: {'preadu_id': 1, 'channel': 6},
-                           17: {'preadu_id': 1, 'channel': 7},
-                           18: {'preadu_id': 1, 'channel': 4},
-                           19: {'preadu_id': 1, 'channel': 5},
-                           20: {'preadu_id': 1, 'channel': 2},
-                           21: {'preadu_id': 1, 'channel': 3},
-                           22: {'preadu_id': 1, 'channel': 0},
-                           23: {'preadu_id': 1, 'channel': 1},
-                           24: {'preadu_id': 0, 'channel': 8},
-                           25: {'preadu_id': 0, 'channel': 9},
-                           26: {'preadu_id': 0, 'channel': 10},
-                           27: {'preadu_id': 0, 'channel': 11},
-                           28: {'preadu_id': 0, 'channel': 12},
-                           29: {'preadu_id': 0, 'channel': 13},
-                           30: {'preadu_id': 0, 'channel': 14},
-                           31: {'preadu_id': 0, 'channel': 15}}
+        self.spi_remap = self.preadu.spi_remap
 
         self.label_top = QtWidgets.QLabel(parent)
         self.label_top.setGeometry(QtCore.QRect(80, 15, 380, 21))
@@ -682,15 +815,14 @@ class Preadu(object):
         self.button_rfoff.setText("RF OFF")
         self.button_apply.setText("Apply")
 
-        rf_map = read_routing_table()
         self.records = []
         for i in range(self.inputs):
-            self.records += [create_record(parent, rf_map[i])]
+            self.records += [create_record(parent, self.rf_map[i])]
 
         self.label_comments = QtWidgets.QLabel(parent)
         self.label_comments.setGeometry(QtCore.QRect(20, 630, DIALOG_WIDTH - 20, 21))
         self.label_comments.setAlignment(QtCore.Qt.AlignCenter)
-        self.adjustControls(self.board_type)
+        self.adjustControls(self.board_version)
         self.connections()
 
     def connections(self):
@@ -713,20 +845,22 @@ class Preadu(object):
         for num in range(self.inputs):
             # SPI Register Value
             #register_value = int(self.preadu_val[self.spi_remap[num]])
-            register_value = int(self.preadu.rx[num].value)
-            self.preadu.rx[num].value = register_value
+            register_value = int(self.preadu.get_register_value(nrx=num))
+            #self.preadu.rx[num].value = register_value # ????
             self.records[num]['reg_val'] = register_value
             self.records[num]['value'].setText(str(hex(register_value))[2:])
             # Attenuation
-            update_text(self.records[num]['text'], str(self.preadu.get_rx_attenuation(num)))
+            #print(num, register_value, str(hex(register_value)), str(self.preadu.get_rx_attenuation(num)))
+            update_text(self.records[num]['text'], str(self.preadu.get_rx_attenuation(nrx=num)))
             #update_text(self.records[num]['text'], str((register_value & 0b11111000) >> 3))
-            update_flag_lo_filter(self.records[num], self.preadu.rx[num].is_lopass())
-            update_flag_hi_filter(self.records[num], self.preadu.rx[num].is_hipass())
-            update_flag_termination(self.records[num], self.preadu.rx[num].is_terminated())
+            if self.board_version < 3:
+                update_flag_lo_filter(self.records[num], self.preadu.rx[num].is_lopass())
+                update_flag_hi_filter(self.records[num], self.preadu.rx[num].is_hipass())
+                update_flag_termination(self.records[num], self.preadu.rx[num].is_terminated())
             self.records[num]['value'].setFont(font_normal())
         if self.debug:
             for num in range(self.inputs):
-                print(format(num, '02d'), format(self.preadu.rx[num].value, '08b'), "ATT:",
+                print(format(num, '02d'), format(self.preadu.get_register_value(nrx=num), '08b'), "ATT:",
                       self.preadu.rx[num].get_attenuation(), ", LO:", self.preadu.rx[num].is_lopass(),
                       ", HI:", self.preadu.rx[num].is_hipass(), ", RF-ENABLED: ", self.preadu.rx[num].is_terminated())
 
@@ -738,7 +872,7 @@ class Preadu(object):
             #conf_value = ('0x' + self.records[num]['value'].text()).toInt(16)[0] & 0b11111011
             #conf_value = conf_value | 0b10
             self.records[num]['value'].setFont(font_bold())
-            self.records[num]['value'].setText(hex(self.preadu.rx[num].value)[2:])
+            self.records[num]['value'].setText(hex(self.preadu.get_register_value(nrx=num))[2:])
             update_flag_lo_filter(self.records[num], self.preadu.rx[num].is_lopass())
             update_flag_hi_filter(self.records[num], self.preadu.rx[num].is_hipass())
             #update_flag(self.records[num], (conf_value & 0b111))
@@ -751,52 +885,55 @@ class Preadu(object):
             #conf_value=('0x'+self.records[num]['value'].text()).toInt(16)[0] & 0b11111101
             #conf_value=conf_value | 0b100
             self.records[num]['value'].setFont(font_bold())
-            self.records[num]['value'].setText(hex(self.preadu.rx[num].value)[2:])
+            self.records[num]['value'].setText(hex(self.preadu.get_register_value(nrx=num))[2:])
             update_flag_lo_filter(self.records[num], self.preadu.rx[num].is_lopass())
             update_flag_hi_filter(self.records[num], self.preadu.rx[num].is_hipass())
             #update_flag(self.records[num], (conf_value & 0b111) )
 
     def set_rf(self, num):
-        if (self.preadu.rx[num].value & 1) == 1:
-            self.preadu.rx[num].value = self.preadu.rx[num].value & 0b11111110
-            self.records[num]['value'].setFont(font_bold())
-            self.records[num]['value'].setText(hex(self.preadu.rx[num].value)[2:])
-            update_flag_termination(self.records[num], False)
-        else:
-            self.preadu.rx[num].value = self.preadu.rx[num].value | 1
-            self.records[num]['value'].setFont(font_bold())
-            self.records[num]['value'].setText(hex(self.preadu.rx[num].value)[2:])
-            update_flag_termination(self.records[num], True)
+        if self.board_version < 3:
+            if (self.preadu.get_register_value(nrx=num) & 1) == 1:
+                self.preadu.set_register_value(nrx=num, value=(self.preadu.get_register_value(nrx=num) & 0b11111110))
+                self.records[num]['value'].setFont(font_bold())
+                self.records[num]['value'].setText(hex(self.preadu.get_register_value(nrx=num)[2:]))
+                update_flag_termination(self.records[num], False)
+            else:
+                self.preadu.set_register_value(nrx=num, value=(self.preadu.get_register_value(nrx=num) | 1))
+                self.records[num]['value'].setFont(font_bold())
+                self.records[num]['value'].setText(hex(self.preadu.get_register_value(nrx=num))[2:])
+                update_flag_termination(self.records[num], True)
 
     def action_plus(self, num):
         valore = int(self.records[num]['text'].text()) + 1
         # print "Valore: ", valore
         if valore > 31:
             valore = 31
-        self.preadu.rx[num].set_attenuation(bound(valore))
+        self.preadu.set_rx_attenuation(nrx=num, att=bound(valore))
         self.records[num]['value'].setFont(font_bold())
-        self.records[num]['value'].setText(hex(self.preadu.rx[num].value)[2:])
-        self.records[num]['text'].setText(str(self.preadu.rx[num].get_attenuation()))
+        self.records[num]['value'].setText(hex(self.preadu.get_register_value(nrx=num))[2:])
+        self.records[num]['text'].setText(str(self.preadu.get_rx_attenuation(nrx=num)))
 
     def action_minus(self, num):
         valore = int(self.records[num]['text'].text()) - 1
         if valore < 0:
             valore = 0
-        self.preadu.rx[num].set_attenuation(bound(valore))
+        self.preadu.set_rx_attenuation(nrx=num, att=bound(valore))
         self.records[num]['value'].setFont(font_bold())
-        self.records[num]['value'].setText(hex(self.preadu.rx[num].value)[2:])
-        self.records[num]['text'].setText(str(self.preadu.rx[num].get_attenuation()))
+        self.records[num]['value'].setText(hex(self.preadu.get_register_value(nrx=num))[2:])
+        self.records[num]['text'].setText(str(self.preadu.get_rx_attenuation(nrx=num)))
 
     def action_rfoff(self, num):
-        self.preadu.rx[num].value = self.preadu.rx[num].value & 0b11111110
+        value = self.preadu.get_register_value(nrx=num) & 0b11111110
+        self.preadu.set_register_value(nrx=num, value=value)
         self.records[num]['value'].setFont(font_bold())
-        self.records[num]['value'].setText(hex(self.preadu.rx[num].value)[2:])
+        self.records[num]['value'].setText(hex(self.preadu.get_register_value(nrx=num))[2:])
         update_flag_termination(self.records[num], False)
 
     def action_rfon(self, num):
-        self.preadu.rx[num].value = self.preadu.rx[num].value | 1
+        value = self.preadu.get_register_value(nrx=num) | 1
+        self.preadu.set_register_value(nrx=num, value=value)
         self.records[num]['value'].setFont(font_bold())
-        self.records[num]['value'].setText(hex(self.preadu.rx[num].value)[2:])
+        self.records[num]['value'].setText(hex(self.preadu.get_register_value(nrx=num))[2:])
         update_flag_termination(self.records[num], True)
 
     def decreaseAll(self):
@@ -817,30 +954,31 @@ class Preadu(object):
 
     def selection_change(self, valore):
         for num in range(self.inputs):
-            self.preadu.rx[num].set_attenuation(bound(valore))
+            self.preadu.set_rx_attenuation(nrx=num, att=(bound(valore)))
             self.records[num]['value'].setFont(font_bold())
-            self.records[num]['value'].setText(hex(self.preadu.rx[num].value)[2:])
-            self.records[num]['text'].setText(str(self.preadu.rx[num].get_attenuation()))
+            self.records[num]['value'].setText(hex(self.preadu.get_register_value(nrx=num))[2:])
+            self.records[num]['text'].setText(str(self.preadu.get_rx_attenuation(nrx=num)))
 
     def readConfiguration(self, tpm=None):
         if tpm is None:
             tpm = self.tpm
-        while self.Busy:
-            time.sleep(0.2)
-        self.Busy = True
-        tpm.tpm.tpm_preadu[0].read_configuration()  # TOP
-        tpm.tpm.tpm_preadu[1].read_configuration()  # BOTTOM
-        remap = list(np.flip(np.arange(8)) + 8) + list(np.arange(8)) + list(np.flip(np.arange(8))) + list(
-            np.arange(8) + 8)
         preaduConf = []
-        for i in range(32):
-            value = tpm.tpm.tpm_preadu[(((i + 8) // 8) % 2)].channel_filters[remap[i]]
-            preaduConf += [{'id': i,
-                            'sn': "n/a",
-                            'code': value,
-                            'dsa': self.preadu.rx[i].code2att(value),
-                            'version': self.preadu.rx[i].version}]
-        self.Busy = False
+        if tpm is not None:
+            tpm.tpm.tpm_preadu[0].read_configuration()  # TOP
+            tpm.tpm.tpm_preadu[1].read_configuration()  # BOTTOM
+            for i in range(32):
+                preadu_id, channel_filter = self.preadu.get_spi_conf(nrx=i)
+                value = self.tpm.tpm.tpm_preadu[preadu_id].channel_filters[channel_filter]
+                preaduConf += [{'id': i,
+                                'sn': "n/a",
+                                'code': value,
+                                'preadu_id': preadu_id,
+                                'channel_filter': channel_filter,
+                                'dsa': self.preadu.get_rx_attenuation(i),
+                                'version': self.preadu.rx[i].version}]
+        #print("\nConfiguration READ:")
+        #for conf in preaduConf:
+        #    print(conf)
         return preaduConf
 
     def apply_configuration(self):
@@ -848,31 +986,35 @@ class Preadu(object):
             new_values = []
             for i in range(CHANNELS):
                 new_values += [int("0x" + self.records[i]['value'].text(), 16)]
-            self.write_configuration(new_values)
+            self.write_armed = True
+            #self.write_configuration(new_values)  # only top layer can do a write operation
 
     def write_configuration(self, new_values=None):
+        self.Busy = True
         if self.tpm is not None:
             if new_values is None:
                 new_values = []
                 for i in range(CHANNELS):
-                    new_values += [self.preadu.rx[i].value]
-            g = 0
-            while self.Busy:
-                time.sleep(0.2)
-            self.Busy = True
-            for preadu in [1, 0]:
-                for i in range(16):
-                    self.tpm.tpm.tpm_preadu[preadu].channel_filters[i] = new_values[self.spi_remap[g]]
-                    g = g + 1
-            for preadu in [1, 0]:
-                self.tpm.tpm.tpm_preadu[preadu].write_configuration()
-            self.Busy = False
+                    new_values += [self.preadu.get_register_value(nrx=i)]
+            for i in range(32):
+                value = self.preadu.get_register_value(nrx=i)
+                spi_map = self.preadu.get_spi_conf(nrx=i)
+                #print("PREADU ID: %d, CHAN-FILTER %02d, RMS-INDEX %d, CODE %d" % (spi_map[0], spi_map[1], i, value))
+                self.tpm.tpm.tpm_preadu[spi_map[0]].channel_filters[spi_map[1]] = value
+            for preadu_id in [1, 0]:
+                self.tpm.tpm.tpm_preadu[preadu_id].write_configuration()
             self.reload()
+        self.write_armed = False
+        self.Busy = False
 
     def reload(self):
         conf = self.readConfiguration()
-        for i in range(32):
-            self.preadu.rx[i].value = conf[i]['code']
+        if not conf == []:
+            for i in range(32):
+                self.preadu.set_register_value(nrx=i, value=conf[i]['code'])
+        else:
+            for i in range(32):
+                self.preadu.set_register_value(nrx=i, value=255)
         self.updateForm()
 
     def setTpm(self, tpm):
@@ -882,25 +1024,30 @@ class Preadu(object):
     def set_preadu_version(self, board_type=0):
         del self.preadu
         gc.collect()
-        self.board_type = board_type
-        if self.board_type == 0:
-            self.preadu = preAduOptRx()
-            print("PreADU 3.0 with Optical Receivers selected")
-        elif self.board_type == 1:
-            self.preadu = preAduOptRx()
-            print("PreADU 2.1 with Optical Receivers selected")
-        elif self.board_type == 2:
+        self.board_version = board_type
+        self.rf_map = read_routing_table("./SignalMap/TPM_AAVS1.txt")
+        if self.board_version == 3:
+            self.preadu = preAduAAVS3()
+            self.rf_map = read_routing_table("./SignalMap/TPM_AAVS3.txt")
+            print("PreADU 3.0 with Optical Receivers selected (pre-AAVS3)")
+        elif self.board_version == 2:
+            self.preadu = preAduAAVS1()
+            print("PreADU 2.1 with Optical Receivers selected (AAVS1/AAVS2)")
+        elif self.board_version == 1:
             self.preadu = preAduRf()
             print("PreADU 2.0 (RF) without optical receivers")
-        elif self.board_type == 3:
+        elif self.board_version == 0:
             self.preadu = preAduSadino()
             print("PreADU 2.0b (RF SADino) with Mixed RF and Optical Rxs selected")
+        for spimap in self.rf_map:
+            self.preadu.set_spi_conf(nrx=int(spimap[0]), preadu_id=int(spimap[3]), channel=int(spimap[4]))
+
         self.adjustControls(board_type)
         self.reload()
 
     def adjustControls(self, board_type=0):
-        if self.board_type == 0:
-            table_names = "ADU#  Code      Attenuation          Fibre           RMS           dBm"
+        if self.board_version > 2:
+            table_names = "ADU#  Code      Attenuation           Rx             Fibre       RMS           dBm"
             self.label_legend_1.setText(table_names)
             self.label_legend_2.setText(table_names)
             self.label_legend_3.setText(table_names)
@@ -910,18 +1057,24 @@ class Preadu(object):
             for i in range(CHANNELS):
                 self.records[i]['hi'].setVisible(False)
                 self.records[i]['lo'].setVisible(False)
-                self.records[i]['rf'].setVisible(False)
+                self.records[i]['rf'].setVisible(True)
+                self.records[i]['rf'].setText(self.rf_map[i][1])
+                pos = self.records[i]['rf'].geometry()
+                wdt = pos.width()
+                self.records[i]['rf'].setGeometry((10 + 220 + (((i & 8) >> 3) * TABLE_HSPACE)),
+                                                  pos.y(), pos.width(), pos.height())
+                self.records[i]['of'].setText(self.rf_map[i][2])
                 pos = self.records[i]['of'].geometry()
                 wdt = pos.width()
-                self.records[i]['of'].setGeometry((10 + 220 + (((i & 8) >> 3) * TABLE_HSPACE)),
+                self.records[i]['of'].setGeometry((10 + 290 + (((i & 8) >> 3) * TABLE_HSPACE)),
                                                   pos.y(), pos.width(), pos.height())
                 pos = self.records[i]['rms'].geometry()
                 wdt = pos.width()
-                self.records[i]['rms'].setGeometry(10 + 290 + (((i & 8) >> 3) * TABLE_HSPACE),
+                self.records[i]['rms'].setGeometry(10 + 350 + (((i & 8) >> 3) * TABLE_HSPACE),
                                                    pos.y(), pos.width(), pos.height())
                 pos = self.records[i]['power'].geometry()
                 wdt = pos.width()
-                self.records[i]['power'].setGeometry((10 + 350 + (((i & 8) >> 3) * TABLE_HSPACE)),
+                self.records[i]['power'].setGeometry((10 + 400 + (((i & 8) >> 3) * TABLE_HSPACE)),
                                                      pos.y(), pos.width(), pos.height())
         else:
             table_names = "ADU#  Code      Attenuation               Bands"
@@ -936,6 +1089,12 @@ class Preadu(object):
                 self.records[i]['hi'].setVisible(True)
                 self.records[i]['lo'].setVisible(True)
                 self.records[i]['rf'].setVisible(True)
+                self.records[i]['rf'].setText(self.rf_map[i][1])
+                pos = self.records[i]['rf'].geometry()
+                wdt = pos.width()
+                self.records[i]['rf'].setGeometry((10 + 310 + (((i & 8) >> 3) * TABLE_HSPACE)),
+                                                  pos.y(), pos.width(), pos.height())
+                self.records[i]['of'].setText(self.rf_map[i][2])
                 pos = self.records[i]['of'].geometry()
                 wdt = pos.width()
                 self.records[i]['of'].setGeometry((10 + 360 + (((i & 8) >> 3) * TABLE_HSPACE)),

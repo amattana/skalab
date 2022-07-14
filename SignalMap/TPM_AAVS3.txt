@@ -1,0 +1,52 @@
+# RF Input Signal Map File for AAVS3 and TPM 1.6 with preADU 3.0
+#
+#  * Columns: ADU Input, RF-Pol, Fiber Input, PreADU ID, ChannelFiler IDx
+#
+#  - ADU Input: Is the absolute input number from 0 to 31
+#  - RF-Pol (1:Y, 2:X): This depends on how the Receiver is mounted in the Preadu and the PREADU is mounted in the TPM.
+#                       It is used only as a label in the PREADU Widget
+#                       1330nm laser wavelength corresponds to Pol-Y RF-1
+#                       1270nm laser wavelength corresponds to Pol-X RF-2
+#  - Fiber Input: This is the TPM Input Fibre number from 1 to 16 as in the TPM front panel
+#  - PreADU ID: TPM Top mounted PreADu has id=0, Bottom mounted id=1
+#  - ChannelFilter IDx: is the index of the array in the TPM FW of the
+#                       8 bit hex code that will be uploaded onto the Receiver Register
+#
+#  NOTE (1): The following mapping must be applied only to preADU version 3.0 that has a wrong PCB SPI signal path
+#
+#  NOTE (2): The following mapping does not take into account any internal SKALAB RMS remapping
+#            since the current TPM firmware (sbf_406) does not apply any internal remapping
+#            You would consider to modify the channel_filter numbers if and when a new fw will be released
+#
+0,RF-2,F8,1,1
+1,RF-1,F8,1,0
+2,RF-2,F7,1,3
+3,RF-1,F7,1,2
+4,RF-2,F6,1,5
+5,RF-1,F6,1,4
+6,RF-2,F5,1,7
+7,RF-1,F5,1,6
+8,RF-1,F4,0,14
+9,RF-2,F4,0,15
+10,RF-1,F3,0,12
+11,RF-2,F3,0,13
+12,RF-1,F2,0,10
+13,RF-2,F2,0,11
+14,RF-1,F1,0,8
+15,RF-2,F1,0,9
+16,RF-2,F16,1,9
+17,RF-1,F16,1,8
+18,RF-2,F15,1,11
+19,RF-1,F15,1,10
+20,RF-2,F14,1,13
+21,RF-1,F14,1,12
+22,RF-2,F13,1,15
+23,RF-1,F13,1,14
+24,RF-1,F12,0,6
+25,RF-2,F12,0,7
+26,RF-1,F11,0,4
+27,RF-2,F11,0,5
+28,RF-1,F10,0,2
+29,RF-2,F10,0,3
+30,RF-1,F9,0,0
+31,RF-2,F9,0,1
