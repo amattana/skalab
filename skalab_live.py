@@ -890,6 +890,7 @@ class Live(QtWidgets.QMainWindow):
                         self.preadu.write_armed = True
                         self.writing_preadu = True
                         while self.writing_preadu:
+                            # wait for the write operation completed by the process
                             time.sleep(0.1)
                         #self.preadu.write_configuration()
                         time.sleep(0.2)
@@ -910,6 +911,7 @@ class Live(QtWidgets.QMainWindow):
                         self.preadu.write_armed = True
                         self.writing_preadu = True
                         while self.writing_preadu:
+                            # wait for the write operation completed by the process
                             time.sleep(0.1)
                         #self.preadu.write_configuration()
                         time.sleep(0.2)

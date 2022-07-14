@@ -459,40 +459,37 @@ class preAduRf:
         for i in range(32):
             self.rx[i].sn = i
 
-        self.spi_remap = [23, 22, 21, 20, 19, 18, 17, 16,
-                          7, 6, 5, 4, 3, 2, 1, 0,
-                          8, 9, 10, 11, 12, 13, 14, 15,
-                          24, 25, 26, 27, 28, 29, 30, 31]
+        self.spi_remap = np.arange(32)
 
     def set_rx_attenuation(self, nrx, att):
-        self.rx[nrx].set_attenuation(bound(att))
+        self.rx[self.spi_remap[nrx]].set_attenuation(bound(att))
 
     def get_rx_attenuation(self, nrx):
-        return self.rx[nrx].get_attenuation()
+        return self.rx[self.spi_remap[nrx]].get_attenuation()
 
     def set_rx_hi_filter(self, nrx):
-        self.rx[nrx].set_hipass()
+        self.rx[self.spi_remap[nrx]].set_hipass()
 
     def set_rx_lo_filter(self, nrx):
-        self.rx[nrx].set_lopass()
+        self.rx[self.spi_remap[nrx]].set_lopass()
 
     def set_all_hi_filter(self):
         for i in range(self.nof_rx):
-            self.rx[i].set_hipass()
+            self.rx[self.spi_remap[i]].set_hipass()
 
     def set_all_lo_filter(self):
         for i in range(self.nof_rx):
-            self.rx[i].set_lopass()
+            self.rx[self.spi_remap[i]].set_lopass()
 
     def set_all_rx_attenuation(self, att):
         for i in range(self.nof_rx):
-            self.rx[i].set_attenuation(bound(att))
+            self.rx[self.spi_remap[i]].set_attenuation(bound(att))
 
     def get_register_value(self, nrx):
-        return self.rx[nrx].get_reg_value()
+        return self.rx[self.spi_remap[nrx]].get_reg_value()
 
     def set_register_value(self, nrx, value):
-        return self.rx[nrx].set_reg_value(value=value)
+        return self.rx[self.spi_remap[nrx]].set_reg_value(value=value)
 
     def set_spi_conf(self, nrx, preadu_id, channel):
         self.rx[self.spi_remap[nrx]].fw_map['preadu_id'] = preadu_id
@@ -572,43 +569,39 @@ class preAduSadino:
 
         for i in range(32):
             self.rx[i].sn = i
-
-        self.spi_remap = [23, 22, 21, 20, 19, 18, 17, 16,
-                          7, 6, 5, 4, 3, 2, 1, 0,
-                          8, 9, 10, 11, 12, 13, 14, 15,
-                          24, 25, 26, 27, 28, 29, 30, 31]
+        self.spi_remap = np.arange(32)
 
     def set_rx_attenuation(self, nrx, att):
         #print("PRIMA\t", nrx, self.rx[nrx].sn, self.rx[nrx].version, "DSA", self.rx[nrx].get_attenuation(), "OLD VALUE", self.rx[nrx].value, "SET DSA", att)
-        self.rx[nrx].set_attenuation(bound(att))
+        self.rx[self.spi_remap[nrx]].set_attenuation(bound(att))
         #print(" DOPO\t", nrx, self.rx[nrx].sn, self.rx[nrx].version, "DSA", self.rx[nrx].get_attenuation(), "NEW VALUE", self.rx[nrx].value)
 
     def get_rx_attenuation(self, nrx):
-        return self.rx[nrx].get_attenuation()
+        return self.rx[self.spi_remap[nrx]].get_attenuation()
 
     def set_rx_hi_filter(self, nrx):
-        self.rx[nrx].set_hipass()
+        self.rx[self.spi_remap[nrx]].set_hipass()
 
     def set_rx_lo_filter(self, nrx):
-        self.rx[nrx].set_lopass()
+        self.rx[self.spi_remap[nrx]].set_lopass()
 
     def set_all_hi_filter(self):
         for i in range(self.nof_rx):
-            self.rx[i].set_hipass()
+            self.rx[self.spi_remap[i]].set_hipass()
 
     def set_all_lo_filter(self):
         for i in range(self.nof_rx):
-            self.rx[i].set_lopass()
+            self.rx[self.spi_remap[i]].set_lopass()
 
     def set_all_rx_attenuation(self, att):
         for i in range(self.nof_rx):
-            self.rx[i].set_attenuation(bound(att))
+            self.rx[self.spi_remap[i]].set_attenuation(bound(att))
 
     def get_register_value(self, nrx):
-        return self.rx[nrx].get_reg_value()
+        return self.rx[self.spi_remap[nrx]].get_reg_value()
 
     def set_register_value(self, nrx, value):
-        return self.rx[nrx].set_reg_value(value=value)
+        return self.rx[self.spi_remap[nrx]].set_reg_value(value=value)
 
     def set_spi_conf(self, nrx, preadu_id, channel):
         self.rx[self.spi_remap[nrx]].fw_map['preadu_id'] = preadu_id
