@@ -254,9 +254,10 @@ class Live(QtWidgets.QMainWindow):
         if 'integrated_spectra_path' in self.profile['App'].keys():
             self.wg.qline_integrated_spectra_path.setText(self.profile['App']['integrated_spectra_path'])
         if 'board_version' in self.profile['App'].keys():
-            self.wg.qline_board_version.setText(self.profile['App']['board_version'])
-            if not self.profile['App']['board_version'] == self.board_version:
-                self.board_version = self.profile['App']['board_version']
+            self.wg.qline_profile_board_version.setText(self.profile['App']['board_version'])
+            if not self.profile['App']['board_version'] == self.board_version and \
+                    not self.profile['App']['board_version'] == "":
+                self.board_version = float(self.profile['App']['board_version'])
                 self.setupPreadu(version=self.board_version)
         # Overriding Configuration File with parameters
         self.updateProfileCombo(current=profile)
@@ -415,8 +416,8 @@ class Live(QtWidgets.QMainWindow):
         self.wg.qcombo_tpm.setEnabled(True)
 
     def setupPreadu(self, version):
-        print("Setting preadu board version: %d" % (self.wg.qcombo_preadu_version.count() - version - 1))
-        self.preadu.set_preadu_version(self.wg.qcombo_preadu_version.count() - version - 1)
+        print("Setting preadu board version: %d" % (int(self.wg.qcombo_preadu_version.count()) - float(version) - 1))
+        self.preadu.set_preadu_version(int(self.wg.qcombo_preadu_version.count()) - float(version) - 1)
         #self.readDsaConfiguration()
 
     def switchTpm(self):
@@ -948,16 +949,17 @@ class Live(QtWidgets.QMainWindow):
             self.rms_file.close()
 
     def setupDAQ(self):
-        ddd = "/storage/daq/tmp/"
-        self.tpm_nic_name = get_if_name(self.station_configuration['network']['lmc']['lmc_ip'])
-        if self.tpm_nic_name == "":
-            print("Connection Error! (ETH Card name ERROR)")
+        self.tpm_nic_name == ""
+        if not self.profile['App']['data_path'] == "":
+            self.tpm_nic_name = get_if_name(self.station_configuration['network']['lmc']['lmc_ip'])
+            if self.tpm_nic_name == "":
+                print("Connection Error! (ETH Card name ERROR)")
         if not self.tpm_nic_name == "":
-            if os.path.exists(ddd):
+            if os.path.exists(self.profile['App']['data_path']):
                 self.mydaq = MyDaq(daq, self.tpm_nic_name, self.tpm_station, len(self.station_configuration['tiles']),
-                                   directory=ddd)
+                                   directory=self.profile['App']['data_path'])
                 print("DAQ Initialized, NIC: %s, NofTiles: %d, Data Directory: %s" %
-                      (self.tpm_nic_name, len(self.station_configuration['tiles']), ddd))
+                      (self.tpm_nic_name, len(self.station_configuration['tiles']), self.profile['App']['data_path']))
             else:
                 print("DAQ Error: a valid data directory is required.")
 

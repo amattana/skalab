@@ -196,7 +196,7 @@ class AAVSOpticalRx:
         self._value_ = 4 + 128  # LowPassFilter, 16 dB of attenuation
         self.version = "AAVS1 OF-Rx"
         self.type = "RF-X"
-        self.fw_map = {'preadu_id': 0, 'channel': 0}
+        self.fw_map = {'preadu_id': 0, 'channel': 0, 'pol': 'n/a', 'adu_in': 0, 'tpm_in': 0}
         self.sn = 0
 
     def print_bit_description(self):
@@ -272,7 +272,7 @@ class NewSKAOpticalRx:
         self._value_ = 0  # register value
         self.version = "AAVS3 OF-Rx"
         self.type = "RF-X"
-        self.fw_map = {'preadu_id': 0, 'channel': 0}
+        self.fw_map = {'preadu_id': 0, 'channel': 0, 'pol': 'n/a', 'adu_in': 0, 'tpm_in': 0}
         self.sn = 0
 
     def print_bit_description(self):
@@ -320,7 +320,7 @@ class InafSkaRfRx:
         self._value_ = 16 + 128  # LowPassFilter, 16 dB of attenuation
         self.version = "RF-Rx"
         self.type = "RF-X"
-        self.fw_map = {'preadu_id': 0, 'channel': 0}
+        self.fw_map = {'preadu_id': 0, 'channel': 0, 'pol': 'n/a', 'adu_in': 0, 'tpm_in': 0}
         self.sn = 0
 
     def print_bit_description(self):
@@ -473,6 +473,15 @@ class preAduRf:
     def set_rx_lo_filter(self, nrx):
         self.rx[self.spi_remap[nrx]].set_lopass()
 
+    def is_lopass(self, nrx):
+        return self.rx[self.spi_remap[nrx]].is_lopass()
+
+    def is_hipass(self, nrx):
+        return self.rx[self.spi_remap[nrx]].is_hipass()
+
+    def is_terminated(self, nrx):
+        return self.rx[self.spi_remap[nrx]].is_terminated()
+
     def set_all_hi_filter(self):
         for i in range(self.nof_rx):
             self.rx[self.spi_remap[i]].set_hipass()
@@ -491,12 +500,15 @@ class preAduRf:
     def set_register_value(self, nrx, value):
         return self.rx[self.spi_remap[nrx]].set_reg_value(value=value)
 
-    def set_spi_conf(self, nrx, preadu_id, channel):
+    def set_spi_conf(self, nrx, preadu_id, channel_filter, pol, adu_in, tpm_in):
         self.rx[self.spi_remap[nrx]].fw_map['preadu_id'] = preadu_id
-        self.rx[self.spi_remap[nrx]].fw_map['channel'] = channel
+        self.rx[self.spi_remap[nrx]].fw_map['channel_filter'] = channel_filter
+        self.rx[self.spi_remap[nrx]].fw_map['pol'] = pol
+        self.rx[self.spi_remap[nrx]].fw_map['adu_in'] = adu_in
+        self.rx[self.spi_remap[nrx]].fw_map['tpm_in'] = tpm_in
 
     def get_spi_conf(self, nrx):
-        return int(self.rx[self.spi_remap[nrx]].fw_map['preadu_id']), int(self.rx[self.spi_remap[nrx]].fw_map['channel'])
+        return self.rx[self.spi_remap[nrx]].fw_map
 
 
 class preAduSadino:
@@ -585,6 +597,15 @@ class preAduSadino:
     def set_rx_lo_filter(self, nrx):
         self.rx[self.spi_remap[nrx]].set_lopass()
 
+    def is_lopass(self, nrx):
+        return self.rx[self.spi_remap[nrx]].is_lopass()
+
+    def is_hipass(self, nrx):
+        return self.rx[self.spi_remap[nrx]].is_hipass()
+
+    def is_terminated(self, nrx):
+        return self.rx[self.spi_remap[nrx]].is_terminated()
+
     def set_all_hi_filter(self):
         for i in range(self.nof_rx):
             self.rx[self.spi_remap[i]].set_hipass()
@@ -603,12 +624,15 @@ class preAduSadino:
     def set_register_value(self, nrx, value):
         return self.rx[self.spi_remap[nrx]].set_reg_value(value=value)
 
-    def set_spi_conf(self, nrx, preadu_id, channel):
+    def set_spi_conf(self, nrx, preadu_id, channel_filter, pol, adu_in, tpm_in):
         self.rx[self.spi_remap[nrx]].fw_map['preadu_id'] = preadu_id
-        self.rx[self.spi_remap[nrx]].fw_map['channel'] = channel
+        self.rx[self.spi_remap[nrx]].fw_map['channel_filter'] = channel_filter
+        self.rx[self.spi_remap[nrx]].fw_map['pol'] = pol
+        self.rx[self.spi_remap[nrx]].fw_map['adu_in'] = adu_in
+        self.rx[self.spi_remap[nrx]].fw_map['tpm_in'] = tpm_in
 
     def get_spi_conf(self, nrx):
-        return int(self.rx[self.spi_remap[nrx]].fw_map['preadu_id']), int(self.rx[self.spi_remap[nrx]].fw_map['channel'])
+        return self.rx[self.spi_remap[nrx]].fw_map
 
 
 class preAduAAVS1:
@@ -642,6 +666,15 @@ class preAduAAVS1:
     def set_rx_lo_filter(self, nrx):
         self.rx[self.spi_remap[nrx]].set_lopass()
 
+    def is_lopass(self, nrx):
+        return self.rx[self.spi_remap[nrx]].is_lopass()
+
+    def is_hipass(self, nrx):
+        return self.rx[self.spi_remap[nrx]].is_hipass()
+
+    def is_terminated(self, nrx):
+        return self.rx[self.spi_remap[nrx]].is_terminated()
+
     def set_all_hi_filter(self):
         for i in range(self.nof_rx):
             self.rx[self.spi_remap[i]].set_hipass()
@@ -660,12 +693,15 @@ class preAduAAVS1:
     def set_register_value(self, nrx, value):
         return self.rx[self.spi_remap[nrx]].set_reg_value(value=value)
 
-    def set_spi_conf(self, nrx, preadu_id, channel):
+    def set_spi_conf(self, nrx, preadu_id, channel_filter, pol, adu_in, tpm_in):
         self.rx[self.spi_remap[nrx]].fw_map['preadu_id'] = preadu_id
-        self.rx[self.spi_remap[nrx]].fw_map['channel'] = channel
+        self.rx[self.spi_remap[nrx]].fw_map['channel_filter'] = channel_filter
+        self.rx[self.spi_remap[nrx]].fw_map['pol'] = pol
+        self.rx[self.spi_remap[nrx]].fw_map['adu_in'] = adu_in
+        self.rx[self.spi_remap[nrx]].fw_map['tpm_in'] = tpm_in
 
     def get_spi_conf(self, nrx):
-        return int(self.rx[self.spi_remap[nrx]].fw_map['preadu_id']), int(self.rx[self.spi_remap[nrx]].fw_map['channel'])
+        return self.rx[self.spi_remap[nrx]].fw_map
 
 
 class preAduAAVS3:
@@ -709,12 +745,15 @@ class preAduAAVS3:
     def set_register_value(self, nrx, value):
         return self.rx[self.spi_remap[nrx]].set_reg_value(value=value)
 
-    def set_spi_conf(self, nrx, preadu_id, channel):
+    def set_spi_conf(self, nrx, preadu_id, channel_filter, pol, adu_in, tpm_in):
         self.rx[self.spi_remap[nrx]].fw_map['preadu_id'] = preadu_id
-        self.rx[self.spi_remap[nrx]].fw_map['channel'] = channel
+        self.rx[self.spi_remap[nrx]].fw_map['channel_filter'] = channel_filter
+        self.rx[self.spi_remap[nrx]].fw_map['pol'] = pol
+        self.rx[self.spi_remap[nrx]].fw_map['adu_in'] = adu_in
+        self.rx[self.spi_remap[nrx]].fw_map['tpm_in'] = tpm_in
 
     def get_spi_conf(self, nrx):
-        return int(self.rx[self.spi_remap[nrx]].fw_map['preadu_id']), int(self.rx[self.spi_remap[nrx]].fw_map['channel'])
+        return self.rx[self.spi_remap[nrx]].fw_map
 
 
 class Preadu(object):
@@ -745,7 +784,10 @@ class Preadu(object):
             print("SADino preADU with Mixed RF and Optical Rxs selected")
 
         for spimap in self.rf_map:
-            self.preadu.set_spi_conf(nrx=int(spimap[0]), preadu_id=int(spimap[3]), channel=int(spimap[4]))
+            self.preadu.set_spi_conf(nrx=int(spimap[0]),
+                                     preadu_id=int(spimap[3]),
+                                     channel_filter=int(spimap[4]),
+                                     pol=spimap[1], adu_in=spimap[0], tpm_in=spimap[2])
 
         self.spi_remap = self.preadu.spi_remap
 
@@ -847,40 +889,40 @@ class Preadu(object):
             update_text(self.records[num]['text'], str(self.preadu.get_rx_attenuation(nrx=num)))
             #update_text(self.records[num]['text'], str((register_value & 0b11111000) >> 3))
             if self.board_version < 3:
-                update_flag_lo_filter(self.records[num], self.preadu.rx[num].is_lopass())
-                update_flag_hi_filter(self.records[num], self.preadu.rx[num].is_hipass())
-                update_flag_termination(self.records[num], self.preadu.rx[num].is_terminated())
+                update_flag_lo_filter(self.records[num], self.preadu.is_lopass(nrx=num))
+                update_flag_hi_filter(self.records[num], self.preadu.is_hipass(nrx=num))
+                update_flag_termination(self.records[num], self.preadu.is_terminated(nrx=num))
             self.records[num]['value'].setFont(font_normal())
         if self.debug:
             for num in range(self.inputs):
                 print(format(num, '02d'), format(self.preadu.get_register_value(nrx=num), '08b'), "ATT:",
-                      self.preadu.rx[num].get_attenuation(), ", LO:", self.preadu.rx[num].is_lopass(),
-                      ", HI:", self.preadu.rx[num].is_hipass(), ", RF-ENABLED: ", self.preadu.rx[num].is_terminated())
+                      self.preadu.get_rx_attenuation(nrx=num), ", LO:", self.preadu.is_lopass(nrx=num),
+                      ", HI:", self.preadu.is_hipass(nrx=num), ", RF-ENABLED: ", self.preadu.is_terminated(nrx=num))
 
     def set_hi(self):
         for num in range(self.inputs):
             self.records[num]['lo'].setStyleSheet("background-color: rgb(255, 255, 0);")
             self.records[num]['hi'].setStyleSheet("background-color: rgb(0, 170, 0);")
-            self.preadu.rx[num].set_hipass()
+            self.preadu.set_hipass(rx=num)
             #conf_value = ('0x' + self.records[num]['value'].text()).toInt(16)[0] & 0b11111011
             #conf_value = conf_value | 0b10
             self.records[num]['value'].setFont(font_bold())
             self.records[num]['value'].setText(hex(self.preadu.get_register_value(nrx=num))[2:])
-            update_flag_lo_filter(self.records[num], self.preadu.rx[num].is_lopass())
-            update_flag_hi_filter(self.records[num], self.preadu.rx[num].is_hipass())
+            update_flag_lo_filter(self.records[num], self.preadu.is_lopass(rx=num))
+            update_flag_hi_filter(self.records[num], self.preadu.is_hipass(rx=num))
             #update_flag(self.records[num], (conf_value & 0b111))
 
     def set_lo(self):
         for num in range(self.inputs):
             self.records[num]['hi'].setStyleSheet("background-color: rgb(255, 255, 0);")
             self.records[num]['lo'].setStyleSheet("background-color: rgb(0, 170, 0);")
-            self.preadu.rx[num].set_lopass()
+            self.preadu.set_lopass(rx=num)
             #conf_value=('0x'+self.records[num]['value'].text()).toInt(16)[0] & 0b11111101
             #conf_value=conf_value | 0b100
             self.records[num]['value'].setFont(font_bold())
             self.records[num]['value'].setText(hex(self.preadu.get_register_value(nrx=num))[2:])
-            update_flag_lo_filter(self.records[num], self.preadu.rx[num].is_lopass())
-            update_flag_hi_filter(self.records[num], self.preadu.rx[num].is_hipass())
+            update_flag_lo_filter(self.records[num], self.preadu.is_lopass(rx=num))
+            update_flag_hi_filter(self.records[num], self.preadu.is_hipass(rx=num))
             #update_flag(self.records[num], (conf_value & 0b111) )
 
     def set_rf(self, num):
@@ -888,7 +930,7 @@ class Preadu(object):
             if (self.preadu.get_register_value(nrx=num) & 1) == 1:
                 self.preadu.set_register_value(nrx=num, value=(self.preadu.get_register_value(nrx=num) & 0b11111110))
                 self.records[num]['value'].setFont(font_bold())
-                self.records[num]['value'].setText(hex(self.preadu.get_register_value(nrx=num)[2:]))
+                self.records[num]['value'].setText(hex(self.preadu.get_register_value(nrx=num))[2:])
                 update_flag_termination(self.records[num], False)
             else:
                 self.preadu.set_register_value(nrx=num, value=(self.preadu.get_register_value(nrx=num) | 1))
@@ -960,13 +1002,17 @@ class Preadu(object):
             tpm.tpm.tpm_preadu[0].read_configuration()  # TOP
             tpm.tpm.tpm_preadu[1].read_configuration()  # BOTTOM
             for i in range(32):
-                preadu_id, channel_filter = self.preadu.get_spi_conf(nrx=i)
+                fw_map = self.preadu.get_spi_conf(nrx=i)
+                preadu_id = int(fw_map['preadu_id'])
+                channel_filter = int(fw_map['channel_filter'])
+                pol = fw_map['pol']
                 value = self.tpm.tpm.tpm_preadu[preadu_id].channel_filters[channel_filter]
                 preaduConf += [{'id': i,
                                 'sn': "n/a",
                                 'code': value,
                                 'preadu_id': preadu_id,
                                 'channel_filter': channel_filter,
+                                'pol': pol,
                                 'dsa': self.preadu.get_rx_attenuation(i),
                                 'version': self.preadu.rx[i].version}]
         #print("\nConfiguration READ:")
@@ -976,24 +1022,20 @@ class Preadu(object):
 
     def apply_configuration(self):
         if self.tpm is not None:
-            new_values = []
             for i in range(CHANNELS):
-                new_values += [int("0x" + self.records[i]['value'].text(), 16)]
+                self.preadu.set_register_value(nrx=i, value=int("0x" + self.records[i]['value'].text(), 16))
             self.write_armed = True
-            #self.write_configuration(new_values)  # only top layer can do a write operation
 
-    def write_configuration(self, new_values=None):
+    def write_configuration(self):
         self.Busy = True
         if self.tpm is not None:
-            if new_values is None:
-                new_values = []
-                for i in range(CHANNELS):
-                    new_values += [self.preadu.get_register_value(nrx=i)]
             for i in range(32):
                 value = self.preadu.get_register_value(nrx=i)
-                spi_map = self.preadu.get_spi_conf(nrx=i)
+                fw_map = self.preadu.get_spi_conf(nrx=i)
+                preadu_id = int(fw_map['preadu_id'])
+                channel_filter = int(fw_map['channel_filter'])
                 #print("PREADU ID: %d, CHAN-FILTER %02d, RMS-INDEX %d, CODE %d" % (spi_map[0], spi_map[1], i, value))
-                self.tpm.tpm.tpm_preadu[spi_map[0]].channel_filters[spi_map[1]] = value
+                self.tpm.tpm.tpm_preadu[preadu_id].channel_filters[channel_filter] = value
             for preadu_id in [1, 0]:
                 self.tpm.tpm.tpm_preadu[preadu_id].write_configuration()
             self.reload()
@@ -1033,7 +1075,8 @@ class Preadu(object):
             self.preadu = preAduSadino()
             print("PreADU 2.0b (RF SADino) with Mixed RF and Optical Rxs selected")
         for spimap in self.rf_map:
-            self.preadu.set_spi_conf(nrx=int(spimap[0]), preadu_id=int(spimap[3]), channel=int(spimap[4]))
+            self.preadu.set_spi_conf(nrx=int(spimap[0]), preadu_id=int(spimap[3]), channel_filter=int(spimap[4]),
+                                     pol=spimap[1], adu_in=spimap[0], tpm_in=spimap[2])
 
         self.adjustControls(board_type)
         self.reload()
