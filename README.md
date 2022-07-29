@@ -1,5 +1,5 @@
-# skalab
-## SKA in Lab
+# SKALAB
+## SKA in LAB
 
 **skalab** is a tool that allow to easy access to the SKA-Low devices without the need of deploy the Tango Framework.
 

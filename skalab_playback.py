@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from skalab_base import SkalabBase
 import shutil
 import sys
 import os
@@ -67,23 +68,19 @@ configuration = {'tiles': None,
                  }
 
 
-class Playback(QtWidgets.QMainWindow):
+class Playback(SkalabBase):
     """ Main UI Window class """
 
-    def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936]):
+    def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936], swpath=""):
         """ Initialise main window """
-        super(Playback, self).__init__()
-        # Load window file
         self.wg = uic.loadUi(uiFile)
+        self.wgProBox = QtWidgets.QWidget(self.wg.qtab_conf)
+        self.wgProBox.setGeometry(QtCore.QRect(1, 1, 800, 860))
+        self.wgProBox.setVisible(True)
+        self.wgProBox.show()
+        super(Playback, self).__init__(App="playback", Profile=profile, Path=swpath, parent=self.wgProBox)
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
-
-        self.profile_name = profile
-        if self.profile_name == "":
-            self.profile_name = "Default"
-        self.profile = {}
-        self.profile_file = ""
-        self.load_profile(self.profile_name)
 
         # Populate the playback plots for the spectra, and power data
         self.miniPlots = MiniPlots(parent=self.wg.qplot_spectra, nplot=16)
@@ -171,7 +168,6 @@ class Playback(QtWidgets.QMainWindow):
         self.wg.qcheck_raw_grid.stateChanged.connect(self.cb_show_raw_grid)
         self.wg.qcheck_power_grid.stateChanged.connect(self.cb_show_power_grid)
         self.wg.qcheck_rms_grid.stateChanged.connect(self.cb_show_rms_grid)
-        self.wg.qradio_oplot.toggled.connect(lambda: self.check_oplot(self.wg.qradio_oplot))
         self.wg.qradio_power.toggled.connect(lambda: self.check_power(self.wg.qradio_power))
         self.wg.qradio_raw.toggled.connect(lambda: self.check_raw(self.wg.qradio_raw))
         self.wg.qradio_rms.toggled.connect(lambda: self.check_rms(self.wg.qradio_rms))
@@ -185,12 +181,6 @@ class Playback(QtWidgets.QMainWindow):
         self.wg.qcheck_xpol_sp.stateChanged.connect(self.cb_show_xline)
         self.wg.qcheck_ypol_sp.stateChanged.connect(self.cb_show_yline)
         self.wg.qcheck_rms.stateChanged.connect(self.cb_show_rms)
-
-        self.wg.qbutton_load_profile.clicked.connect(lambda: self.load())
-        self.wg.qbutton_browse_station_config.clicked.connect(lambda: self.browse_config())
-        self.wg.qbutton_saveas_profile.clicked.connect(lambda: self.save_as_profile())
-        self.wg.qbutton_save_profile.clicked.connect(lambda: self.save_profile(this_profile=self.profile_name))
-        self.wg.qbutton_delete_profile.clicked.connect(lambda: self.delete_profile(self.wg.qcombo_profile.currentText()))
 
     def setup_config(self):
         if not self.config_file == "":
@@ -227,31 +217,15 @@ class Playback(QtWidgets.QMainWindow):
             if n in tpm_list:
                 self.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (n + 1, i))
 
-    def load_profile(self, profile):
-        self.profile = {}
-        fullpath = default_app_dir + profile + "/" + profile_filename
-        if os.path.exists(fullpath):
-            print("Loading Playback Profile: " + profile + " (" + fullpath + ")")
-        else:
-            print("\nThe Playback Profile does not exist.\nGenerating a new one in "
-                  + fullpath + "\n")
-            self.make_profile(profile=profile, prodict={})
-        self.profile = parse_profile(fullpath)
-        self.profile_name = profile
-        self.profile_file = fullpath
-        self.wg.qline_configuration_file.setText(self.profile_file)
-        self.wg.qline_configfile.setText(self.profile['App']['station_config'])
-        # Overriding Configuration File with parameters
-        self.updateProfileCombo(current=profile)
-        self.populate_table_profile()
+    # def reload(self):
+    #     self.wg.qline_configfile.setText(self.profile['Playback']['station_file'])
 
     def browse_data_folder(self):
-        #if self.
         fd = QtWidgets.QFileDialog()
         fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
         options = fd.options()
         self.folder = fd.getExistingDirectory(self, caption="Choose a data folder",
-                                              directory="/storage/daq/", options=options)
+                                              directory=self.profile['Playback']['data_path'], options=options)
         self.wg.qline_datapath.setText(self.folder)
         self.check_dir()
         self.calc_data_volume()
@@ -346,6 +320,7 @@ class Playback(QtWidgets.QMainWindow):
                 self.miniPlots.plotClear()
                 allspgram = []
                 gc.collect()
+                wclim = (int(self.wg.qline_spg_color_min.text()), int(self.wg.qline_spg_color_max.text()))
                 for n in range(len(self.input_list)):
                     allspgram += [[]]
                     allspgram[n] = np.empty((3, xmax - xmin + 1,))
@@ -361,44 +336,16 @@ class Playback(QtWidgets.QMainWindow):
                     first_empty, allspgram[num] = allspgram[num][:3], allspgram[num][3:]
                     self.spectrogramPlots.plotSpectrogram(spettrogramma=allspgram[num], ant=num, ytickstep=yticksteps,
                                                           xmin=t_start, xmax=t_stop, startfreq=xAxisRange[0],
-                                                          stopfreq=xAxisRange[1], title="INPUT-%02d" % int(tpm_input))
+                                                          stopfreq=xAxisRange[1], title="INPUT-%02d" % int(tpm_input),
+                                                          wclim=wclim)
                 self.spectrogramPlots.updatePlot()
-
-        elif self.wg.qradio_oplot.isChecked():
-            lw = 1
-            if self.wg.qcheck_spectra_noline.isChecked():
-                lw = 0
-            if not self.data == []:
-                self.miniPlots.plotClear()
-                for k in range(self.nof_files):
-                    for n, i in enumerate(self.input_list):
-                        # Plot X Pol
-                        spettro, rms = calcolaspettro(self.data[k]['data'][i - 1, 0, :], self.nsamples)
-                        self.miniPlots.plotCurve(self.asse_x, spettro, n, xAxisRange=self.xAxisRange,
-                                                 yAxisRange=self.yAxisRange, title="INPUT-%02d" % i,
-                                                 xLabel="MHz", yLabel="dB", colore="b", rfpower=rms,
-                                                 annotate_rms=False, grid=self.show_spectra_grid,
-                                                 show_line=self.wg.qcheck_xpol_sp.isChecked(), lw=lw)
-                        # Plot Y Pol
-                        spettro, rms = calcolaspettro(self.data[k]['data'][i - 1, 1, :], self.nsamples)
-                        self.miniPlots.plotCurve(self.asse_x, spettro, n, xAxisRange=self.xAxisRange,
-                                                 yAxisRange=self.yAxisRange, colore="g", rfpower=rms,
-                                                 annotate_rms=False, grid=self.show_spectra_grid,
-                                                 show_line=self.wg.qcheck_ypol_sp.isChecked(), lw=lw)
-                    self.wg.qprogress_plot.setValue(int((k + 1) * 100 / self.nof_files))
-                self.miniPlots.updatePlot()
-            else:
-                msgBox = QtWidgets.QMessageBox()
-                msgBox.setText("Please LOAD a data set first...")
-                msgBox.setWindowTitle("Error!")
-                msgBox.exec_()
 
         elif self.wg.qradio_avg.isChecked():
             lw = 1
             if self.wg.qcheck_spectra_noline.isChecked():
                 lw = 0
             if not self.data == []:
-                self.miniPlots.plotClear()
+                #self.miniPlots.plotClear()
                 spettri_x = [np.zeros(len(self.asse_x))] * len(self.input_list)
                 rms_x = [0] * len(self.input_list)
                 spettri_y = [np.zeros(len(self.asse_x))] * len(self.input_list)
@@ -503,7 +450,7 @@ class Playback(QtWidgets.QMainWindow):
                                   float(self.wg.qline_raw_stop.text()))
                     yAxisRange = (float(self.wg.qline_raw_min.text()),
                                   float(self.wg.qline_raw_max.text()))
-                    self.rawPlots.plotClear()
+                    #self.rawPlots.plotClear()
                     for n, i in enumerate(self.input_list):
                         for npol, pol in enumerate(["Pol-X", "Pol-Y"]):
                             self.raw["Input-%02d_%s" % (i, pol)] = []
@@ -583,12 +530,6 @@ class Playback(QtWidgets.QMainWindow):
         if self.wg.qradio_spectrogram.isChecked():
             msgBox = QtWidgets.QMessageBox()
             msgBox.setText("Spectrogram Data Export is not yet implemented")
-            msgBox.setWindowTitle("Message")
-            msgBox.exec_()
-            pass
-        elif self.wg.qradio_oplot.isChecked():
-            msgBox = QtWidgets.QMessageBox()
-            msgBox.setText("Oplot Data Export is not yet implemented")
             msgBox.setWindowTitle("Message")
             msgBox.exec_()
             pass
@@ -709,21 +650,6 @@ class Playback(QtWidgets.QMainWindow):
             for k in times:
                 self.miniPlots.hide_annotation(["b", "g"], visu=False)
 
-    def check_oplot(self, b):
-        if b.isChecked():
-            # Show only spectra plot
-            self.wg.qplot_spectrogram.hide()
-            self.wg.qplot_power.hide()
-            self.wg.qplot_raw.hide()
-            self.wg.qplot_rms.hide()
-            self.wg.qplot_spectra.show()
-            # Show only spectra ctrl
-            self.wg.ctrl_spectrogram.hide()
-            self.wg.ctrl_power.hide()
-            self.wg.ctrl_raw.hide()
-            self.wg.ctrl_rms.hide()
-            self.wg.ctrl_spectra.show()
-
     def check_power(self, b):
         if b.isChecked():
             # Show only power plot
@@ -831,121 +757,6 @@ class Playback(QtWidgets.QMainWindow):
         self.yAxisRange = [float(self.wg.qline_level_min.text()), float(self.wg.qline_level_max.text())]
         self.miniPlots.set_y_limits(self.yAxisRange)
         self.wg.qbutton_apply.setEnabled(False)
-
-    def load(self):
-        self.load_profile(self.wg.qcombo_profile.currentText())
-
-    def browse_config(self):
-        fd = QtWidgets.QFileDialog()
-        fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
-        options = fd.options()
-        self.config_file = fd.getOpenFileName(self, caption="Select a Station Config File...",
-                                              directory="/opt/aavs/config/", options=options)[0]
-        self.wg.qline_configfile.setText(self.config_file)
-
-    def populate_table_profile(self):
-        self.wg.qtable_conf.clearSpans()
-        self.wg.qtable_conf.setGeometry(QtCore.QRect(640, 20, 481, 171))
-        self.wg.qtable_conf.setObjectName("qtable_conf")
-        self.wg.qtable_conf.setColumnCount(1)
-        self.wg.qtable_conf.setWordWrap(True)
-
-        total_rows = 1
-        for i in self.profile.sections():
-            total_rows = total_rows + len(self.profile[i]) + 1
-        self.wg.qtable_conf.setRowCount(total_rows + 1)
-
-        item = QtWidgets.QTableWidgetItem("Profile: " + self.profile_name)
-        item.setTextAlignment(QtCore.Qt.AlignCenter)
-        font = QtGui.QFont()
-        font.setBold(True)
-        font.setWeight(75)
-        item.setFont(font)
-        item.setFlags(QtCore.Qt.ItemIsEnabled)
-        self.wg.qtable_conf.setHorizontalHeaderItem(0, item)
-
-        item = QtWidgets.QTableWidgetItem(" ")
-        item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        item.setFlags(QtCore.Qt.ItemIsEnabled)
-        self.wg.qtable_conf.setVerticalHeaderItem(0, item)
-
-        q = 1
-        for i in self.profile.sections():
-            item = QtWidgets.QTableWidgetItem("[" + i + "]")
-            item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-            item.setFlags(QtCore.Qt.ItemIsEnabled)
-            font = QtGui.QFont()
-            font.setBold(True)
-            font.setWeight(75)
-            item.setFont(font)
-            self.wg.qtable_conf.setVerticalHeaderItem(q, item)
-            q = q + 1
-            for k in self.profile[i]:
-                item = QtWidgets.QTableWidgetItem(k)
-                item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-                item.setFlags(QtCore.Qt.ItemIsEnabled)
-                self.wg.qtable_conf.setVerticalHeaderItem(q, item)
-                item = QtWidgets.QTableWidgetItem(self.profile[i][k])
-                item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-                item.setFlags(QtCore.Qt.ItemIsEnabled)
-                self.wg.qtable_conf.setItem(q, 0, item)
-                q = q + 1
-            item = QtWidgets.QTableWidgetItem(" ")
-            item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-            item.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.wg.qtable_conf.setVerticalHeaderItem(q, item)
-            q = q + 1
-
-        #self.wg.qtable_conf.horizontalHeader().setStretchLastSection(True)
-        self.wg.qtable_conf.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        #self.wg.qtable_conf.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wg.qtable_conf.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-
-    def make_profile(self, profile: str, prodict: dict):
-        conf = configparser.ConfigParser()
-        conf['App'] = {}
-        if 'App' in prodict.keys() and 'station_config' in prodict['App'].keys():
-            conf['App']['station_config'] = prodict['App']['station_config']
-        else:
-            conf['App']['station_config'] = ""
-
-        if not os.path.exists(default_app_dir):
-            os.makedirs(default_app_dir)
-        conf_path = default_app_dir + profile
-        if not os.path.exists(conf_path):
-            os.makedirs(conf_path)
-        conf_path = conf_path + "/" + profile_filename
-        with open(conf_path, 'w') as configfile:
-            conf.write(configfile)
-
-    def updateProfileCombo(self, current):
-        profiles = []
-        for d in os.listdir(default_app_dir):
-            if os.path.exists(default_app_dir + "/" + d + "/" + profile_filename):
-                profiles += [d]
-        if profiles:
-            self.wg.qcombo_profile.clear()
-            for n, p in enumerate(profiles):
-                self.wg.qcombo_profile.addItem(p)
-                if current == p:
-                    self.wg.qcombo_profile.setCurrentIndex(n)
-
-    def save_profile(self, this_profile, reload=True):
-        self.make_profile(profile=this_profile,
-                          prodict={'App': {'station_config': self.wg.qline_configfile.text()}})
-        if reload:
-            self.load_profile(profile=this_profile)
-
-    def save_as_profile(self):
-        text, ok = QtWidgets.QInputDialog.getText(self, 'Profiles', 'Enter a Profile name:')
-        if ok:
-            self.save_profile(this_profile=text)
-
-    def delete_profile(self, profile):
-        if os.path.exists(default_app_dir + profile):
-            shutil.rmtree(default_app_dir + profile)
-        self.updateProfileCombo(current="")
-        self.load_profile(self.wg.qcombo_profile.currentText())
 
     def closeEvent(self, event):
         result = QtWidgets.QMessageBox.question(self,

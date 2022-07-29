@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from skalab_base import SkalabBase
 import gc
 import os.path
 import glob
@@ -110,32 +111,34 @@ def populateCharts(form):
     return qbuttons
 
 
-class Subrack(QtWidgets.QMainWindow):
+class Subrack(SkalabBase):
     """ Main UI Window class """
     # Signal for Slots
     signalTlm = QtCore.pyqtSignal()
 
-    def __init__(self, ip=None, port=None, uiFile="", profile="", size=[1190, 936]):
+    def __init__(self, ip=None, port=None, uiFile="", profile="", size=[1190, 936], swpath=""):
         """ Initialise main window """
-        super(Subrack, self).__init__()
-        # Load window file
-        self.wg = uic.loadUi(uiFile)
-        self.setCentralWidget(self.wg)
-        self.resize(size[0], size[1])
-
         self.tlm_keys = []
         self.telemetry = {}
         self.query_once = []
         self.query_deny = []
         self.query_tiles = []
+        # Load window file
+        self.wg = uic.loadUi(uiFile)
+        self.wgProBox = QtWidgets.QWidget(self.wg.qtab_conf)
+        self.wgProBox.setGeometry(QtCore.QRect(1, 1, 800, 860))
+        self.wgProBox.setVisible(True)
+        self.wgProBox.show()
+        super(Subrack, self).__init__(App="subrack", Profile=profile, Path=swpath, parent=self.wgProBox)
+        self.connected = False
+        self.populate_table_profile()
+        self.reload(ip=ip, port=port)
+
+        self.setCentralWidget(self.wg)
+        self.resize(size[0], size[1])
+
         self.tlm_file = ""
         self.tlm_hdf = None
-        self.profile_name = profile
-        if self.profile_name == "":
-            self.profile_name = "Default"
-        self.profile = {}
-        self.profile_file = ""
-        self.load_profile(self.profile_name, ip, port)
 
         self.plotTpmPower = BarPlot(parent=self.wg.qplot_tpm_power, size=(4.95, 2.3), xlim=[0, 9], ylabel="Power (W)",
                                     xrotation=0, xlabel="TPM Voltages", ylim=[0, 140],
@@ -159,7 +162,6 @@ class Subrack(QtWidgets.QMainWindow):
         self.plotChartTpm = ChartPlots(parent=self.wg.qplot_chart_tpm, ntraces=8, xlabel="time samples", ylim=[0, 120],
                                        ylabel="TPM Power", size=(11.3, 3.45), xlim=[0, 200])
 
-        self.connected = False
         self.client = None
         self.qbutton_tpm = populateSlots(self.wg.frame_tpm)
         self.fans = populateFans(self.wg.frame_fan)
@@ -176,7 +178,6 @@ class Subrack(QtWidgets.QMainWindow):
 
         self.populate_help()
 
-
     def load_events(self):
         self.wg.qbutton_connect.clicked.connect(lambda: self.connect())
         for n, t in enumerate(self.qbutton_tpm):
@@ -185,17 +186,30 @@ class Subrack(QtWidgets.QMainWindow):
         self.wg.qbutton_tpm_off.clicked.connect(lambda: self.cmdSwitchTpmsOff())
         self.wg.qcombo_chart.currentIndexChanged.connect(lambda: self.switchChart())
         self.wg.qbutton_clear_chart.clicked.connect(lambda: self.clearChart())
-        self.wg.qbutton_load.clicked.connect(lambda: self.load())
-        self.wg.qbutton_browse.clicked.connect(lambda: self.browse_outdir())
-        self.wg.qbutton_saveas.clicked.connect(lambda: self.save_as_profile())
-        self.wg.qbutton_save.clicked.connect(lambda: self.save_profile(this_profile=self.profile_name))
-        self.wg.qbutton_delete.clicked.connect(lambda: self.delete_profile(self.wg.qcombo_profile.currentText()))
         for i in range(4):
             self.fans[i]['manual'].clicked.connect(lambda state, g=i: self.cmdSetFanManual(fan_id=g))
             self.fans[i]['auto'].clicked.connect(lambda state, g=i: self.cmdSetFanAuto(fan_id=g))
             #self.fans[i]['slider'].valueChanged.connect(lambda state, g=i: self.cmdSetFanSpeed(fan_id=g))
             self.fans[i]['slider'].sliderPressed.connect(lambda g=i: self.sliderPressed(fan_id=g))
             self.fans[i]['slider'].sliderReleased.connect(lambda g=i: self.cmdSetFanSpeed(fan_id=g))
+
+    def reload(self, ip=None, port=None):
+        if ip is not None:
+            self.ip = ip
+        else:
+            self.ip = str(self.profile['SubRack']['ip'])
+        if port is not None:
+            self.port = port
+        else:
+            self.port = int(self.profile['SubRack']['port'])
+        self.wg.qline_ip.setText("%s (%d)" % (self.ip, self.port))
+        if 'Query' in self.profile.keys():
+            if 'once' in self.profile['Query'].keys():
+                self.query_once = list(self.profile['Query']['once'].split(","))
+            if 'deny' in self.profile['Query'].keys():
+                self.query_deny = list(self.profile['Query']['deny'].split(","))
+            if 'deny' in self.profile['Query'].keys():
+                self.query_tiles = list(self.profile['Query']['tiles'].split(","))
 
     def populate_help(self, uifile="skalab_subrack.ui"):
         with open(uifile) as f:
@@ -247,194 +261,6 @@ class Subrack(QtWidgets.QMainWindow):
 
     def sliderPressed(self, fan_id):
         self.fans[fan_id]['sliderPressed'] = True
-
-    def populate_table_profile(self):
-        self.wg.qtable_conf.clearSpans()
-        self.wg.qtable_conf.setGeometry(QtCore.QRect(660, 20, 461, 291))
-        self.wg.qtable_conf.setObjectName("qtable_conf")
-        self.wg.qtable_conf.setColumnCount(1)
-        self.wg.qtable_conf.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-
-        total_rows = 1
-        for i in self.profile.sections():
-            total_rows = total_rows + len(self.profile[i]) + 1
-        self.wg.qtable_conf.setRowCount(total_rows + 2)
-
-        item = QtWidgets.QTableWidgetItem("Profile: " + self.profile_name)
-        item.setTextAlignment(QtCore.Qt.AlignCenter)
-        font = QtGui.QFont()
-        font.setBold(True)
-        font.setWeight(75)
-        item.setFont(font)
-        item.setFlags(QtCore.Qt.ItemIsEnabled)
-        self.wg.qtable_conf.setHorizontalHeaderItem(0, item)
-
-        item = QtWidgets.QTableWidgetItem(" ")
-        item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        item.setFlags(QtCore.Qt.ItemIsEnabled)
-        self.wg.qtable_conf.setVerticalHeaderItem(0, item)
-
-        q = 1
-        for i in self.profile.sections():
-            item = QtWidgets.QTableWidgetItem("[" + i + "]")
-            item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-            item.setFlags(QtCore.Qt.ItemIsEnabled)
-            font = QtGui.QFont()
-            font.setBold(True)
-            font.setWeight(75)
-            item.setFont(font)
-            self.wg.qtable_conf.setVerticalHeaderItem(q, item)
-            q = q + 1
-            for k in self.profile[i]:
-                item = QtWidgets.QTableWidgetItem(k)
-                item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-                item.setFlags(QtCore.Qt.ItemIsEnabled)
-                self.wg.qtable_conf.setVerticalHeaderItem(q, item)
-                item = QtWidgets.QTableWidgetItem(self.profile[i][k])
-                item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-                item.setFlags(QtCore.Qt.ItemIsEnabled)
-                self.wg.qtable_conf.setItem(q, 0, item)
-                q = q + 1
-            item = QtWidgets.QTableWidgetItem(" ")
-            item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-            item.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.wg.qtable_conf.setVerticalHeaderItem(q, item)
-            q = q + 1
-        self.wg.qtable_conf.horizontalHeader().setStretchLastSection(True)
-        #self.wg.qtable_conf.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wg.qtable_conf.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-
-    def load(self):
-        if not self.connected:
-            self.load_profile(self.wg.qcombo_profile.currentText())
-        else:
-            msgBox = QtWidgets.QMessageBox()
-            msgBox.setText("Please DISCONNECT from the Subrack first!")
-            msgBox.setWindowTitle("Error!")
-            msgBox.exec_()
-
-    def load_profile(self, profile, eth_ip=None, eth_port=None):
-        self.profile = {}
-        fullpath = default_app_dir + profile + "/" + profile_filename
-        if os.path.exists(fullpath):
-            print("Loading SubRack Profile: " + profile + " (" + fullpath + ")")
-        else:
-            print("\nThe SubRack Profile does not exist.\nGenerating a new one in "
-                  + fullpath + "\n")
-            self.make_profile(profile=profile, prodict={})
-        self.profile = parse_profile(fullpath)
-        self.profile_name = profile
-        self.profile_file = fullpath
-        if 'Query' in self.profile.sections():
-            if 'once' in self.profile['Query'].keys():
-                self.query_once = list(self.profile['Query']['once'].split(","))
-        if 'Query' in self.profile.sections():
-            if 'deny' in self.profile['Query'].keys():
-                self.query_deny = list(self.profile['Query']['deny'].split(","))
-        if 'Query' in self.profile.sections():
-            if 'deny' in self.profile['Query'].keys():
-                self.query_tiles = list(self.profile['Query']['tiles'].split(","))
-        self.wg.qline_configuration_file.setText(self.profile_file)
-        self.wg.qline_profile_ip.setText(self.profile['Device']['ip'])
-        self.wg.qline_profile_port.setText(self.profile['Device']['port'])
-        self.wg.qline_profile_interval.setText(self.profile['Device']['query_interval'])
-        self.wg.qline_output_dir.setText(self.profile['App']['data_path'])
-        # Overriding Configuration File with parameters
-        if eth_ip is not None:
-            self.ip = eth_ip
-        else:
-            self.ip = str(self.profile['Device']['ip'])
-        if eth_port is not None:
-            self.port = eth_port
-        else:
-            self.port = int(self.profile['Device']['port'])
-        self.wg.qline_ip.setText("%s:%d" % (self.ip, self.port))
-        self.updateProfileCombo(current=profile)
-        self.populate_table_profile()
-
-    def updateProfileCombo(self, current):
-        profiles = []
-        for d in os.listdir(default_app_dir):
-            if os.path.exists(default_app_dir + "/" + d + "/" + profile_filename):
-                profiles += [d]
-        if profiles:
-            self.wg.qcombo_profile.clear()
-            for n, p in enumerate(profiles):
-                self.wg.qcombo_profile.addItem(p)
-                if current == p:
-                    self.wg.qcombo_profile.setCurrentIndex(n)
-
-    def save_profile(self, this_profile, reload=True):
-        self.make_profile(profile=this_profile,
-                          prodict={'App': {'data_path': self.wg.qline_output_dir.text()},
-                                   'Device': {'ip': self.wg.qline_profile_ip.text(),
-                                              'port': self.wg.qline_profile_port.text(),
-                                              'query_interval': self.wg.qline_profile_interval.text()}})
-        if reload:
-            self.load_profile(profile=this_profile)
-
-    def save_as_profile(self):
-        text, ok = QtWidgets.QInputDialog.getText(self, 'Profiles', 'Enter a Profile name:')
-        if ok:
-            self.save_profile(this_profile=text)
-
-    def delete_profile(self, profile):
-        if os.path.exists(default_app_dir + profile):
-            shutil.rmtree(default_app_dir + profile)
-        self.updateProfileCombo(current="")
-        self.load_profile(self.wg.qcombo_profile.currentText())
-
-    def make_profile(self, profile: str, prodict: dict):
-        conf = configparser.ConfigParser()
-        if 'App' in prodict.keys() and 'data_path' in prodict['App'].keys():
-            conf['App'] = {'data_path': prodict['App']['data_path']}
-        else:
-            conf['App'] = {'data_path': ""}
-        conf['Device'] = {}
-        if 'Device' in prodict.keys() and 'ip' in prodict['Device'].keys():
-            conf['Device']['ip'] = prodict['Device']['ip']
-        else:
-            conf['Device']['ip'] = ""
-        if 'Device' in prodict.keys() and 'port' in prodict['Device'].keys():
-            conf['Device']['port'] = prodict['Device']['port']
-        else:
-            conf['Device']['port'] = "8081"
-        if 'Device' in prodict.keys() and 'query_interval' in prodict['Device'].keys():
-            conf['Device']['query_interval'] = prodict['Device']['query_interval']
-        else:
-            conf['Device']['query_interval'] = "3"
-        conf['Query'] = {}
-        if 'Query' in prodict.keys() and 'once' in prodict['Query'].keys():
-            conf['Query']['once'] = prodict['Query']['once']
-        else:
-            conf['Query']['once'] = "api_version,assigned_tpm_ip_adds"
-        if 'Query' in prodict.keys() and 'deny' in prodict['Query'].keys():
-            conf['Query']['deny'] = prodict['Query']['deny']
-        else:
-            conf['Query']['deny'] = "api_version,tpm_ips,tpm_mcu_temperatures,assigned_tpm_ip_adds," + \
-                                    "tpms_temp_alarms,tpms_voltage_alarms,tpms_temperatures"
-        if 'Query' in prodict.keys() and 'deny' in prodict['Query'].keys():
-            conf['Query']['tiles'] = prodict['Query']['tiles']
-        else:
-            conf['Query']['tiles'] = "api_version,tpm_ips,assigned_tpm_ip_adds"
-        if not os.path.exists(default_app_dir):
-            os.makedirs(default_app_dir)
-        conf_path = default_app_dir + profile
-        if not os.path.exists(conf_path):
-            os.makedirs(conf_path)
-        conf_path = conf_path + "/" + profile_filename
-        with open(conf_path, 'w') as configfile:
-            conf.write(configfile)
-
-    def browse_outdir(self):
-        fd = QtWidgets.QFileDialog()
-        fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
-        options = fd.options()
-        self.folder = fd.getExistingDirectory(self, caption="Choose a directory to save the Subrack data",
-                                              directory="/storage/", options=options)
-        self.wg.qline_output_dir.setText(self.folder)
-        #self.check_dir()
-        #self.calc_data_volume()
 
     def switchChart(self):
         if self.wg.qcombo_chart.currentIndex() == 0:
@@ -603,8 +429,8 @@ class Subrack(QtWidgets.QMainWindow):
         self.plotTpmTemp.updatePlot()
 
     def setup_hdf5(self):
-        if not self.profile['App']['data_path'] == "":
-            fname = self.profile['App']['data_path']
+        if not self.profile['SubRack']['data_path'] == "":
+            fname = self.profile['SubRack']['data_path']
             if not fname[-1] == "/":
                 fname = fname + "/"
             fname += datetime.datetime.strftime(datetime.datetime.utcnow(), "subrack_tlm_%Y-%m-%d_%H%M%S.h5")
@@ -617,13 +443,10 @@ class Subrack(QtWidgets.QMainWindow):
             msgBox.exec_()
             return None
 
-
     def connect(self):
         if not self.wg.qline_ip.text() == "":
             if not self.connected:
-                self.ip = self.wg.qline_ip.text().split(":")[0]
-                self.port = int(self.wg.qline_ip.text().split(":")[1])
-                print("Connecting to Subrack %s:%d..." % (self.ip, self.port))
+                print("Connecting to Subrack %s:%d..." % (self.ip, int(self.port)))
                 self.client = WebHardwareClient(self.ip, self.port)
                 if self.client.connect():
                     self.tlm_keys = self.client.execute_command("list_attributes")["retvalue"]
@@ -634,7 +457,7 @@ class Subrack(QtWidgets.QMainWindow):
                                 self.telemetry[tlmk] = data["value"]
                             else:
                                 self.telemetry[tlmk] = data["info"]
-                    if 'api_version' in self.tlm_keys:
+                    if 'api_version' in self.telemetry.keys():
                         self.wg.qlabel_message.setText("SubRack API version: " + self.telemetry['api_version'])
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")
                     self.wg.qbutton_connect.setText("ONLINE")
@@ -760,7 +583,7 @@ class Subrack(QtWidgets.QMainWindow):
                 sleep(0.1)
                 self.signalTlm.emit()
                 cycle = 0.0
-                while cycle < (float(self.wg.qline_profile_interval.text())) and not self.skipThreadPause:
+                while cycle < (float(self.profile['SubRack']['query_interval'])) and not self.skipThreadPause:
                     sleep(0.1)
                     cycle = cycle + 0.1
                 self.skipThreadPause = False
@@ -849,7 +672,7 @@ if __name__ == "__main__":
 
     if not opt.nogui:
         app = QtWidgets.QApplication(sys.argv)
-        window = Subrack(ip=opt.ip, port=opt.port, uiFile="skalab_subrack.ui", profile=opt.profile)
+        window = Subrack(ip=opt.ip, port=opt.port, uiFile="skalab_subrack.ui", profile=opt.profile, swpath=default_app_dir)
         window.signalTlm.connect(window.updateTlm)
         sys.exit(app.exec_())
     else:

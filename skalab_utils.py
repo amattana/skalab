@@ -117,7 +117,12 @@ class MiniPlots(QtWidgets.QWidget):
         if len(data) != 0:
             if (colore + 'line') in self.plots[int(ant)].keys():
                 if len(self.plots[int(ant)][colore + 'line'].get_ydata()) == len(data):
-                    self.plots[int(ant)][colore + 'line'].set_ydata(data)
+                    self.plots[int(ant)][colore + 'line'].set_data(assex, data)
+                    self.plots[int(ant)][colore + 'line'].set_visible(show_line)
+                    self.plots[int(ant)][colore + 'line'].set_lw(lw)
+                    self.plots[int(ant)][colore + 'line'].set_markersize(markersize)
+                    self.plots[int(ant)][colore + 'line'].set_marker(".")
+                    self.plots[int(ant)][colore + 'line'].set_color(colore)
                     from_scratch = False
             if from_scratch:
                 line, = self.canvas.ax[int(ant)].plot(assex, data, color=colore, lw=lw, markersize=markersize, marker=".")
@@ -250,6 +255,7 @@ class MiniPlots(QtWidgets.QWidget):
 
     def updatePlot(self):
         self.canvas.draw()
+        self.canvas.flush_events()
         self.show()
 
     def plotClear(self):

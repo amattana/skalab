@@ -274,7 +274,7 @@
        <rect>
         <x>120</x>
         <y>30</y>
-        <width>321</width>
+        <width>221</width>
         <height>31</height>
        </rect>
       </property>
@@ -301,7 +301,7 @@
      <widget class="QPushButton" name="qbutton_browse">
       <property name="geometry">
        <rect>
-        <x>460</x>
+        <x>360</x>
         <y>30</y>
         <width>81</width>
         <height>31</height>
@@ -480,6 +480,19 @@
       </property>
       <property name="alignment">
        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="qbutton_edit">
+      <property name="geometry">
+       <rect>
+        <x>460</x>
+        <y>30</y>
+        <width>81</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Edit</string>
       </property>
      </widget>
     </widget>
