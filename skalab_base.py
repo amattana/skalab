@@ -7,22 +7,24 @@ from PyQt5 import QtCore, QtGui, QtWidgets, uic
 class SkalabBase(QtWidgets.QMainWindow):
     def __init__(self, App="", Profile="", Path="", parent=None):
         super().__init__()
+        self.connected = False
         self.profile = {}
         self.wgProfile = uic.loadUi("skalab_profile.ui", parent)
         self.wgProfile.qbutton_load.clicked.connect(lambda: self.load())
         self.wgProfile.qbutton_saveas.clicked.connect(lambda: self.save_as_profile())
         self.wgProfile.qbutton_save.clicked.connect(lambda: self.save_profile())
-        self.wgProfile.qbutton_delete.clicked.connect(lambda: self.delete_profile(self.wgProfile.qcombo_profile.currentText()))
+        self.wgProfile.qbutton_delete.clicked.connect(
+            lambda: self.delete_profile(self.wgProfile.qcombo_profile.currentText()))
         self.wgProfile.qbutton_browse.clicked.connect(lambda: self.browse())
         self.wgProfile.qbutton_clear.clicked.connect(lambda: self.clear())
         self.wgProfile.qbutton_apply.clicked.connect(lambda: self.apply())
         self.load_profile(App=App, Profile=Profile, Path=Path)
         self.wgProfile.qtable_conf.cellDoubleClicked.connect(self.editValue)
 
-    def parseProfile(self, config=""):
-        confparser = configparser.ConfigParser()
-        confparser.read(config)
-        return confparser
+    # def parseProfile(self, config=""):
+    #     confparser = configparser.ConfigParser()
+    #     confparser.read(config)
+    #     return confparser
 
     def load(self):
         if not self.connected:
@@ -40,6 +42,36 @@ class SkalabBase(QtWidgets.QMainWindow):
         # If needed, this will be overridden by children for custom post load
         pass
 
+    def readConfig(self, fname):
+        profile = {}
+        confparser = configparser.ConfigParser()
+        confparser.read(fname)
+        for s in confparser.sections():
+            if not s in profile.keys():
+                profile[s] = {}
+            for k in confparser._sections[s]:
+                val = confparser._sections[s][k]
+                if '~' in val:
+                    home = os.getenv("HOME")
+                    val = val.replace('~', home)
+                profile[s][k] = val
+        return profile
+
+    def writeConfig(self, profileConfig, fname):
+        conf = configparser.ConfigParser()
+        for s in profileConfig.keys():
+            # print(s, ": ", self.profile[s], type(self.profile[s]))
+            if type(profileConfig[s]) == dict:
+                # print("Creating Dict", s)
+                conf[s] = {}
+                for k in profileConfig[s]:
+                    # print("Adding ", k, self.profile[s][k])
+                    conf[s][k] = str(profileConfig[s][k])
+            else:
+                print("Malformed ConfigParser, found a non dict section!")
+        with open(fname, 'w') as f:
+            conf.write(f)
+
     def load_profile(self, App="", Profile="", Path=""):
         if not Profile == "":
             loadPath = Path + Profile + "/"
@@ -51,107 +83,58 @@ class SkalabBase(QtWidgets.QMainWindow):
                       " does not exist.\nGenerating a new one in " + fullPath + "\n")
                 self.make_profile(App=App, Profile=Profile, Path=Path)
             self.wgProfile.qline_configuration_file.setText(fullPath)
-            self.profileParser = self.parseProfile(fullPath)
-
-            for s in self.profileParser.sections():
-                if not s in self.profile.keys():
-                    self.profile[s] = {}
-                for k in self.profileParser._sections[s]:
-                    val = self.profileParser._sections[s][k]
-                    if '~' in val:
-                        home = os.getenv("HOME")
-                        val.replace('~', home)
-                    self.profile[s][k] = self.profileParser._sections[s][k]
-
+            self.profile = self.readConfig(fullPath)
+            self.clear()
             self.populate_table_profile()
             self.updateProfileCombo(current=Profile)
             self.reload()
 
-            #self.profile['Base']['profile'] = profile_name
-            #self.profile['Base']['path'] = loadPath
-
-            # self.wgProfile.qline_profile.setText(fullPath)
-            #
-            # if not self.profile.sections():
-            #     msgBox = QtWidgets.QMessageBox()
-            #     msgBox.setText("Cannot find this profile!")
-            #     msgBox.setWindowTitle("Error!")
-            #     msgBox.exec_()
-            # else:
-            #     self.config_file = self.profile['Init']['station_setup']
-            #     self.wgProfile.qline_configfile.setText(self.config_file)
-            #     self.populate_table_profile()
-            #     if 'Extras' in self.profile.keys():
-            #         if 'text_editor' in self.profile['Extras'].keys():
-            #             self.text_editor = self.profile['Extras']['text_editor']
-
-    # def reload_profile(self, profile):
-    #     self.load_profile(profile=profile)
-    #     if self.profile.sections():
-    #         if self.profile['App']['subrack']:
-    #             self.wgSubrack.load_profile(profile=self.profile['App']['subrack'])
-    #
     def delete_profile(self, profile_name):
         result = QtWidgets.QMessageBox.question(self,
                                                 "Confirm Delete...",
-                                                "Are you sure you want to delete the Profile '%s' ?" % profile_name,
+                                                "Are you sure you want to delete the Profile '%s' for the App '%s'?" % (
+                                                    profile_name, self.profile['Base']['app']),
                                                 QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
 
         if result == QtWidgets.QMessageBox.Yes:
-            if os.path.exists(self.profile['Base']['path'] + profile_name):
-                shutil.rmtree(self.profile['Base']['path'] + profile_name)
+            print("Removing", self.profile['Base']['path'] + profile_name + "/" + self.profile['Base']['app'])
+            if os.path.exists(self.profile['Base']['path'] + profile_name + "/" + self.profile['Base']['app'] + ".ini"):
+                # shutil.rmtree(self.profile['Base']['path'] + profile_name + "/" + self.profile['Base']['app'] + ".ini")
+                os.remove(self.profile['Base']['path'] + profile_name + "/" + self.profile['Base']['app'] + ".ini")
                 self.updateProfileCombo(current="")
                 self.load_profile(App=self.profile['Base']['app'],
                                   Profile=self.wgProfile.qcombo_profile.currentText(),
                                   Path=self.profile['Base']['path'])
 
-
-    # def make_skalab_profile(self, profile="Default", subrack="Default", live="Default", playback="Default", config=""):
-    #     conf = configparser.ConfigParser()
-    #     conf['App'] = {'subrack': subrack,
-    #                    'live': live,
-    #                    'playback': playback}
-    #     conf['Init'] = {'station_setup': config}
-    #     conf['Extras'] = {'text_editor': self.text_editor}
-    #     if not os.path.exists(default_app_dir):
-    #         os.makedirs(default_app_dir)
-    #     conf_path = default_app_dir + profile
-    #     if not os.path.exists(conf_path):
-    #         os.makedirs(conf_path)
-    #     conf_path = conf_path + "/skalab.ini"
-    #     with open(conf_path, 'w') as configfile:
-    #         conf.write(configfile)
-
     def make_profile(self, App="", Profile="", Path=""):
-        if 'Base' not in self.profile.keys():
-            self.profile = {'Base': {
-                'app': App.lower(),
-                'profile': Profile,
-                'path': Path
-            }}
-        self.profile['Base']['profile'] = Profile
-        conf = configparser.ConfigParser()
-        for s in self.profile.keys():
-            #print(s, ": ", self.profile[s], type(self.profile[s]))
-            if type(self.profile[s]) == dict:
-                #print("Creating Dict", s)
-                conf[s] = {}
-                for k in self.profile[s]:
-                    #print("Adding ", k, self.profile[s][k])
-                    conf[s][k] = str(self.profile[s][k])
+        """
+            This method is called to generate a Profile File from scratch or to save changes
+        """
+        fname = Path + Profile + "/" + App.lower() + ".ini"
+        if not os.path.exists(fname):
+            defFile = "./Templates/" + App.lower() + ".ini"
+            if os.path.exists(defFile):
+                self.profile = self.readConfig(defFile)
+                print("Copying the Template File", defFile)
+                print(self.readConfig(defFile))
+                if not os.path.exists(Path[:-1]):
+                    os.makedirs(Path[:-1])
+                if not os.path.exists(Path + Profile):
+                    os.makedirs(Path + Profile)
+                self.writeConfig(self.profile, fname)
+                self.populate_table_profile()
             else:
-                print("Malformed ConfigParser, found a non dict section!")
-        if self.profile['Base']['path'] != "":
-            if not os.path.exists(self.profile['Base']['path']):
-                os.makedirs(self.profile['Base']['path'])
-            if not os.path.exists(self.profile['Base']['path'] + Profile):
-                os.makedirs(self.profile['Base']['path'] + Profile)
-            fname = self.profile['Base']['path'] + Profile + "/" + self.profile['Base']['app'].lower() + ".ini"
-            with open(fname, 'w') as configfile:
-                conf.write(configfile)
-            print("Saved Profile %s (%s)" % (Profile, fname))
-        else:
-            print("Profile Base Path cannot be empty!")
+                msgBox = QtWidgets.QMessageBox()
+                msgBox.setIcon(QtWidgets.QMessageBox.Critical)
+                msgBox.setText("The Template for the " +
+                               App.upper() +
+                               "Profile file is not available.\n" +
+                               "Please, check it out from the repo.")
+                msgBox.setWindowTitle("Error!")
+                msgBox.exec_()
+        profile = self.readTableProfile()
+        profile['Base']['Profile'] = Profile
+        self.writeConfig(profile, fname)
 
     def save_profile(self):
         self.make_profile(App=self.profile['Base']['app'],
@@ -239,20 +222,36 @@ class SkalabBase(QtWidgets.QMainWindow):
         self.wgProfile.qtable_conf.setGeometry(QtCore.QRect(30, 140, 741, min((20 + total_rows * 30), 700)))
 
     def editValue(self, row, col):
-        key = self.wgProfile.qtable_conf.verticalHeaderItem(row)
-        if key is not None:
-            if not key.text() == " " and not "[" in key.text():
-                self.wgProfile.qline_row.setText(str(row))
-                self.wgProfile.qline_col.setText(str(col))
-                self.wgProfile.qline_edit_key.setText(key.text())
-                for s in self.profile.keys():
-                    for k in self.profile[s].keys():
-                        if k == key.text():
-                            self.wgProfile.qline_edit_value.setText(self.profile[s][k])
-                item = self.wgProfile.qtable_conf.item(row, col)
-                if item:
-                    self.wgProfile.qline_edit_newvalue.setText(item.text())
-                    #print(row, col, item.text())
+        # Base keys cannot be edited
+        if row > 4:
+            key = self.wgProfile.qtable_conf.verticalHeaderItem(row)
+            if key is not None:
+                if not key.text() == " " and not "[" in key.text():
+                    self.wgProfile.qline_row.setText(str(row))
+                    self.wgProfile.qline_col.setText(str(col))
+                    self.wgProfile.qline_edit_key.setText(key.text())
+                    for s in self.profile.keys():
+                        for k in self.profile[s].keys():
+                            if k == key.text():
+                                self.wgProfile.qline_edit_value.setText(self.profile[s][k])
+                    item = self.wgProfile.qtable_conf.item(row, col)
+                    if item:
+                        self.wgProfile.qline_edit_newvalue.setText(item.text())
+                        # print(row, col, item.text())
+
+    def readTableProfile(self):
+        profile = {}
+        section = ''
+        for r in range(self.wgProfile.qtable_conf.rowCount()):
+            key = self.wgProfile.qtable_conf.verticalHeaderItem(r)
+            if key is not None:
+                if not key.text() == " ":
+                    if "[" in key.text():
+                        section = key.text()[1:-1]
+                        profile[section] = {}
+                    else:
+                        profile[section][key.text()] = self.wgProfile.qtable_conf.item(r, 0).text()
+        return profile
 
     def updateProfileCombo(self, current):
         profiles = []
