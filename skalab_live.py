@@ -104,7 +104,7 @@ class Live(SkalabBase):
         self.resize(size[0], size[1])
         self.populate_table_profile()
 
-        self.board_version = board_version
+        self.board_version = self.profile['Live']['preadu_version']
 
         # Populate the plots for the Live Spectra
         self.livePlots = MiniPlots(parent=self.wg.qplot_spectra, nplot=16)
@@ -128,6 +128,15 @@ class Live(SkalabBase):
         self.qw_preadu.setVisible(True)
         self.qw_preadu.show()
         self.preadu = Preadu(parent=self.qw_preadu, debug=0, board_version=self.board_version)
+        if self.board_version == "1.0":
+            self.wg.qcombo_preadu_version.setCurrentIndex(3)
+        elif self.board_version == "1.1":
+            self.wg.qcombo_preadu_version.setCurrentIndex(2)
+        elif self.board_version == "2.0":
+            self.wg.qcombo_preadu_version.setCurrentIndex(1)
+        elif self.board_version == "3.0":
+            self.wg.qcombo_preadu_version.setCurrentIndex(0)
+
         self.writing_preadu = False
         self.wg.ctrl_preadu.hide()
         self.data_temp_charts = {}
@@ -212,6 +221,7 @@ class Live(SkalabBase):
         self.wg.qbutton_single.clicked.connect(lambda: self.doSingleAcquisition())
         self.wg.qbutton_run.clicked.connect(lambda: self.startContinuousAcquisition())
         self.wg.qbutton_stop.clicked.connect(lambda: self.stopContinuousAcquisition())
+        self.wg.qbutton_save.clicked.connect(lambda: self.savePicture())
 
         self.wg.qbutton_preadu_setup.clicked.connect(lambda: self.setupPreadu(self.wg.qcombo_preadu_version.currentIndex()))
         self.wg.qbutton_equalize.clicked.connect(lambda: self.equalization())
@@ -237,6 +247,30 @@ class Live(SkalabBase):
         helpkeys = [d[d.rfind('name="Help_'):].split('"')[1] for d in data if 'name="Help_' in d]
         for k in helpkeys:
             self.wg.findChild(QtWidgets.QTextEdit, k).setText(getTextFromFile(k.replace("_", "/")+".html"))
+
+    def savePicture(self):
+        fd = QtWidgets.QFileDialog()
+        fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
+        options = fd.options()
+        base_path = self.profile['Live']['default_path_save_pictures']
+        result = fd.getSaveFileName(caption="Select a File Name to save the picture...",
+                                    directory=base_path,
+                                    filter="Image Files (*.png *.jpg *.bmp *.svg)",
+                                    options=options)[0]
+        if not result == "":
+            if self.wg.qradio_int_spectra.isChecked():
+                self.monitorPlots.savePicture(fname=result)
+                print("Saved Integrated Spectra Monitoring Plots Picture on " + result)
+            elif self.wg.qradio_raw.isChecked():
+                self.livePlots.savePicture(fname=result)
+                print("Saved Live Spectra Picture on " + result)
+            elif self.wg.qradio_temps.isChecked():
+                self.tempChart.savePicture(fname=result)
+                print("Saved Temperatures Chart Picture on " + result)
+            elif self.wg.qradio_rms.isChecked():
+                if self.wg.qradio_rms_chart.isChecked():
+                    self.rmsChart.savePicture(fname=result)
+                    print("Saved RMS Chart Picture on " + result)
 
     def check_raw(self, b):
         if b.isChecked():
@@ -319,7 +353,7 @@ class Live(SkalabBase):
             self.wg.qbutton_single.setEnabled(False)
             self.wg.qbutton_run.setEnabled(False)
             self.wg.qbutton_stop.setEnabled(False)
-            self.wg.qbutton_save.setEnabled(False)
+            self.wg.qbutton_save.setEnabled(True)
             self.wg.qbutton_export.setEnabled(False)
             self.wg.qcombo_rms_label.setEnabled(True)
             #self.wg.qcombo_tpm.setEnabled(False)
@@ -349,7 +383,7 @@ class Live(SkalabBase):
             self.wg.qbutton_single.setEnabled(False)
             self.wg.qbutton_run.setEnabled(False)
             self.wg.qbutton_stop.setEnabled(False)
-            self.wg.qbutton_save.setEnabled(False)
+            self.wg.qbutton_save.setEnabled(True)
             self.wg.qbutton_export.setEnabled(False)
             self.wg.qcombo_rms_label.setEnabled(False)
             self.wg.qcombo_tpm.setEnabled(False)

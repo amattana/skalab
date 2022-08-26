@@ -757,7 +757,7 @@ class preAduAAVS3:
 
 
 class Preadu(object):
-    def __init__(self, parent, tpm=None, board_version=3, debug=0):
+    def __init__(self, parent, tpm=None, board_version="3.0", debug=0):
         """ Initialise main window """
         super(Preadu, self).__init__()
 
@@ -769,19 +769,19 @@ class Preadu(object):
 
         self.inputs = CHANNELS
         self.rf_map = read_routing_table("./SignalMap/TPM_AAVS1.txt")
-        if self.board_version == 3:
+        if self.board_version == "1.0":
+            self.preadu = preAduRf()
+            print("RF PreADU without optical receivers")
+        elif self.board_version == "1.1":
+            self.preadu = preAduSadino()
+            print("SADino preADU with Mixed RF and AAVS1 Like RF Rxs selected")
+        elif self.board_version == "2.0":
+            self.preadu = preAduAAVS1()
+            print("AAVS1 PreADU with Optical WDM Receivers selected")
+        elif self.board_version == "3.0":
             self.preadu = preAduAAVS3()
             self.rf_map = read_routing_table("./SignalMap/TPM_AAVS3.txt")
             print("New PreADU with Embedded Optical WDM Receivers selected")
-        elif self.board_version == 2:
-            self.preadu = preAduAAVS1()
-            print("AAVS1 PreADU with Optical WDM Receivers selected")
-        elif self.board_version == 1:
-            self.preadu = preAduRf()
-            print("RF PreADU without optical receivers")
-        else:
-            self.preadu = preAduSadino()
-            print("SADino preADU with Mixed RF and Optical Rxs selected")
 
         for spimap in self.rf_map:
             self.preadu.set_spi_conf(nrx=int(spimap[0]),
@@ -1056,24 +1056,24 @@ class Preadu(object):
         self.tpm = tpm
         self.reload()
 
-    def set_preadu_version(self, board_type=0):
+    def set_preadu_version(self, board_type="3.0"):
         del self.preadu
         gc.collect()
         self.board_version = board_type
         self.rf_map = read_routing_table("./SignalMap/TPM_AAVS1.txt")
-        if self.board_version == 3:
+        if self.board_version == "1.0":
+            self.preadu = preAduRf()
+            print("RF PreADU without optical receivers")
+        elif self.board_version == "1.1":
+            self.preadu = preAduSadino()
+            print("SADino preADU with Mixed RF and AAVS1 Like RF Rxs selected")
+        elif self.board_version == "2.0":
+            self.preadu = preAduAAVS1()
+            print("AAVS1 PreADU with Optical WDM Receivers selected")
+        elif self.board_version == "3.0":
             self.preadu = preAduAAVS3()
             self.rf_map = read_routing_table("./SignalMap/TPM_AAVS3.txt")
-            print("PreADU 3.0 with Optical Receivers selected (pre-AAVS3)")
-        elif self.board_version == 2:
-            self.preadu = preAduAAVS1()
-            print("PreADU 2.1 with Optical Receivers selected (AAVS1/AAVS2)")
-        elif self.board_version == 1:
-            self.preadu = preAduRf()
-            print("PreADU 2.0 (RF) without optical receivers")
-        elif self.board_version == 0:
-            self.preadu = preAduSadino()
-            print("PreADU 2.0b (RF SADino) with Mixed RF and Optical Rxs selected")
+            print("New PreADU with Embedded Optical WDM Receivers selected")
         for spimap in self.rf_map:
             self.preadu.set_spi_conf(nrx=int(spimap[0]), preadu_id=int(spimap[3]), channel_filter=int(spimap[4]),
                                      pol=spimap[1], adu_in=spimap[0], tpm_in=spimap[2])
@@ -1082,7 +1082,7 @@ class Preadu(object):
         self.reload()
 
     def adjustControls(self, board_type=0):
-        if self.board_version > 2:
+        if float(self.board_version.split(".")[0]) > 2:
             table_names = "ADU#  Code      Attenuation           Rx             Fibre       RMS           dBm"
             self.label_legend_1.setText(table_names)
             self.label_legend_2.setText(table_names)

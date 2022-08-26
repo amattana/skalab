@@ -258,6 +258,11 @@ class MiniPlots(QtWidgets.QWidget):
         self.canvas.flush_events()
         self.show()
 
+    def savePicture(self, fname=""):
+        if not fname == "":
+            a = self.canvas.print_figure(fname)
+            print(a)
+
     def plotClear(self):
         # Reset the plot landscape
         for i in range(self.nplot):
@@ -742,6 +747,10 @@ class BarPlot(QtWidgets.QWidget):
         self.canvas.draw()
         self.show()
 
+    def savePicture(self, fname=""):
+        if not fname == "":
+            self.canvas.print_figure(fname)
+
     def plotClear(self):
         # Reset the plot landscape
         self.canvas.ax.clear()
@@ -845,6 +854,10 @@ class ChartPlots(QtWidgets.QWidget):
     def updatePlot(self):
         self.canvas.draw()
         #self.show()
+
+    def savePicture(self, fname=""):
+        if not fname == "":
+            self.canvas.print_figure(fname)
 
     def plotClear(self):
         # Reset the plot landscape
