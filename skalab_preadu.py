@@ -888,7 +888,7 @@ class Preadu(object):
             #print(num, register_value, str(hex(register_value)), str(self.preadu.get_rx_attenuation(num)))
             update_text(self.records[num]['text'], str(self.preadu.get_rx_attenuation(nrx=num)))
             #update_text(self.records[num]['text'], str((register_value & 0b11111000) >> 3))
-            if self.board_version < 3:
+            if not self.board_version == "3.0":
                 update_flag_lo_filter(self.records[num], self.preadu.is_lopass(nrx=num))
                 update_flag_hi_filter(self.records[num], self.preadu.is_hipass(nrx=num))
                 update_flag_termination(self.records[num], self.preadu.is_terminated(nrx=num))

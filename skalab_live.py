@@ -442,7 +442,8 @@ class Live(SkalabBase):
             if self.newTilesIPs is not None:
                 station.configuration['tiles'] = self.newTilesIPs
             # Test
-            try:
+            if True:
+            #try:
                 # Create station
                 self.tpm_station = Station(station.configuration)
                 # Connect station (program, initialise and configure if required)
@@ -484,7 +485,8 @@ class Live(SkalabBase):
                     msgBox.setWindowTitle("Error!")
                     msgBox.setIcon(QtWidgets.QMessageBox.Critical)
                     msgBox.exec_()
-            except Exception as e:
+            else:
+            #except Exception as e:
                 msgBox = QtWidgets.QMessageBox()
                 msgBox.setText("An exception occurred while trying to connect to the Station.\n\nException: " + str(e))
                 msgBox.setWindowTitle("Error!")
