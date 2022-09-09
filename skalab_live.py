@@ -550,21 +550,29 @@ class Live(SkalabBase):
         monit_daq = None
         while True:
             if self.connected:
-                try:
+                if True:
                     if self.initMonitor:
                         import pydaq.daq_receiver as monit_daq
                         nof_tiles = len(self.tpm_station.configuration['tiles'])
                         int_data_port = str(self.tpm_station.configuration['network']['lmc']['lmc_port'])
+                        int_data_ip = str(self.tpm_station.configuration['network']['lmc']['lmc_ip'])
                         if self.tpm_station.configuration['network']['lmc']['use_teng']:
                             int_data_port = str(self.tpm_station.configuration['network']['lmc']['integrated_data_port'])
+                        if not self.tpm_station.configuration['network']['lmc']['use_teng_integrated']:
+                            int_data_ip = str(self.tpm_station.configuration['network']['lmc']['integrated_data_ip'])
+                        int_data_if = get_if_name(int_data_ip)
                         daq_config = {
-                            "receiver_interface": get_if_name(self.tpm_station.configuration['network']['lmc']['lmc_ip']),
+                            "receiver_interface": int_data_if,
                             "receiver_ports": int_data_port,
+                            "receiver_ip": int_data_ip.encode(),
                             "nof_tiles": nof_tiles,
                             'directory': self.profile['Data']['integrated_spectra_path']}
+                        #print(daq_config)
                         if os.path.exists(self.profile['Data']['integrated_spectra_path']):
+                            self.initMonitor = False
                             self.monitor_daq = monit_daq
                             self.monitor_daq.populate_configuration(daq_config)
+                            print("Integrated Data Conf %s:%s on NIC %s" % (int_data_ip, int_data_port, int_data_if))
                             self.monitor_daq.initialise_daq()
                             self.monitor_daq.start_integrated_channel_data_consumer()
                             self.monitor_file_manager = ChannelFormatFileManager(root_path=self.profile['Data']['integrated_spectra_path'],
@@ -574,9 +582,8 @@ class Live(SkalabBase):
                                                                       ts_to_datestring(self.monitor_tstart) +
                                                                       " (Period: %3.1f secs)" %
                                                                       (8 * float(self.tpm_station.configuration['station']['channel_integration_time'])))
-                            self.initMonitor = False
-                except:
-                    pass
+                #except:
+                #    pass
 
                 try:
                     if not self.ThreadTempPause:
