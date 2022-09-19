@@ -5,7 +5,7 @@
 
 **skalab** is the container of each subsytem that can be also run in stand alone mode.
 
-**skalab** must be installed along the aavs-system repository (https://gitlab.com/ska-telescope/aavs-system) in the utilitie folder:
+**skalab** must be installed along the aavs-system repository (https://gitlab.com/ska-telescope/aavs-system) in the **utilities** folder:
 
 `cd $AAVS_HOME/aavs-system/python/utilities`
 
