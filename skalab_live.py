@@ -128,13 +128,13 @@ class Live(SkalabBase):
         self.qw_preadu.setVisible(True)
         self.qw_preadu.show()
         self.preadu = Preadu(parent=self.qw_preadu, debug=0, board_version=self.board_version)
-        if self.board_version == "1.0":
+        if self.board_version == "2.0":
             self.wg.qcombo_preadu_version.setCurrentIndex(3)
-        elif self.board_version == "1.1":
+        elif self.board_version == "2.1":
             self.wg.qcombo_preadu_version.setCurrentIndex(2)
-        elif self.board_version == "2.0":
+        elif self.board_version == "2.2":
             self.wg.qcombo_preadu_version.setCurrentIndex(1)
-        elif self.board_version == "3.0":
+        else:
             self.wg.qcombo_preadu_version.setCurrentIndex(0)
 
         self.writing_preadu = False
@@ -418,8 +418,9 @@ class Live(SkalabBase):
         self.wg.qcombo_tpm.setEnabled(True)
 
     def setupPreadu(self, version):
-        print("Setting preadu board version: %d" % (int(self.wg.qcombo_preadu_version.count()) - float(version) - 1))
-        self.preadu.set_preadu_version(int(self.wg.qcombo_preadu_version.count()) - float(version) - 1)
+        # print("Setting preadu board version: %d" % (int(self.wg.qcombo_preadu_version.count()) - float(version) - 1))
+        print("Setting preadu board version: %s" % (self.wg.qcombo_preadu_version.currentText().split()[0]))
+        self.preadu.set_preadu_version(self.wg.qcombo_preadu_version.currentText().split()[0])
         #self.readDsaConfiguration()
 
     def switchTpm(self):

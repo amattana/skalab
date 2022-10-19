@@ -1,3 +1,5 @@
+import sys
+sys.path.append("../")
 import os.path
 import time
 from tqdm import tqdm
@@ -191,6 +193,9 @@ if __name__ == "__main__":
     parser.add_option("--conf", action="store", dest="conf",
                       default="",
                       help="Station configuration File")
+    parser.add_option("--ip", action="store", dest="ip",
+                      default="",
+                      help="TPM IP (if different wrt config file)")
     parser.add_option("--tpm", action="store", dest="tpm",
                       default=1, type=int,
                       help="Station Tile Number")
@@ -212,7 +217,7 @@ if __name__ == "__main__":
     parser.add_option("--title", action="store", dest="title", type=str,
                       default="", help="Measurement File Name (if not given the channel number is appended)")
     parser.add_option("--version", action="store", dest="version", type=str,
-                      default="1.2", help="TPM Version (default: 1.2)")
+                      default="2.1", help="TPM Version (default: 2.1)")
     parser.add_option("--ylim", action="store", dest="ylim", type=str,
                       default="-0.5,0.5", help="Y Plot Limits (def. '-0.5,0.5'). ")
     parser.add_option("--autoscale", action="store_true", dest="autoscale",
@@ -222,6 +227,7 @@ if __name__ == "__main__":
     if opts.conf == "":
         exit()
     station.load_configuration_file(opts.conf)
+    station.configuration['tiles'] = opts.ip.split(",")
     station_configuration = station.configuration
     band = [float(opts.band.split(",")[0]), float(opts.band.split(",")[1])]
 
@@ -233,14 +239,14 @@ if __name__ == "__main__":
                      17, 16, 19, 18, 21, 20, 23, 22,
                      30, 31, 28, 29, 26, 27, 24, 25,
                      14, 15, 12, 13, 10, 11, 8, 9]
-        signal_map_file = "SignalMap/TPM_AAVS1.txt"
-    elif opts.version == "3.0":
-        print("Using RMS Mapping for TPM 1.6 with PreADU==3.0")
+        signal_map_file = "../SignalMap/TPM_AAVS1.txt"
+    elif opts.version == "3.1":
+        print("Using RMS Mapping for TPM 1.6 with PreADU>=3.0")
         fibre_remap = [15, 14, 13, 12, 11, 10, 9, 8,
                        6, 7, 4, 5, 2, 3, 0, 1,
                        31, 30, 29, 28, 27, 26, 25, 24,
                        22, 23, 20, 21, 18, 19, 16, 17]
-        signal_map_file = "SignalMap/TPM_AAVS3.txt"
+        signal_map_file = "../SignalMap/TPM_AAVS3.txt"
     else:
         print("Board version do not satisfy requirements (is a preadu with optical receivers?!?) Version %s", opts.version)
         exit(0)
@@ -265,20 +271,20 @@ if __name__ == "__main__":
     # Instantiate PreADU
     board_version = float(opts.version)
     preadu = None
-    rf_map = read_routing_table("./SignalMap/TPM_AAVS1.txt")
-    if board_version == 3.0:
+    rf_map = read_routing_table("../SignalMap/TPM_AAVS1.txt")
+    if board_version == 3.1:
         preadu = preAduAAVS3()
-        rf_map = read_routing_table("./SignalMap/TPM_AAVS3.txt")
-        print("PreADU 3.0 with Optical Receivers selected (pre-AAVS3)")
-    elif board_version == 2.1:
-        preadu = preAduAAVS1()
-        print("PreADU 2.1 with Optical Receivers selected (AAVS1/AAVS2)")
+        rf_map = read_routing_table("../SignalMap/TPM_AAVS3.txt")
+        print("PreADU 3.1 with Optical Receivers selected (pre-AAVS3)")
     elif board_version == 2.0:
         preadu = preAduRf()
         print("PreADU 2.0 (RF) without optical receivers")
-    elif board_version == 2.01:
+    elif board_version == 2.1:
+        preadu = preAduAAVS1()
+        print("PreADU 2.1 with Optical Receivers selected (AAVS1/AAVS2)")
+    elif board_version == 2.2:
         preadu = preAduSadino()
-        print("PreADU 2.0b (RF SADino) with Mixed RF and Optical Rxs selected")
+        print("PreADU 2.2 (RF SADino) with Mixed RF and Optical Rxs selected")
     for spimap in rf_map:
         preadu.set_spi_conf(nrx=int(spimap[0]), preadu_id=int(spimap[3]), channel_filter=int(spimap[4]),
                             pol=spimap[1], adu_in=spimap[0], tpm_in=spimap[2])
@@ -329,10 +335,6 @@ if __name__ == "__main__":
         preadu_id = int(fw_map['preadu_id'])
         channel_filter = int(fw_map['channel_filter'])
         dsa = preadu.get_rx_attenuation(nrx=rx_id)
-        if fw_map['pol'].upper() == "RF-2":
-            dsa_x = dsa
-        else:
-            dsa_y = dsa
         # print("RX # %d" % rx_id, "PreADU Id: %d" % preadu_id,
         #       " Channel Filter: %d" % channel_filter, "  -->  ",
         #       fw_map['pol'], " DSA: %02d dB" % dsa)
@@ -355,6 +357,10 @@ if __name__ == "__main__":
                 # print("PreADU Id: %d" % preadu_id, " Channel Filter: %d" % channel_filter, "  -->  ", pol,
                 #       " DSA: %02d dB\n" % preadu.get_rx_attenuation(nrx=rx_id))
         rms = get_rms(tile=tpm_station.tiles[opts.tpm - 1], version=board_version)
+        if fw_map['pol'].upper() == "RF-2":
+            dsa_x = dsa
+        else:
+            dsa_y = dsa
     #print()
 
     if opts.daq:

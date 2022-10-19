@@ -2333,7 +2333,7 @@
        <enum>Qt::LeftToRight</enum>
       </property>
       <property name="text">
-       <string>dBm</string>
+       <string>dB</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>

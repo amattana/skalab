@@ -757,7 +757,7 @@ class preAduAAVS3:
 
 
 class Preadu(object):
-    def __init__(self, parent, tpm=None, board_version="3.0", debug=0):
+    def __init__(self, parent, tpm=None, board_version="3.1", debug=0):
         """ Initialise main window """
         super(Preadu, self).__init__()
 
@@ -769,16 +769,16 @@ class Preadu(object):
 
         self.inputs = CHANNELS
         self.rf_map = read_routing_table("./SignalMap/TPM_AAVS1.txt")
-        if self.board_version == "1.0":
+        if self.board_version == "2.0":
             self.preadu = preAduRf()
             print("RF PreADU without optical receivers")
-        elif self.board_version == "1.1":
-            self.preadu = preAduSadino()
-            print("SADino preADU with Mixed RF and AAVS1 Like RF Rxs selected")
-        elif self.board_version == "2.0":
+        elif self.board_version == "2.1":
             self.preadu = preAduAAVS1()
             print("AAVS1 PreADU with Optical WDM Receivers selected")
-        elif self.board_version == "3.0":
+        elif self.board_version == "2.2":
+            self.preadu = preAduSadino()
+            print("SADino preADU with Mixed RF and AAVS1 Like RF Rxs selected")
+        elif self.board_version == "3.1":
             self.preadu = preAduAAVS3()
             self.rf_map = read_routing_table("./SignalMap/TPM_AAVS3.txt")
             print("New PreADU with Embedded Optical WDM Receivers selected")
@@ -888,7 +888,7 @@ class Preadu(object):
             #print(num, register_value, str(hex(register_value)), str(self.preadu.get_rx_attenuation(num)))
             update_text(self.records[num]['text'], str(self.preadu.get_rx_attenuation(nrx=num)))
             #update_text(self.records[num]['text'], str((register_value & 0b11111000) >> 3))
-            if not self.board_version == "3.0":
+            if not self.board_version == "3.1":
                 update_flag_lo_filter(self.records[num], self.preadu.is_lopass(nrx=num))
                 update_flag_hi_filter(self.records[num], self.preadu.is_hipass(nrx=num))
                 update_flag_termination(self.records[num], self.preadu.is_terminated(nrx=num))
@@ -926,7 +926,7 @@ class Preadu(object):
             #update_flag(self.records[num], (conf_value & 0b111) )
 
     def set_rf(self, num):
-        if self.board_version < 3:
+        if float(self.board_version) < 3:
             if (self.preadu.get_register_value(nrx=num) & 1) == 1:
                 self.preadu.set_register_value(nrx=num, value=(self.preadu.get_register_value(nrx=num) & 0b11111110))
                 self.records[num]['value'].setFont(font_bold())
@@ -1056,21 +1056,21 @@ class Preadu(object):
         self.tpm = tpm
         self.reload()
 
-    def set_preadu_version(self, board_type="3.0"):
+    def set_preadu_version(self, board_type="3.1"):
         del self.preadu
         gc.collect()
         self.board_version = board_type
         self.rf_map = read_routing_table("./SignalMap/TPM_AAVS1.txt")
-        if self.board_version == "1.0":
+        if self.board_version == "2.0":
             self.preadu = preAduRf()
             print("RF PreADU without optical receivers")
-        elif self.board_version == "1.1":
-            self.preadu = preAduSadino()
-            print("SADino preADU with Mixed RF and AAVS1 Like RF Rxs selected")
-        elif self.board_version == "2.0":
+        elif self.board_version == "2.1":
             self.preadu = preAduAAVS1()
             print("AAVS1 PreADU with Optical WDM Receivers selected")
-        elif self.board_version == "3.0":
+        elif self.board_version == "2.2":
+            self.preadu = preAduSadino()
+            print("SADino preADU with Mixed RF and AAVS1 Like RF Rxs selected")
+        elif self.board_version == "3.1":
             self.preadu = preAduAAVS3()
             self.rf_map = read_routing_table("./SignalMap/TPM_AAVS3.txt")
             print("New PreADU with Embedded Optical WDM Receivers selected")
