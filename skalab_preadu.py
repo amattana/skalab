@@ -757,9 +757,176 @@ class preAduAAVS3:
 
 
 class Preadu(object):
-    def __init__(self, parent, tpm=None, board_version="3.1", debug=0):
-        """ Initialise main window """
+    def __init__(self, parent, tpm=None, board_version="2.1", debug=0):
+        """ This is the PreADU class """
         super(Preadu, self).__init__()
+
+        self.board_version = board_version
+        self.debug = debug
+        self.tpm = tpm
+        self.Busy = False  # UCP Communication Token
+        self.write_armed = False  # Tells the top layer (skalab_live) that a write operation is ready to go
+
+        self.inputs = CHANNELS
+        self.rf_map = read_routing_table("./SignalMap/TPM_AAVS1.txt")
+        if self.board_version == "2.0":
+            self.preadu = preAduRf()
+            print("RF PreADU without optical receivers")
+        elif self.board_version == "2.1":
+            self.preadu = preAduAAVS1()
+            print("AAVS1 PreADU with Optical WDM Receivers selected")
+        elif self.board_version == "2.2":
+            self.preadu = preAduSadino()
+            print("SADino preADU with Mixed RF and AAVS1 Like RF Rxs selected")
+        elif self.board_version == "3.1":
+            self.preadu = preAduAAVS3()
+            self.rf_map = read_routing_table("./SignalMap/TPM_AAVS3.txt")
+            print("New PreADU with Embedded Optical WDM Receivers selected")
+
+        for spimap in self.rf_map:
+            self.preadu.set_spi_conf(nrx=int(spimap[0]),
+                                     preadu_id=int(spimap[3]),
+                                     channel_filter=int(spimap[4]),
+                                     pol=spimap[1], adu_in=spimap[0], tpm_in=spimap[2])
+
+        self.spi_remap = self.preadu.spi_remap
+
+    def set_hi(self):
+        for num in range(self.inputs):
+            self.preadu.set_hipass(rx=num)
+
+    def set_lo(self):
+        for num in range(self.inputs):
+            self.preadu.set_lopass(rx=num)
+
+    def set_rf(self, num):
+        if float(self.board_version) < 3:
+            if (self.preadu.get_register_value(nrx=num) & 1) == 1:
+                self.preadu.set_register_value(nrx=num, value=(self.preadu.get_register_value(nrx=num) & 0b11111110))
+            else:
+                self.preadu.set_register_value(nrx=num, value=(self.preadu.get_register_value(nrx=num) | 1))
+
+    def action_plus(self, num):
+        valore = self.preadu.get_rx_attenuation(nrx=num) + 1
+        if valore > 31:
+            valore = 31
+        self.preadu.set_rx_attenuation(nrx=num, att=bound(valore))
+
+    def action_minus(self, num):
+        valore = self.preadu.get_rx_attenuation(nrx=num) - 1
+        if valore < 0:
+            valore = 0
+        self.preadu.set_rx_attenuation(nrx=num, att=bound(valore))
+
+    def action_rfoff(self, num):
+        value = self.preadu.get_register_value(nrx=num) & 0b11111110
+        self.preadu.set_register_value(nrx=num, value=value)
+
+    def action_rfon(self, num):
+        value = self.preadu.get_register_value(nrx=num) | 1
+        self.preadu.set_register_value(nrx=num, value=value)
+
+    def decreaseAll(self):
+        for i in range(self.inputs):
+            self.action_minus(i)
+
+    def increaseAll(self):
+        for i in range(self.inputs):
+            self.action_plus(i)
+
+    def rfoffAll(self):
+        for i in range(self.inputs):
+            self.action_rfoff(i)
+
+    def rfonAll(self):
+        for i in range(self.inputs):
+            self.action_rfon(i)
+
+    def readConfiguration(self, tpm=None):
+        if tpm is None:
+            tpm = self.tpm
+        preaduConf = []
+        if tpm is not None:
+            time.sleep(0.01)
+            tpm.tpm.tpm_preadu[0].read_configuration()  # TOP
+            time.sleep(0.01)
+            tpm.tpm.tpm_preadu[1].read_configuration()  # BOTTOM
+            for i in range(32):
+                fw_map = self.preadu.get_spi_conf(nrx=i)
+                preadu_id = int(fw_map['preadu_id'])
+                channel_filter = int(fw_map['channel_filter'])
+                pol = fw_map['pol']
+                value = self.tpm.tpm.tpm_preadu[preadu_id].channel_filters[channel_filter]
+                preaduConf += [{'id': i,
+                                'sn': "n/a",
+                                'code': value,
+                                'preadu_id': preadu_id,
+                                'channel_filter': channel_filter,
+                                'pol': pol,
+                                'dsa': self.preadu.get_rx_attenuation(i),
+                                'version': self.preadu.rx[i].version}]
+        #print("\nConfiguration READ:")
+        #for conf in preaduConf:
+        #    print(conf)
+        return preaduConf
+
+    def write_configuration(self):
+        self.Busy = True
+        if self.tpm is not None:
+            for i in range(32):
+                value = self.preadu.get_register_value(nrx=i)
+                fw_map = self.preadu.get_spi_conf(nrx=i)
+                preadu_id = int(fw_map['preadu_id'])
+                channel_filter = int(fw_map['channel_filter'])
+                #print("PREADU ID: %d, CHAN-FILTER %02d, RMS-INDEX %d, CODE %d" % (spi_map[0], spi_map[1], i, value))
+                self.tpm.tpm.tpm_preadu[preadu_id].channel_filters[channel_filter] = value
+            for preadu_id in [1, 0]:
+                self.tpm.tpm.tpm_preadu[preadu_id].write_configuration()
+            self.reload()
+        self.write_armed = False
+        self.Busy = False
+
+    def reload(self):
+        conf = self.readConfiguration()
+        if not conf == []:
+            for i in range(32):
+                self.preadu.set_register_value(nrx=i, value=conf[i]['code'])
+        else:
+            for i in range(32):
+                self.preadu.set_register_value(nrx=i, value=255)
+
+    def setTpm(self, tpm):
+        self.tpm = tpm
+        self.reload()
+
+    def set_preadu_version(self, board_type="3.1"):
+        del self.preadu
+        gc.collect()
+        self.board_version = board_type
+        self.rf_map = read_routing_table("./SignalMap/TPM_AAVS1.txt")
+        if self.board_version == "2.0":
+            self.preadu = preAduRf()
+            print("RF PreADU without optical receivers")
+        elif self.board_version == "2.1":
+            self.preadu = preAduAAVS1()
+            print("AAVS1 PreADU with Optical WDM Receivers selected")
+        elif self.board_version == "2.2":
+            self.preadu = preAduSadino()
+            print("SADino preADU with Mixed RF and AAVS1 Like RF Rxs selected")
+        elif self.board_version == "3.1":
+            self.preadu = preAduAAVS3()
+            self.rf_map = read_routing_table("./SignalMap/TPM_AAVS3.txt")
+            print("New PreADU with Embedded Optical WDM Receivers selected")
+        for spimap in self.rf_map:
+            self.preadu.set_spi_conf(nrx=int(spimap[0]), preadu_id=int(spimap[3]), channel_filter=int(spimap[4]),
+                                     pol=spimap[1], adu_in=spimap[0], tpm_in=spimap[2])
+        self.reload()
+
+
+class PreaduGui(object):
+    def __init__(self, parent, tpm=None, board_version="3.1", debug=0):
+        """ This is the PreADU Gui Class """
+        super(PreaduGui, self).__init__()
 
         self.board_version = board_version
         self.debug = debug
@@ -999,7 +1166,9 @@ class Preadu(object):
             tpm = self.tpm
         preaduConf = []
         if tpm is not None:
+            time.sleep(0.01)
             tpm.tpm.tpm_preadu[0].read_configuration()  # TOP
+            time.sleep(0.01)
             tpm.tpm.tpm_preadu[1].read_configuration()  # BOTTOM
             for i in range(32):
                 fw_map = self.preadu.get_spi_conf(nrx=i)

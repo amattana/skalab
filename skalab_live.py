@@ -19,7 +19,7 @@ from PyQt5.QtCore import Qt
 import pydaq.daq_receiver as daq
 from skalab_utils import MiniPlots, calcolaspettro, closest, MyDaq, get_if_name, BarPlot, ChartPlots, getTextFromFile
 from skalab_utils import parse_profile, ts_to_datestring, dt_to_timestamp, Archive, COLORI, decodeChannelList
-from skalab_preadu import Preadu, bound
+from skalab_preadu import Preadu, PreaduGui, bound
 from pyaavs.station import Station
 from pyaavs import station
 from threading import Thread
@@ -109,16 +109,16 @@ class Live(SkalabBase):
         # Populate the plots for the Live Spectra
         self.livePlots = MiniPlots(parent=self.wg.qplot_spectra, nplot=16)
         self.monitorPlots = MiniPlots(parent=self.wg.qplot_int_spectra, nplot=16)
-        self.tempBoardPlots = BarPlot(parent=self.wg.qplot_temps_board, size=(3.65, 2.12), xlim=[0, 9],
+        self.tempBoardPlots = BarPlot(parent=self.wg.qplot_temps_board, size=(3.65, 2.12), xlim=[0, 17],
                                       ylabel="Celsius (deg)", xrotation=0, xlabel="Board",
-                                      ylim=[40, 80], yticks=np.arange(20, 120, 20), xticks=np.arange(9))
-        self.tempFpga1Plots = BarPlot(parent=self.wg.qplot_temps_fpga1, size=(3.65, 2.12), xlim=[0, 9],
+                                      ylim=[40, 80], yticks=np.arange(20, 120, 20), xticks=np.arange(17))
+        self.tempFpga1Plots = BarPlot(parent=self.wg.qplot_temps_fpga1, size=(3.65, 2.12), xlim=[0, 17],
                                       ylabel="Celsius (deg)", xrotation=0, xlabel="FPGA1",
-                                      ylim=[40, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(9))
-        self.tempFpga2Plots = BarPlot(parent=self.wg.qplot_temps_fpga2, size=(3.65, 2.12), xlim=[0, 9],
+                                      ylim=[40, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(17))
+        self.tempFpga2Plots = BarPlot(parent=self.wg.qplot_temps_fpga2, size=(3.65, 2.12), xlim=[0, 17],
                                       ylabel="Celsius (deg)", xrotation=0, xlabel="FPGA2",
-                                      ylim=[40, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(9))
-        self.tempChart = ChartPlots(parent=self.wg.qplot_chart, ntraces=8, xlabel="time samples", ylim=[40, 80],
+                                      ylim=[40, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(17))
+        self.tempChart = ChartPlots(parent=self.wg.qplot_chart, ntraces=16, xlabel="time samples", ylim=[40, 80],
                                     ylabel="Board Temp (deg)", size=(11.2, 4), xlim=[0, 200])
         self.rmsChart = ChartPlots(parent=self.wg.qplot_rms_chart, ntraces=32, xlabel="time samples", ylim=[-40, 20],
                                     ylabel="RMS (dBm)", size=(11.2, 6.6), xlim=[0, 200])
@@ -127,7 +127,7 @@ class Live(SkalabBase):
         self.qw_preadu.setGeometry(QtCore.QRect(10, 180, 1131, 681))
         self.qw_preadu.setVisible(True)
         self.qw_preadu.show()
-        self.preadu = Preadu(parent=self.qw_preadu, debug=0, board_version=self.board_version)
+        self.preadu = PreaduGui(parent=self.qw_preadu, debug=0, board_version=self.board_version)
         if self.board_version == "2.0":
             self.wg.qcombo_preadu_version.setCurrentIndex(3)
         elif self.board_version == "2.1":
@@ -595,8 +595,10 @@ class Live(SkalabBase):
                         sleep(0.1)
                         self.preaduConf = []
                         for t in self.tpm_station.tiles:
+                            time.sleep(0.05)
                             while self.preadu.Busy:
-                                time.sleep(0.2)
+                                time.sleep(0.1)
+                            #self.preadu.setTpm(t)
                             self.preaduConf += [self.preadu.readConfiguration(t)]
                         sleep(0.1)
                         self.readRms()
