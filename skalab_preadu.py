@@ -1070,7 +1070,7 @@ class PreaduGui(object):
         for num in range(self.inputs):
             self.records[num]['lo'].setStyleSheet("background-color: rgb(255, 255, 0);")
             self.records[num]['hi'].setStyleSheet("background-color: rgb(0, 170, 0);")
-            self.preadu.set_rx_hi_filter(rx=num)
+            self.preadu.set_rx_hi_filter(num)
             #conf_value = ('0x' + self.records[num]['value'].text()).toInt(16)[0] & 0b11111011
             #conf_value = conf_value | 0b10
             self.records[num]['value'].setFont(font_bold())
@@ -1083,7 +1083,7 @@ class PreaduGui(object):
         for num in range(self.inputs):
             self.records[num]['hi'].setStyleSheet("background-color: rgb(255, 255, 0);")
             self.records[num]['lo'].setStyleSheet("background-color: rgb(0, 170, 0);")
-            self.preadu.set_rx_lo_filter(rx=num)
+            self.preadu.set_rx_lo_filter(num)
             #conf_value=('0x'+self.records[num]['value'].text()).toInt(16)[0] & 0b11111101
             #conf_value=conf_value | 0b100
             self.records[num]['value'].setFont(font_bold())
