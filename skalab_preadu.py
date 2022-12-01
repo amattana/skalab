@@ -1056,15 +1056,15 @@ class PreaduGui(object):
             update_text(self.records[num]['text'], str(self.preadu.get_rx_attenuation(nrx=num)))
             #update_text(self.records[num]['text'], str((register_value & 0b11111000) >> 3))
             if not self.board_version == "3.1":
-                update_flag_lo_filter(self.records[num], self.preadu.is_lopass(nrx=num))
-                update_flag_hi_filter(self.records[num], self.preadu.is_hipass(nrx=num))
-                update_flag_termination(self.records[num], self.preadu.is_terminated(nrx=num))
+                update_flag_lo_filter(self.records[num], self.preadu.is_lopass(num))
+                update_flag_hi_filter(self.records[num], self.preadu.is_hipass(num))
+                update_flag_termination(self.records[num], self.preadu.is_terminated(num))
             self.records[num]['value'].setFont(font_normal())
         if self.debug:
             for num in range(self.inputs):
                 print(format(num, '02d'), format(self.preadu.get_register_value(nrx=num), '08b'), "ATT:",
-                      self.preadu.get_rx_attenuation(nrx=num), ", LO:", self.preadu.is_lopass(nrx=num),
-                      ", HI:", self.preadu.is_hipass(nrx=num), ", RF-ENABLED: ", self.preadu.is_terminated(nrx=num))
+                      self.preadu.get_rx_attenuation(nrx=num), ", LO:", self.preadu.is_lopass(num),
+                      ", HI:", self.preadu.is_hipass(num), ", RF-ENABLED: ", self.preadu.is_terminated(num))
 
     def set_hi(self):
         for num in range(self.inputs):
@@ -1075,8 +1075,8 @@ class PreaduGui(object):
             #conf_value = conf_value | 0b10
             self.records[num]['value'].setFont(font_bold())
             self.records[num]['value'].setText(hex(self.preadu.get_register_value(nrx=num))[2:])
-            update_flag_lo_filter(self.records[num], self.preadu.is_lopass(rx=num))
-            update_flag_hi_filter(self.records[num], self.preadu.is_hipass(rx=num))
+            update_flag_lo_filter(self.records[num], self.preadu.is_lopass(num))
+            update_flag_hi_filter(self.records[num], self.preadu.is_hipass(num))
             #update_flag(self.records[num], (conf_value & 0b111))
 
     def set_lo(self):
@@ -1088,8 +1088,8 @@ class PreaduGui(object):
             #conf_value=conf_value | 0b100
             self.records[num]['value'].setFont(font_bold())
             self.records[num]['value'].setText(hex(self.preadu.get_register_value(nrx=num))[2:])
-            update_flag_lo_filter(self.records[num], self.preadu.is_lopass(rx=num))
-            update_flag_hi_filter(self.records[num], self.preadu.is_hipass(rx=num))
+            update_flag_lo_filter(self.records[num], self.preadu.is_lopass(num))
+            update_flag_hi_filter(self.records[num], self.preadu.is_hipass(num))
             #update_flag(self.records[num], (conf_value & 0b111) )
 
     def set_rf(self, num):
