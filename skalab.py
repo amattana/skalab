@@ -16,8 +16,8 @@ __copyright__ = "Copyright 2022, Istituto di RadioAstronomia, Radiotelescopi di 
 __author__ = "Andrea Mattana"
 __credits__ = ["Andrea Mattana"]
 __license__ = "GPL"
-__version__ = "1.2.3"
-__release__ = "2022-10-19"
+__version__ = "1.3.0"
+__release__ = "2022-12-22"
 __maintainer__ = "Andrea Mattana"
 
 import gc
