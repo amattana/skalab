@@ -1186,6 +1186,8 @@ class PreaduGui(object):
                     self.guiConf[num]['code']))
                 #time.sleep(0.001)
                 update_flag_termination(self.records[num], self.staticRx.rx[self.guiConf[num]['version']].op_is_terminated(self.guiConf[num]['code']))
+            else:
+                update_flag_termination(self.records[num], False)
                 #time.sleep(0.001)
             self.records[num]['code'].setFont(font_normal())
             time.sleep(0.001)

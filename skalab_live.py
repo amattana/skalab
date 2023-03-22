@@ -204,6 +204,7 @@ class Live(SkalabBase):
 
         self.live_input_list = np.arange(1, 17)
         self.live_channels = self.wg.qline_channels.text()
+        self.live_mapping = np.arange(16)
 
         self.xAxisRange = [float(self.wg.qline_spectra_band_from.text()), float(self.wg.qline_spectra_band_to.text())]
         self.yAxisRange = [float(self.wg.qline_spectra_level_min.text()), float(self.wg.qline_spectra_level_max.text())]
@@ -236,7 +237,7 @@ class Live(SkalabBase):
         self.wg.qradio_rms_power.toggled.connect(lambda: self.customizeRms())
         self.wg.qradio_rms_dsa.toggled.connect(lambda: self.customizeRms())
         self.wg.qradio_rms_chart.toggled.connect(lambda: self.customizeRms())
-        self.wg.qcombo_rms_label.currentIndexChanged.connect(lambda: self.customizeRms())
+        self.wg.qcombo_rms_label.currentIndexChanged.connect(lambda: self.customizeMapping())
         self.wg.qcheck_spectra_grid.stateChanged.connect(self.live_show_spectra_grid)
         self.wg.qradio_raw.toggled.connect(lambda: self.check_raw(self.wg.qradio_raw))
         self.wg.qradio_int_spectra.toggled.connect(lambda: self.check_int_spectra(self.wg.qradio_int_spectra))
@@ -890,6 +891,23 @@ class Live(SkalabBase):
         self.qwRmsMainLayout.insertWidget(0, self.qwRms)
         self.qwRms.show()
 
+    def customizeMapping(self):
+        self.customizeRms()
+        if self.wg.qcombo_rms_label.currentIndex() == 1:
+            # ADU RF Receivers Polarization X-Y remapping
+            self.live_mapping = np.arange(16)
+        elif self.wg.qcombo_rms_label.currentIndex() == 2:
+            # TPM 1.2 Fibre Mapping
+            self.live_mapping = np.arange(16)
+        elif self.wg.qcombo_rms_label.currentIndex() == 3:
+            # TPM 1.6 RF Rx
+            self.live_mapping = [12, 13, 14, 15, 3, 2, 1, 0, 8, 9, 10, 11, 7, 6, 5, 4]
+        elif self.wg.qcombo_rms_label.currentIndex() == 4:
+            # TPM 1.6 Fibre Mapping
+            self.live_mapping = [12, 13, 14, 15, 3, 2, 1, 0, 8, 9, 10, 11, 7, 6, 5, 4]
+        else:
+            self.live_mapping = np.arange(16)
+
     def customizeRms(self):
         self.wg.qline_rms_level_min.setEnabled(True)
         self.wg.qline_rms_level_max.setEnabled(True)
@@ -1110,7 +1128,7 @@ class Live(SkalabBase):
             #self.livePlots.plotClear()
             for n, i in enumerate(self.live_input_list):
                 # Plot X Pol
-                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 0, :],
+                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][self.live_mapping[i - 1], 0, :],
                                                 self.nsamples)
                 self.livePlots.plotCurve(self.asse_x, spettro, n, xAxisRange=xAxisRange,
                                          yAxisRange=yAxisRange, title="INPUT-%02d" % i,
@@ -1119,7 +1137,7 @@ class Live(SkalabBase):
                                          show_line=self.wg.qcheck_xpol_sp.isChecked())
 
                 # Plot Y Pol
-                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 1, :],
+                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][self.live_mapping[i - 1], 1, :],
                                               self.nsamples)
                 self.livePlots.plotCurve(self.asse_x, spettro, n, xAxisRange=xAxisRange,
                                          yAxisRange=yAxisRange, colore="g", rfpower=rms,

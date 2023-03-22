@@ -619,7 +619,7 @@ class MyDaq:
             self.station.send_raw_data()
         else:
             for i in range(self.nof_tiles):
-                self.station.tiles[i].send_raw_data(seconds=0.02)
+                self.station.tiles[i].send_raw_data(seconds=0.2)
             #self.station.send_raw_data()
         while not self.data_received == self.nof_tiles:
             time.sleep(0.1)
