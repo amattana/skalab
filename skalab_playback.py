@@ -779,6 +779,6 @@ if __name__ == "__main__":
     (conf, args) = parser.parse_args(argv[1:])
 
     app = QtWidgets.QApplication(sys.argv)
-    window = Playback(config=conf.config, uiFile="skalab_playback.ui", swpath=default_app_dir)
+    window = Playback(config=conf.config, uiFile="skalab_playback.ui")
 
     sys.exit(app.exec_())

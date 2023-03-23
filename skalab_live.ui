@@ -1069,22 +1069,22 @@
       </property>
       <item>
        <property name="text">
-        <string>3.0   AAVS3 integrated design</string>
+        <string>3.1   AAVS3 integrated design</string>
        </property>
       </item>
       <item>
        <property name="text">
-        <string>2.0   AAVS1/2 with Optical Rx</string>
+        <string>2.2   SADino (Mixed RF Rxs and AAVS1 Like RF Rxs)</string>
        </property>
       </item>
       <item>
        <property name="text">
-        <string>1.1   SADino (Mixed RF Rxs and AAVS1 Like RF Rxs)</string>
+        <string>2.1   AAVS1/2 with Optical Rx</string>
        </property>
       </item>
       <item>
        <property name="text">
-        <string>1.0   RF Receivers</string>
+        <string>2.0   RF Receivers</string>
        </property>
       </item>
      </widget>

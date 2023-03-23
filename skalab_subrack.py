@@ -139,6 +139,7 @@ class Subrack(SkalabBase):
         self.connected = False
         self.populate_table_profile()
         self.reload(ip=ip, port=port)
+
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
 
@@ -402,7 +403,7 @@ class Subrack(SkalabBase):
 
     def drawBars(self):
         # Draw Bars
-        if "tpm_powers" in self.telemetry.keys() and "tpm_voltages" in self.telemetry.keys():
+        if ("tpm_powers" in self.telemetry.keys()) and ("tpm_voltages" in self.telemetry.keys()):
             self.plotTpmPower.set_xlabel("TPM Voltages")
             for i in range(8):
                 self.plotTpmPower.plotBar(data=self.telemetry["tpm_powers"][i], bar=i, color=COLORI[i])
@@ -417,7 +418,7 @@ class Subrack(SkalabBase):
         else:
             self.plotPsu.set_xlabel("No data available")
         self.plotPsu.updatePlot()
-        if MgnTraces[0] in self.telemetry.keys() and MgnTraces[1] in self.telemetry.keys():
+        if (MgnTraces[0] in self.telemetry.keys()) and (MgnTraces[1] in self.telemetry.keys()):
             self.plotMgnTemp.set_xlabel("SubRack Temperatures")
             for n, k in enumerate(MgnTraces):
                 self.plotMgnTemp.plotBar(data=self.telemetry[k][0], bar=(n * 2), color=COLORI[(n * 2)])
@@ -648,7 +649,7 @@ class Subrack(SkalabBase):
             self.signal_to_monitor_for_tpm.emit()
 
         # Fan status on Sliders
-        if 'subrack_fan_speeds' in self.telemetry.keys() and 'subrack_fan_speeds_percent' in self.telemetry.keys():
+        if ('subrack_fan_speeds' in self.telemetry.keys()) and ('subrack_fan_speeds_percent' in self.telemetry.keys()):
             for i in range(4):
                 self.fans[i]['rpm'].setText("%d" % int(self.telemetry['subrack_fan_speeds'][i]))
                 if not self.fans[i]['sliderPressed']:
@@ -768,5 +769,4 @@ if __name__ == "__main__":
                         print("\nTerminated by the user.\n")
                 client.disconnect()
                 del client
-
 

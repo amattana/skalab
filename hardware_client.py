@@ -46,10 +46,10 @@ return a list of the available command/attribute names.
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
-
 import requests
+from typing import Any, Optional
 from typing_extensions import TypedDict
+
 
 CommandResponseType = TypedDict(
     "CommandResponseType",

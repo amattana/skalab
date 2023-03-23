@@ -2,6 +2,7 @@ import glob
 import datetime
 import subprocess
 import calendar
+import time
 
 import h5py
 import numpy as np
@@ -23,6 +24,7 @@ from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtWidgets import QWidget
 
 COLORI = ["b", "g", "k", "r", "orange", "magenta", "darkgrey", "turquoise"] * 4
+
 
 def parse_profile(config=""):
     confparser = configparser.ConfigParser()
@@ -443,7 +445,8 @@ def calcolaspettro(dati, nsamples=32768, log=True, adurms=False):
     with np.errstate(divide='ignore', invalid='ignore'):
         mediato[:] = 20 * np.log10(mediato / 127.0)
     d = np.array(dati, dtype=np.int8)
-    adu_rms = np.sqrt(np.mean(np.power(d, 2), 0))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        adu_rms = np.sqrt(np.mean(np.power(d, 2), 0))
     volt_rms = adu_rms * (1.7 / 256.)
     with np.errstate(divide='ignore', invalid='ignore'):
         power_adc = 10 * np.log10(np.power(volt_rms, 2) / 400.) + 30
@@ -501,7 +504,19 @@ def read_data(fmanager=None, hdf5_file="", tile=1, nof_tiles=16):
 def calc_disk_usage(directory=".", pattern="*.hdf5"):
     cmd = "find " + directory + " -type f -name '" + pattern + "' -exec du -ch {} + | grep total"
     try:
-        return subprocess.check_output(cmd, shell=True).split()[0].decode("utf-8")
+        subprocess.check_output(cmd, shell=True).decode("utf-8").split()
+        total = 0
+        unit = 'MB'
+        for r in l:
+            if not 'total' in r:
+                val = float(r.replace(",", ".")[:-1])
+                if 'G' in r:
+                    val = val * 1024
+                total = total + val
+        if len(str(total)) > 3:
+            total = total / 1000.
+            unit = 'GB'
+        return "%d%s" % (total, unit)
     except:
         return "0 MB"
 
@@ -729,7 +744,7 @@ class MyDaq:
             self.station.send_raw_data()
         else:
             for i in range(self.nof_tiles):
-                self.station.tiles[i].send_raw_data(seconds=0.02)
+                self.station.tiles[i].send_raw_data(seconds=0.2)
             #self.station.send_raw_data()
         while not self.data_received == self.nof_tiles:
             time.sleep(0.1)

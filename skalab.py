@@ -12,12 +12,12 @@
 
 """
 
-__copyright__ = "Copyright 2022, Istituto di RadioAstronomia, Radiotelescopi di Medicina, INAF, Italy"
+__copyright__ = "Copyright 2023, Istituto di RadioAstronomia, Radiotelescopi di Medicina, INAF, Italy"
 __author__ = "Andrea Mattana"
 __credits__ = ["Andrea Mattana"]
 __license__ = "GPL"
-__version__ = "1.2.2"
-__release__ = "2022-08-26"
+__version__ = "1.3.1"
+__release__ = "2023-03-22"
 __maintainer__ = "Andrea Mattana"
 
 import gc
@@ -207,8 +207,8 @@ class SkaLab(QtWidgets.QMainWindow):
         self.power = {}
         self.raw = {}
         self.rms = {}
-        # if self.config_file:
-        #     self.setup_config()
+        if self.config_file:
+            self.setup_config()
         self.populate_help()
 
     def load_events(self):
@@ -437,15 +437,15 @@ class SkaLab(QtWidgets.QMainWindow):
                     if self.tpm_station.properly_formed_station:
                         self.wg.qbutton_station_init.setStyleSheet("background-color: rgb(78, 154, 6);")
 
-                        if not self.tpm_station.tiles[0].tpm_version() == "tpm_v1_2":
-                            # ByPass the MCU temperature controls on TPM 1.6
-                            for tile in self.tpm_station.tiles:
-                                tile[0x90000034] = 0xBADC0DE
-                                tile[0x30000518] = 1
-                                time.sleep(0.1)
-                            time.sleep(1)
-                            print("MCU Controls Hacked with \nVal 0xBADC0DE in Reg 0x90000034,"
-                                  "\nVal 0x0000001 in Reg 0x30000518")
+                        # if not self.tpm_station.tiles[0].tpm_version() == "tpm_v1_2":
+                        #     # ByPass the MCU temperature controls on TPM 1.6
+                        #     for tile in self.tpm_station.tiles:
+                        #         tile[0x90000034] = 0xBADC0DE
+                        #         tile[0x30000518] = 1
+                        #         time.sleep(0.1)
+                        #     time.sleep(1)
+                        #     print("MCU Controls Hacked with \nVal 0xBADC0DE in Reg 0x90000034,"
+                        #           "\nVal 0x0000001 in Reg 0x30000518")
 
                         # Switch On the PreADUs
                         for tile in self.tpm_station.tiles:
@@ -730,4 +730,3 @@ if __name__ == "__main__":
 
     window = SkaLab("skalab_main.ui", profile=profile)
     sys.exit(app.exec_())
-
