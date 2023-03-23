@@ -12,12 +12,12 @@
 
 """
 
-__copyright__ = "Copyright 2023, Istituto di RadioAstronomia, Radiotelescopi di Medicina, INAF, Italy"
+__copyright__ = "Copyright 2022, Istituto di RadioAstronomia, Radiotelescopi di Medicina, INAF, Italy"
 __author__ = "Andrea Mattana"
 __credits__ = ["Andrea Mattana"]
 __license__ = "GPL"
-__version__ = "1.3.1"
-__release__ = "2023-03-22"
+__version__ = "1.2.2"
+__release__ = "2022-08-26"
 __maintainer__ = "Andrea Mattana"
 
 import gc
@@ -38,8 +38,8 @@ from pyfabil.base.definitions import LibraryError, BoardError, PluginError, Inst
 from skalab_live import Live
 from skalab_playback import Playback
 from skalab_subrack import Subrack
+from skalab_monitor import Monitor
 from skalab_utils import parse_profile, getTextFromFile
-from skalab_base import SkalabBase
 from pathlib import Path
 
 default_app_dir = str(Path.home()) + "/.skalab/"
@@ -104,6 +104,7 @@ class SkaLab(QtWidgets.QMainWindow):
         self.resize(1210, 970)
         self.setWindowTitle("The SKA in LAB Project")
         self.profile = {'App': {'subrack': "",
+                                'monitor': "",
                                 'live': "",
                                 'playback': ""},
                         'Init': {'station_setup': ""}}
@@ -124,19 +125,32 @@ class SkaLab(QtWidgets.QMainWindow):
         self.processInit.start()
 
         self.tabSubrackIndex = 1
-        self.tabLiveIndex = 2
-        self.tabPlayIndex = 3
+        self.tabMonitorIndex = 2
+        self.tabLiveIndex = 3
+        self.tabPlayIndex = 4
+
 
         self.pic_ska = QtWidgets.QLabel(self.wg.qwpics)
         self.pic_ska.setGeometry(1, 1, 489, 120)
-        self.pic_ska.setPixmap(QtGui.QPixmap(os.getcwd() + "/ska_inaf_logo.png"))
+        self.pic_ska.setPixmap(QtGui.QPixmap(os.getcwd() + "/Pictures/ska_inaf_logo.png"))
 
         self.pic_ska_help = QtWidgets.QLabel(self.wg.qwpics_help)
         self.pic_ska_help.setGeometry(1, 1, 489, 120)
-        self.pic_ska_help.setPixmap(QtGui.QPixmap(os.getcwd() + "/ska_inaf_logo.png"))
+        self.pic_ska_help.setPixmap(QtGui.QPixmap(os.getcwd() + "/Pictures/ska_inaf_logo.png"))
         self.wg.qlabel_sw_version.setText("Version: " + __version__)
         self.wg.qlabel_sw_release.setText("Released on: " + __release__)
         self.wg.qlabel_sw_author.setText("Author: " + __author__)
+
+        QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabMonitorIndex, True)
+        self.wgMonitorLayout = QtWidgets.QVBoxLayout()
+        self.wgMonitor = Monitor(self.config_file, uiFile="skalab_monitor.ui", size=[1190, 936],
+                                 profile=self.profile['Base']['monitor'],
+                                 swpath=default_app_dir)
+        self.wgMonitorLayout.addWidget(self.wgMonitor)
+        self.wg.qwMonitor.setLayout(self.wgMonitorLayout)
+        self.wgMonitor.dst_port = configuration['network']['lmc']['lmc_port']
+        self.wgMonitor.lmc_ip = configuration['network']['lmc']['lmc_ip']
+        self.wgMonitor.cpld_port = configuration['network']['lmc']['tpm_cpld_port']
 
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabLiveIndex, True)
         self.wgLiveLayout = QtWidgets.QVBoxLayout()
@@ -159,12 +173,14 @@ class SkaLab(QtWidgets.QMainWindow):
 
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabSubrackIndex, True)
         self.wgSubrackLayout = QtWidgets.QVBoxLayout()
-        self.wgSubrack = Subrack(uiFile="skalab_subrack.ui", size=[1190, 936],
+        self.wgSubrack = Subrack(self.wgMonitor, uiFile="skalab_subrack.ui", size=[1190, 936],
                                  profile=self.profile['Base']['subrack'],
                                  swpath=default_app_dir)
         self.wgSubrackLayout.addWidget(self.wgSubrack)
         self.wg.qwSubrack.setLayout(self.wgSubrackLayout)
         self.wgSubrack.signalTlm.connect(self.wgSubrack.updateTlm)
+        self.wgSubrack.signal_to_monitor.connect(self.wgMonitor.read_subrack_attribute)
+        self.wgSubrack.signal_to_monitor_for_tpm.connect(self.wgMonitor.tpm_status_changed)
 
         self.show()
         self.load_events()
@@ -191,8 +207,8 @@ class SkaLab(QtWidgets.QMainWindow):
         self.power = {}
         self.raw = {}
         self.rms = {}
-        if self.config_file:
-            self.setup_config()
+        # if self.config_file:
+        #     self.setup_config()
         self.populate_help()
 
     def load_events(self):
@@ -257,6 +273,8 @@ class SkaLab(QtWidgets.QMainWindow):
         if self.profile.sections():
             if self.profile['Base']['subrack']:
                 self.wgSubrack.load_profile(App="subrack", Profile=self.profile['Base']['subrack'], Path=default_app_dir)
+            if self.profile['Base']['monitor']:
+                self.wgMonitor.load_profile(App="monitor", Profile=self.profile['Base']['monitor'], Path=default_app_dir)
             if self.profile['Base']['live']:
                 self.wgLive.load_profile(App="live", Profile=self.profile['Base']['live'], Path=default_app_dir)
             if self.profile['Base']['playback']:
@@ -419,15 +437,15 @@ class SkaLab(QtWidgets.QMainWindow):
                     if self.tpm_station.properly_formed_station:
                         self.wg.qbutton_station_init.setStyleSheet("background-color: rgb(78, 154, 6);")
 
-                        # if not self.tpm_station.tiles[0].tpm_version() == "tpm_v1_2":
-                        #     # ByPass the MCU temperature controls on TPM 1.6
-                        #     for tile in self.tpm_station.tiles:
-                        #         tile[0x90000034] = 0xBADC0DE
-                        #         tile[0x30000518] = 1
-                        #         time.sleep(0.1)
-                        #     time.sleep(1)
-                        #     print("MCU Controls Hacked with \nVal 0xBADC0DE in Reg 0x90000034,"
-                        #           "\nVal 0x0000001 in Reg 0x30000518")
+                        if not self.tpm_station.tiles[0].tpm_version() == "tpm_v1_2":
+                            # ByPass the MCU temperature controls on TPM 1.6
+                            for tile in self.tpm_station.tiles:
+                                tile[0x90000034] = 0xBADC0DE
+                                tile[0x30000518] = 1
+                                time.sleep(0.1)
+                            time.sleep(1)
+                            print("MCU Controls Hacked with \nVal 0xBADC0DE in Reg 0x90000034,"
+                                  "\nVal 0x0000001 in Reg 0x30000518")
 
                         # Switch On the PreADUs
                         for tile in self.tpm_station.tiles:
@@ -629,9 +647,10 @@ class SkaLab(QtWidgets.QMainWindow):
         self.wg.qtable_network.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.wg.qtable_network.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
 
-    def make_profile(self, profile="Default", subrack="Default", live="Default", playback="Default", config=""):
+    def make_profile(self, profile="Default", subrack="Default", monitor="Default", live="Default", playback="Default", config=""):
         conf = configparser.ConfigParser()
         conf['Base'] = {'subrack': subrack,
+                        'monitor': monitor,
                         'live': live,
                         'playback': playback}
         conf['Init'] = {'station_file': config}
@@ -657,6 +676,7 @@ class SkaLab(QtWidgets.QMainWindow):
     def save_profile(self, this_profile, reload=True):
         self.make_profile(profile=this_profile,
                           subrack=self.wgSubrack.profile['Base']['profile'],
+                          monitor=self.wgMonitor.profile['Base']['profile'],
                           live=self.wgLive.profile['Base']['profile'],
                           playback=self.wgPlay.profile['Base']['profile'],
                           config=self.config_file)
@@ -679,6 +699,7 @@ class SkaLab(QtWidgets.QMainWindow):
             event.accept()
             self.wgLive.stopThreads = True
             self.wgSubrack.stopThreads = True
+            self.wgMonitor.stopThreads = True
             self.stopThreads = True
             time.sleep(1)
             if self.wg.qradio_autosave.isChecked():
@@ -709,3 +730,4 @@ if __name__ == "__main__":
 
     window = SkaLab("skalab_main.ui", profile=profile)
     sys.exit(app.exec_())
+

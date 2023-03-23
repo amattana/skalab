@@ -2,8 +2,9 @@
 #
 # This file is part of the SKA Low MCCS project
 #
-# Distributed under the terms of the GPL license.
-# See LICENSE.txt for more info.
+#
+# Distributed under the terms of the BSD 3-clause new license.
+# See LICENSE for more info.
 """
 Abstract class to establish a simple connection to a remote hardware device (client).
 
@@ -45,10 +46,10 @@ return a list of the available command/attribute names.
 from __future__ import annotations
 
 import json
-import requests
 from typing import Any, Optional
-from typing_extensions import TypedDict
 
+import requests
+from typing_extensions import TypedDict
 
 CommandResponseType = TypedDict(
     "CommandResponseType",
@@ -86,7 +87,6 @@ class HardwareClient:
 
         None if no connection available, True if connection OK
         """
-        pass
 
     def execute_command(
         self: HardwareClient, command: str, parameters: str = ""
@@ -143,49 +143,26 @@ class HardwareClient:
 
 
 class WebHardwareClient(HardwareClient):
-    """Implementation of the HardwareClient protocol using a web based interface."""
-
-    def __init__(self: WebHardwareClient, ip_address: str, port: int = 80) -> None:
-        """
-        Create a new instance of the HardwareClient protocol.
-
-        To a html based HardwareServer device.
-
-        :param ip_address: IP address of server
-        :param port: Port of server
-        """
-        super().__init__(ip_address, port)
-        try:
-            self._conn = requests.request(
-                "GET",
-                url=f"http://{self._ip}:{self._port}",
-                timeout=2,
-            )
-        except requests.exceptions.RequestException:
-            self._conn = None
+    """Implementation of the HardwareClient protocol using a HTTP-based interface."""
 
     def connect(self: WebHardwareClient) -> bool:
         """
-        Check if connected and establish a connection with the client.
+        Nominally establish a connection with the client.
 
-        If this is not possible, return within 2 seconds
+        However this implementation is based on HTTP, which is connectionless,
+        so this method is essentially unimplemented. It always returned True.
 
-        :return: return result of the connect method
+        :return: True
         """
-        if self._conn is None:
-            try:
-                self._conn = requests.request(
-                    "GET",
-                    url=f"http://{self._ip}:{self._port}",
-                    timeout=10,
-                )
-            except requests.exceptions.RequestException:
-                self._conn = None
-        return not (self._conn is None)
+        return True
 
     def disconnect(self: WebHardwareClient) -> None:
-        """Disconnect from the client."""
-        self._conn = None
+        """
+        Nominally, disconnect from the client.
+
+        However this implementation is based on HTTP, which is
+        connectionless, so this method is implemented to do nothing.
+        """
 
     def execute_command(
         self: WebHardwareClient, command: str, parameters: str = ""
@@ -198,20 +175,20 @@ class WebHardwareClient(HardwareClient):
 
         :return: dictionary with command result
         """
-        if self._conn is None:
-            if not self.connect():
-                return {
-                    "status": "ERROR",
-                    "info": "Not connected",
-                    "command": command,
-                    "retvalue": "",
-                }
-
         path = f"http://{self._ip}:{self._port}"
         query = {"type": "command", "param": command, "value": parameters}
-        res = requests.get(url=f"{path}/get/json.htm", params=query)
 
-        if res.status_code != requests.codes.ok:
+        try:
+            res = requests.get(url=f"{path}/get/json.htm", params=query, timeout=10)
+        except requests.exceptions.RequestException as request_exception:
+            return {
+                "status": "ERROR",
+                "info": "Exception: " + str(request_exception),
+                "command": command,
+                "retvalue": "",
+            }
+
+        if int(res.status_code) != requests.codes["ok"]:
             return {
                 "status": "ERROR",
                 "info": "HTML status: " + str(res.status_code),
@@ -237,20 +214,20 @@ class WebHardwareClient(HardwareClient):
 
         :return: result of the attribute command
         """
-        if self._conn is None:
-            if not self.connect():
-                return {
-                    "status": "ERROR",
-                    "info": "Not connected",
-                    "attribute": attribute,
-                    "value": None,
-                }
         path = f"http://{self._ip}:{self._port}"
 
         query = {"type": "getattribute", "param": attribute}
-        res = requests.get(url=f"{path}/get/json.htm", params=query)
+        try:
+            res = requests.get(url=f"{path}/get/json.htm", params=query, timeout=10)
+        except requests.exceptions.RequestException as request_exception:
+            return {
+                "status": "ERROR",
+                "info": "Exception: " + str(request_exception),
+                "attribute": attribute,
+                "value": None,
+            }
 
-        if res.status_code != requests.codes.ok:
+        if res.status_code != requests.codes["ok"]:
             return {
                 "status": "ERROR",
                 "info": "HTML status " + str(res.status_code),
@@ -279,20 +256,19 @@ class WebHardwareClient(HardwareClient):
 
         :return: result of the attribute command
         """
-        if self._conn is None:
-            if not self.connect():
-                return {
-                    "status": "ERROR",
-                    "info": "Not connected",
-                    "attribute": attribute,
-                    "value": None,
-                }
-
         path = f"http://{self._ip}:{self._port}"
         query = {"type": "set_attribute", "param": attribute, "value": value}
-        res = requests.get(url=f"{path}/get/json.htm", params=query)
+        try:
+            res = requests.get(url=f"{path}/get/json.htm", params=query, timeout=10)
+        except requests.exceptions.RequestException as request_exception:
+            return {
+                "status": "ERROR",
+                "info": "Exception: " + str(request_exception),
+                "attribute": attribute,
+                "value": None,
+            }
 
-        if res.status_code != requests.codes.ok:
+        if res.status_code != requests.codes["ok"]:
             return {
                 "status": "ERROR",
                 "info": "HTML status " + str(res.status_code),

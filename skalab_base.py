@@ -233,7 +233,7 @@ class SkalabBase(QtWidgets.QMainWindow):
                     for s in self.profile.keys():
                         for k in self.profile[s].keys():
                             if k == key.text():
-                                self.wgProfile.qline_edit_value.setText(self.profile[s][k])
+                                self.wgProfile.qline_edit_value.setText(str(self.profile[s][k]))
                     item = self.wgProfile.qtable_conf.item(row, col)
                     if item:
                         self.wgProfile.qline_edit_newvalue.setText(item.text())

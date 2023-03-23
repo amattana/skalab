@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-import copy
-
 from skalab_base import SkalabBase
 import datetime
 import glob
@@ -21,7 +19,7 @@ from PyQt5.QtCore import Qt
 import pydaq.daq_receiver as daq
 from skalab_utils import MiniPlots, calcolaspettro, closest, MyDaq, get_if_name, BarPlot, ChartPlots, getTextFromFile
 from skalab_utils import parse_profile, ts_to_datestring, dt_to_timestamp, Archive, COLORI, decodeChannelList
-from skalab_preadu import Preadu, PreaduGui, bound
+from skalab_preadu import Preadu, bound
 from pyaavs.station import Station
 from pyaavs import station
 from threading import Thread
@@ -89,7 +87,7 @@ class Live(SkalabBase):
     signalRms = QtCore.pyqtSignal()
     signalTemp = QtCore.pyqtSignal()
 
-    def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936], swpath=""):
+    def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936], board_version=3, swpath=""):
         """ Initialise main window """
         self.wg = uic.loadUi(uiFile)
 
@@ -106,21 +104,21 @@ class Live(SkalabBase):
         self.resize(size[0], size[1])
         self.populate_table_profile()
 
-        self.preadu_version = self.profile['Live']['preadu_version']
+        self.board_version = self.profile['Live']['preadu_version']
 
         # Populate the plots for the Live Spectra
         self.livePlots = MiniPlots(parent=self.wg.qplot_spectra, nplot=16)
         self.monitorPlots = MiniPlots(parent=self.wg.qplot_int_spectra, nplot=16)
-        self.tempBoardPlots = BarPlot(parent=self.wg.qplot_temps_board, size=(3.65, 2.12), xlim=[0, 17],
+        self.tempBoardPlots = BarPlot(parent=self.wg.qplot_temps_board, size=(3.65, 2.12), xlim=[0, 9],
                                       ylabel="Celsius (deg)", xrotation=0, xlabel="Board",
-                                      ylim=[40, 80], yticks=np.arange(20, 120, 20), xticks=np.arange(17))
-        self.tempFpga1Plots = BarPlot(parent=self.wg.qplot_temps_fpga1, size=(3.65, 2.12), xlim=[0, 17],
+                                      ylim=[40, 80], yticks=np.arange(20, 120, 20), xticks=np.arange(9))
+        self.tempFpga1Plots = BarPlot(parent=self.wg.qplot_temps_fpga1, size=(3.65, 2.12), xlim=[0, 9],
                                       ylabel="Celsius (deg)", xrotation=0, xlabel="FPGA1",
-                                      ylim=[40, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(17))
-        self.tempFpga2Plots = BarPlot(parent=self.wg.qplot_temps_fpga2, size=(3.65, 2.12), xlim=[0, 17],
+                                      ylim=[40, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(9))
+        self.tempFpga2Plots = BarPlot(parent=self.wg.qplot_temps_fpga2, size=(3.65, 2.12), xlim=[0, 9],
                                       ylabel="Celsius (deg)", xrotation=0, xlabel="FPGA2",
-                                      ylim=[40, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(17))
-        self.tempChart = ChartPlots(parent=self.wg.qplot_chart, ntraces=16, xlabel="time samples", ylim=[40, 80],
+                                      ylim=[40, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(9))
+        self.tempChart = ChartPlots(parent=self.wg.qplot_chart, ntraces=8, xlabel="time samples", ylim=[40, 80],
                                     ylabel="Board Temp (deg)", size=(11.2, 4), xlim=[0, 200])
         self.rmsChart = ChartPlots(parent=self.wg.qplot_rms_chart, ntraces=32, xlabel="time samples", ylim=[-40, 20],
                                     ylabel="RMS (dBm)", size=(11.2, 6.6), xlim=[0, 200])
@@ -129,18 +127,15 @@ class Live(SkalabBase):
         self.qw_preadu.setGeometry(QtCore.QRect(10, 180, 1131, 681))
         self.qw_preadu.setVisible(True)
         self.qw_preadu.show()
-        self.wpreadu = PreaduGui(parent=self.qw_preadu, debug=0, preadu_version=self.preadu_version)
-        if self.preadu_version == "2.0":
+        self.preadu = Preadu(parent=self.qw_preadu, debug=0, board_version=self.board_version)
+        if self.board_version == "1.0":
             self.wg.qcombo_preadu_version.setCurrentIndex(3)
-        elif self.preadu_version == "2.1":
+        elif self.board_version == "1.1":
             self.wg.qcombo_preadu_version.setCurrentIndex(2)
-        elif self.preadu_version == "2.2":
+        elif self.board_version == "2.0":
             self.wg.qcombo_preadu_version.setCurrentIndex(1)
-        else:
+        elif self.board_version == "3.0":
             self.wg.qcombo_preadu_version.setCurrentIndex(0)
-        self.preadu = []
-        self.preaduConfUpdated = False
-        self.eq_armed = False
 
         self.writing_preadu = False
         self.wg.ctrl_preadu.hide()
@@ -204,7 +199,6 @@ class Live(SkalabBase):
 
         self.live_input_list = np.arange(1, 17)
         self.live_channels = self.wg.qline_channels.text()
-        self.live_mapping = np.arange(16)
 
         self.xAxisRange = [float(self.wg.qline_spectra_band_from.text()), float(self.wg.qline_spectra_band_to.text())]
         self.yAxisRange = [float(self.wg.qline_spectra_level_min.text()), float(self.wg.qline_spectra_level_max.text())]
@@ -237,7 +231,7 @@ class Live(SkalabBase):
         self.wg.qradio_rms_power.toggled.connect(lambda: self.customizeRms())
         self.wg.qradio_rms_dsa.toggled.connect(lambda: self.customizeRms())
         self.wg.qradio_rms_chart.toggled.connect(lambda: self.customizeRms())
-        self.wg.qcombo_rms_label.currentIndexChanged.connect(lambda: self.customizeMapping())
+        self.wg.qcombo_rms_label.currentIndexChanged.connect(lambda: self.customizeRms())
         self.wg.qcheck_spectra_grid.stateChanged.connect(self.live_show_spectra_grid)
         self.wg.qradio_raw.toggled.connect(lambda: self.check_raw(self.wg.qradio_raw))
         self.wg.qradio_int_spectra.toggled.connect(lambda: self.check_int_spectra(self.wg.qradio_int_spectra))
@@ -424,12 +418,9 @@ class Live(SkalabBase):
         self.wg.qcombo_tpm.setEnabled(True)
 
     def setupPreadu(self, version):
-        if self.connected:
-            print("Setting preadu version: %s" % (self.wg.qcombo_preadu_version.currentText().split()[0]))
-            self.wpreadu.set_preadu_version(self.wg.qcombo_preadu_version.currentText().split()[0])
-            self.updatePreadu()
-            for p in self.preadu:
-                p.set_preadu_version(self.wg.qcombo_preadu_version.currentText().split()[0])
+        print("Setting preadu board version: %d" % (int(self.wg.qcombo_preadu_version.count()) - float(version) - 1))
+        self.preadu.set_preadu_version(int(self.wg.qcombo_preadu_version.count()) - float(version) - 1)
+        #self.readDsaConfiguration()
 
     def switchTpm(self):
         if self.connected:
@@ -438,9 +429,7 @@ class Live(SkalabBase):
 
     def updatePreadu(self):
         if self.connected:
-            #print("SWITCH to PREADU of TPM %d (Station of %d TPMs)" % (self.wg.qcombo_tpm.currentIndex() + 1, len(self.preaduConf)))
-            self.wpreadu.setConfiguration(conf=self.preaduConf[self.wg.qcombo_tpm.currentIndex()])
-            self.wpreadu.updateRms(self.rms[self.wg.qcombo_tpm.currentIndex()])
+            self.preadu.setTpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
 
     def switchChart(self):
         self.drawTempCharts()
@@ -459,12 +448,9 @@ class Live(SkalabBase):
                 self.tpm_station = Station(station.configuration)
                 # Connect station (program, initialise and configure if required)
                 self.tpm_station.connect()
-                self.preadu = []
                 status = True
                 for t in self.tpm_station.tiles:
                     status = status * t.is_programmed()
-                    self.preadu += [Preadu(tpm=t, preadu_version=self.preadu_version)]
-                self.wpreadu.setConfiguration(conf=self.preadu[self.wg.qcombo_tpm.currentIndex()].readConfiguration())
                 if status:
                     self.tpm_station.tiles[0].get_temperature()
                     #self.wg.qlabel_connection.setText("Connected")
@@ -492,7 +478,7 @@ class Live(SkalabBase):
                     self.setupDAQ()
                     self.setupArchiveTemperatures()
                     self.ThreadTempPause = False
-                    # self.preadu.setTpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
+                    self.preadu.setTpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
                 else:
                     msgBox = QtWidgets.QMessageBox()
                     msgBox.setText("Some TPM is not programmed,\nplease initialize the Station first!")
@@ -527,10 +513,7 @@ class Live(SkalabBase):
         if self.rms_file is not None:
             self.closeRms()
         del self.tpm_station
-        for p in self.preadu:
-            del p
         gc.collect()
-        self.preadu = []
         if self.monitor_daq is not None:
             self.closeDAQ()
         self.tpm_station = None
@@ -609,15 +592,11 @@ class Live(SkalabBase):
                         self.commBusy = True
                         self.readTemperatures()
                         sleep(0.1)
-                        self.tmpPreaduConf = []
-                        for t in range(len(self.tpm_station.tiles)):
-                            time.sleep(0.05)
-                            while self.preadu[t].Busy:
-                                time.sleep(0.1)
-                            self.tmpPreaduConf += [self.preadu[t].readConfiguration()]
-                        if not self.preaduConf == self.tmpPreaduConf:
-                            self.preaduConfUpdated = True
-                        self.preaduConf = copy.deepcopy(self.tmpPreaduConf)
+                        self.preaduConf = []
+                        for t in self.tpm_station.tiles:
+                            while self.preadu.Busy:
+                                time.sleep(0.2)
+                            self.preaduConf += [self.preadu.readConfiguration(t)]
                         sleep(0.1)
                         self.readRms()
                         sleep(0.1)
@@ -629,48 +608,16 @@ class Live(SkalabBase):
                 except:
                     print("Failed to get RMS and/or Temperature data!")
                     self.commBusy = False
-                    # self.preadu.Busy = False
+                    self.preadu.Busy = False
                     pass
                 cycle = 0.0
                 while cycle < float(self.profile['Live']['query_interval']) and not self.stopThreads:
                     sleep(0.1)
                     cycle = cycle + 0.1
-                    if self.connected:
-                        # Apply New Conf from Preadu GUI
-                        if self.wpreadu.write_armed and not self.preadu[self.wg.qcombo_tpm.currentIndex()].Busy and self.connected:
-                            self.writing_preadu = True
-                            # for i in range(self.wpreadu.inputs):
-                            #     self.preadu[self.wg.qcombo_tpm.currentIndex()].preadu.set_register_value(nrx=i, value=int("0x" + self.wpreadu.records[i]['value'].text(), 16))
-                            # print(self.wpreadu.tpmConf, self.wpreadu.guiConf)
-                            self.preadu[self.wg.qcombo_tpm.currentIndex()].write_configuration(self.wpreadu.guiConf)
-                            self.wpreadu.write_armed = False
-                            self.wpreadu.setConfiguration(self.wpreadu.guiConf)
-                            time.sleep(0.2)
-                            self.writing_preadu = False
-                        # Apply Equalization from Live Gui
-                        if self.eq_armed and self.connected:
-                            print("Applying Equalization")
-                            if self.wg.qradio_eq_this.isChecked():
-                                tiles = [self.wg.qcombo_tpm.currentIndex()]
-                            else:
-                                tiles = range(len(self.tpm_station.tiles))
-                            for t in tiles:
-                                #print("TILE-%02d" % (t+1))
-                                self.preadu[t].write_configuration(self.preaduConf[t])
-                                time.sleep(0.1)
-                            self.tmpPreaduConf = []
-                            for t in range(len(self.tpm_station.tiles)):
-                                time.sleep(0.05)
-                                while self.preadu[t].Busy:
-                                    time.sleep(0.1)
-                                self.tmpPreaduConf += [self.preadu[t].readConfiguration()]
-                            if not self.preaduConf == self.tmpPreaduConf:
-                                self.preaduConf = copy.deepcopy(self.tmpPreaduConf)
-                            self.updatePreadu()
-                                #self.wpreadu.setConfiguration(conf=self.preaduConf[self.wg.qcombo_tpm.currentIndex()])
-                            self.eq_armed = False
-                            self.writing_preadu = False
-
+                    if self.preadu.write_armed and not self.preadu.Busy:
+                        self.writing_preadu = True
+                        self.preadu.write_configuration()
+                        self.writing_preadu = False
             if self.stopThreads:
                 #self.closeRms()
                 break
@@ -743,59 +690,58 @@ class Live(SkalabBase):
             self.ThreadTempPause = True
             self.wg.qbutton_equalize.setEnabled(False)
             self.wg.qbutton_equalize.setStyleSheet("background-color: rgb(237, 212, 0);")
-            for iter in range(1):
-                # print("\n\nLEVEL EQUALIZATION (iter %d/3)" % (iter + 1))
+            for iter in range(3):
+                #print("\n\nLEVEL EQUALIZATION (iter %d/3)" % (iter + 1))
                 self.readRms()
-                if len(self.rms) == len(self.tpm_station.tiles):
-                    if self.wg.qradio_eq_this.isChecked():
-                        tiles = [int(self.wg.qcombo_tpm.currentIndex())]
-                    else:
-                        tiles = range(len(self.tpm_station.tiles))
+                if self.wg.qradio_eq_this.isChecked():
+                    tiles = [self.tpm_station.tiles[int(self.wg.qcombo_tpm.currentIndex())]]
+                    RMS = [self.rms[self.wg.qcombo_tpm.currentIndex()]]
+                else:
+                    tiles = self.tpm_station.tiles
                     RMS = self.rms
-                    target = float(self.wg.qline_eqvalue.text())
-                    if self.wg.qcombo_equnit.currentIndex() == 0:  # ADU RMS
-                        for t in tiles:
-                            #print("Tiles", tiles, "t", t, "len(RMS)", len(RMS), self.rms[self.wg.qcombo_tpm.currentIndex()])
-                            for i in range(len(RMS[t])):
-                                rms = RMS[t][i]
-                                if old_div(rms, target) > 0:
-                                    with np.errstate(divide='ignore', invalid='ignore'):
-                                        attenuation = 20 * math.log10(old_div(rms, target))
-                                else:
-                                    attenuation = 0
-                                dsa = self.wpreadu.staticRx.rx[self.preaduConf[t][i]['version']].op_get_attenuation(self.preaduConf[t][i]['code'])
-                                new_dsa = bound(int(round(dsa + attenuation)))
-                                self.preaduConf[t][i]['code'] = self.wpreadu.staticRx.rx[self.preaduConf[t][i]['version']].op_set_attenuation(self.preaduConf[t][i]['code'], new_dsa)
+                target = float(self.wg.qline_eqvalue.text())
+                if self.wg.qcombo_equnit.currentIndex() == 0:  # ADU RMS
+                    for b, t in enumerate(tiles):
+                        self.preadu.setTpm(t)
+                        for i in range(len(RMS[b])):
+                            rms = RMS[b][i]
+                            if old_div(rms, target) > 0:
+                                with np.errstate(divide='ignore', invalid='ignore'):
+                                    attenuation = 20 * math.log10(old_div(rms, target))
+                            else:
+                                attenuation = 0
+                            self.preaduConf[b][i]['dsa'] = bound(int(round(self.preaduConf[b][i]['dsa'] + attenuation)))
+                            self.preadu.preadu.set_rx_attenuation(nrx=i, att=self.preaduConf[b][i]['dsa'])
+                            self.preaduConf[b][i]['code'] = self.preadu.preadu.get_register_value(nrx=i)
+                        self.preadu.write_armed = True
                         self.writing_preadu = True
-                        self.eq_armed = True
                         while self.writing_preadu:
                             # wait for the write operation completed by the process
                             time.sleep(0.1)
                         #self.preadu.write_configuration()
                         time.sleep(0.2)
-                    else:
-                        for t in tiles:
-                            for i in range(len(RMS[t])):
-                                rms = RMS[t][i]  # rms_remap[i]]
-                                with np.errstate(divide='ignore', invalid='ignore'):
-                                    power = 10 * np.log10(np.power((rms * (1.7 / 256.)), 2) / 400.) + 30 + 12
-                                if power == (-np.inf):
-                                    power = -30
-                                dsa = self.wpreadu.staticRx.rx[self.preaduConf[t][i]['version']].op_get_attenuation(self.preaduConf[t][i]['code'])
-                                new_dsa = bound(int(round(dsa + (power - target))))
-                                self.preaduConf[t][i]['code'] = self.wpreadu.staticRx.rx[self.preaduConf[t][i]['version']].op_set_attenuation(self.preaduConf[t][i]['code'], new_dsa)
-                                #print("TPM-%02d INPUT-%02d, Level: %3.1f, Old DSA %d, New DSA %d" % (b+1, i, power, dsa, new_dsa))
-                                #print(i, self.preadu.preadu.get_register_value(nrx=i), self.preaduConf[b][i]['dsa'])
-                            self.eq_armed = True
-                            self.writing_preadu = True
-                            while self.writing_preadu:
-                                # wait for the write operation completed by the process
-                                time.sleep(0.1)
-                            #self.preadu.write_configuration()
-                            time.sleep(0.2)
-                        # self.preadu.setTpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
                 else:
-                    print("ERROR Reading RMS (len=%d instead of %d)" % (len(self.rms), len(self.tpm_station.tiles)))
+                    for b, t in enumerate(tiles):
+                        self.preadu.setTpm(t)
+                        for i in range(len(RMS[b])):
+                            rms = RMS[b][i]  # rms_remap[i]]
+                            with np.errstate(divide='ignore', invalid='ignore'):
+                                power = 10 * np.log10(np.power((rms * (1.7 / 256.)), 2) / 400.) + 30 + 12
+                            if power == (-np.inf):
+                                power = -30
+                            self.preaduConf[b][i]['dsa'] = bound(int(round(self.preaduConf[b][i]['dsa'] + (power - target))))
+                            #print("INPUT-%02d, Level: %3.1f" % (i, power))
+                            self.preadu.preadu.set_rx_attenuation(nrx=i, att=self.preaduConf[b][i]['dsa'])
+                            self.preaduConf[b][i]['code'] = self.preadu.preadu.get_register_value(nrx=i)
+                            #print(i, self.preadu.preadu.get_register_value(nrx=i), self.preaduConf[b][i]['dsa'])
+                        self.preadu.write_armed = True
+                        self.writing_preadu = True
+                        while self.writing_preadu:
+                            # wait for the write operation completed by the process
+                            time.sleep(0.1)
+                        #self.preadu.write_configuration()
+                        time.sleep(0.2)
+                    self.preadu.setTpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
             self.wg.qbutton_equalize.setEnabled(True)
             self.wg.qbutton_equalize.setStyleSheet("")
             self.ThreadTempPause = False
@@ -891,23 +837,6 @@ class Live(SkalabBase):
         self.qwRmsMainLayout.insertWidget(0, self.qwRms)
         self.qwRms.show()
 
-    def customizeMapping(self):
-        self.customizeRms()
-        if self.wg.qcombo_rms_label.currentIndex() == 1:
-            # ADU RF Receivers Polarization X-Y remapping
-            self.live_mapping = np.arange(16)
-        elif self.wg.qcombo_rms_label.currentIndex() == 2:
-            # TPM 1.2 Fibre Mapping
-            self.live_mapping = np.arange(16)
-        elif self.wg.qcombo_rms_label.currentIndex() == 3:
-            # TPM 1.6 RF Rx
-            self.live_mapping = [12, 13, 14, 15, 3, 2, 1, 0, 8, 9, 10, 11, 7, 6, 5, 4]
-        elif self.wg.qcombo_rms_label.currentIndex() == 4:
-            # TPM 1.6 Fibre Mapping
-            self.live_mapping = [12, 13, 14, 15, 3, 2, 1, 0, 8, 9, 10, 11, 7, 6, 5, 4]
-        else:
-            self.live_mapping = np.arange(16)
-
     def customizeRms(self):
         self.wg.qline_rms_level_min.setEnabled(True)
         self.wg.qline_rms_level_max.setEnabled(True)
@@ -968,10 +897,7 @@ class Live(SkalabBase):
     def updateRms(self):
         if self.connected:
             if self.rms:
-                self.wpreadu.updateRms(self.rms[self.wg.qcombo_tpm.currentIndex()])
-                if self.preaduConfUpdated:
-                    self.wpreadu.setConfiguration(conf=self.preaduConf[self.wg.qcombo_tpm.currentIndex()])
-                    self.preaduConfUpdated = False
+                self.preadu.updateRms(self.rms[self.wg.qcombo_tpm.currentIndex()])
             if self.wg.qradio_rms_chart.isChecked():
                 self.drawRmsCharts()
             else:
@@ -1015,8 +941,7 @@ class Live(SkalabBase):
                             if self.wg.qradio_rms_adu.isChecked():
                                 self.qp_rms[t].plotBar(self.rms[t][rms_remap[i]], i, colors[i])
                             elif self.wg.qradio_rms_dsa.isChecked():
-                                #self.qp_rms[t].plotBar(self.preaduConf[t][i]['dsa'], i, 'r')
-                                self.qp_rms[t].plotBar(self.wpreadu.staticRx.rx[self.preaduConf[t][i]['version']].op_get_attenuation(self.preaduConf[t][i]['code']), i, 'r')
+                                self.qp_rms[t].plotBar(self.preaduConf[t][i]['dsa'], i, 'r')
                             with np.errstate(divide='ignore', invalid='ignore'):
                                 power = 10 * np.log10(np.power((self.rms[t][rms_remap[i]] * (1.7 / 256.)), 2) / 400.) + 30 + 12
                             if power == -np.inf:
@@ -1128,7 +1053,7 @@ class Live(SkalabBase):
             #self.livePlots.plotClear()
             for n, i in enumerate(self.live_input_list):
                 # Plot X Pol
-                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][self.live_mapping[i - 1], 0, :],
+                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 0, :],
                                                 self.nsamples)
                 self.livePlots.plotCurve(self.asse_x, spettro, n, xAxisRange=xAxisRange,
                                          yAxisRange=yAxisRange, title="INPUT-%02d" % i,
@@ -1137,7 +1062,7 @@ class Live(SkalabBase):
                                          show_line=self.wg.qcheck_xpol_sp.isChecked())
 
                 # Plot Y Pol
-                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][self.live_mapping[i - 1], 1, :],
+                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 1, :],
                                               self.nsamples)
                 self.livePlots.plotCurve(self.asse_x, spettro, n, xAxisRange=xAxisRange,
                                          yAxisRange=yAxisRange, colore="g", rfpower=rms,
@@ -1342,3 +1267,4 @@ if __name__ == "__main__":
                         print("There is no any temperatures path specified in the profile file.\n")
             else:
                 print("The profile File doesn't have a Station Configuration File.\n")
+

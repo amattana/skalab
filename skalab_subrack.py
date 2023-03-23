@@ -115,9 +115,15 @@ class Subrack(SkalabBase):
     """ Main UI Window class """
     # Signal for Slots
     signalTlm = QtCore.pyqtSignal()
+    signal_to_monitor = QtCore.pyqtSignal()
+    signal_to_monitor_for_tpm = QtCore.pyqtSignal()
 
-    def __init__(self, ip=None, port=None, uiFile="", profile="", size=[1190, 936], swpath=""):
+    def __init__(self, sub_monitor, ip=None, port=None, uiFile="", profile="", size=[1190, 936], swpath=""):
         """ Initialise main window """
+
+        self.monitor = sub_monitor
+        self.interval_monitor = self.monitor.profile['Monitor']['query_interval']
+
         self.tlm_keys = []
         self.telemetry = {}
         self.query_once = []
@@ -133,7 +139,6 @@ class Subrack(SkalabBase):
         self.connected = False
         self.populate_table_profile()
         self.reload(ip=ip, port=port)
-
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
 
@@ -397,7 +402,7 @@ class Subrack(SkalabBase):
 
     def drawBars(self):
         # Draw Bars
-        if ("tpm_powers" in self.telemetry.keys()) and ("tpm_voltages" in self.telemetry.keys()):
+        if "tpm_powers" in self.telemetry.keys() and "tpm_voltages" in self.telemetry.keys():
             self.plotTpmPower.set_xlabel("TPM Voltages")
             for i in range(8):
                 self.plotTpmPower.plotBar(data=self.telemetry["tpm_powers"][i], bar=i, color=COLORI[i])
@@ -412,7 +417,7 @@ class Subrack(SkalabBase):
         else:
             self.plotPsu.set_xlabel("No data available")
         self.plotPsu.updatePlot()
-        if (MgnTraces[0] in self.telemetry.keys()) and (MgnTraces[1] in self.telemetry.keys()):
+        if MgnTraces[0] in self.telemetry.keys() and MgnTraces[1] in self.telemetry.keys():
             self.plotMgnTemp.set_xlabel("SubRack Temperatures")
             for n, k in enumerate(MgnTraces):
                 self.plotMgnTemp.plotBar(data=self.telemetry[k][0], bar=(n * 2), color=COLORI[(n * 2)])
@@ -427,6 +432,38 @@ class Subrack(SkalabBase):
         else:
             self.plotTpmTemp.set_xlabel("No data available")
         self.plotTpmTemp.updatePlot()
+
+    def chartsTelemetry(self,telemetry):
+        for tlmk in telemetry.keys():
+            if tlmk not in self.query_deny:
+                if type(telemetry[tlmk]) is list:
+                    if type(telemetry[tlmk][0]) is list:
+                        for k in range(len(telemetry[tlmk])):
+                            nested_att = ("%s_%d" % (tlmk, k))
+                            if nested_att not in self.data_charts.keys():
+                                self.data_charts[nested_att] = np.zeros(len(telemetry[tlmk][k]) * 201) * np.nan
+                            self.data_charts[nested_att] = \
+                                np.append(self.data_charts[nested_att][len(telemetry[tlmk][k]):],
+                                          telemetry[tlmk][k])
+                            self.telemetry["%s_%d" % (tlmk, k)] = list(telemetry[tlmk][k])
+                        del self.telemetry[tlmk]
+                    else:
+                        if tlmk not in self.data_charts.keys():
+                            self.data_charts[tlmk] = np.zeros(len(telemetry[tlmk]) * 201) * np.nan
+                        self.data_charts[tlmk] = np.append(self.data_charts[tlmk][len(telemetry[tlmk]):], telemetry[tlmk])
+                elif telemetry[tlmk] is not None:
+                    if tlmk not in self.data_charts.keys():
+                        self.data_charts[tlmk] = np.zeros(201) * np.nan
+                    try:
+                        self.data_charts[tlmk] = self.data_charts[tlmk][1:] + [telemetry[tlmk]]
+                    except:
+                        print("ERROR --> key:", tlmk, "\nValue: ", telemetry[tlmk])
+                        pass
+                else:
+                    if tlmk not in self.data_charts.keys():
+                        self.data_charts[tlmk] = np.zeros(201) * np.nan
+                    self.data_charts[tlmk] = self.data_charts[tlmk][1:] + [np.nan]
+        self.writeTlm()
 
     def setup_hdf5(self):
         if not self.profile['SubRack']['data_path'] == "":
@@ -461,8 +498,10 @@ class Subrack(SkalabBase):
                         self.wg.qlabel_message.setText("SubRack API version: " + self.telemetry['api_version'])
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")
                     self.wg.qbutton_connect.setText("ONLINE")
+                    self.monitor.wg.subrack_button.setStyleSheet("background-color: rgb(78, 154, 6);")
                     self.wg.frame_tpm.setEnabled(True)
                     self.wg.frame_fan.setEnabled(True)
+                    [item.setEnabled(True) for item in self.monitor.qtpm]
                     self.connected = True
 
                     self.tlm_hdf = self.setup_hdf5()
@@ -470,23 +509,28 @@ class Subrack(SkalabBase):
                 else:
                     self.wg.qlabel_message.setText("The SubRack server does not respond!")
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
+                    self.monitor.wg.subrack_button.setStyleSheet("background-color: rgb(204, 0, 0);")
                     self.wg.qbutton_connect.setText("OFFLINE")
                     self.wg.frame_tpm.setEnabled(False)
                     self.wg.frame_fan.setEnabled(False)
+                    [item.setEnabled(False) for item in self.monitor.qtpm]
                     self.client = None
                     self.connected = False
             else:
                 self.connected = False
                 self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
                 self.wg.qbutton_connect.setText("OFFLINE")
+                self.monitor.wg.subrack_button.setStyleSheet("background-color: rgb(204, 0, 0);")
                 self.wg.frame_tpm.setEnabled(False)
                 self.wg.frame_fan.setEnabled(False)
+                [item.setEnabled(False) for item in self.monitor.qtpm]
                 self.client.disconnect()
                 del self.client
                 gc.collect()
-                if type(self.tlm_hdf) is not None:
+                if (type(self.tlm_hdf) is not None) or (type(self.monitor.tlm_hdf_monitor) is not None):
                     try:
                         self.tlm_hdf.close()
+                        self.monitor.tlm_hdf_monitor.close()
                     except:
                         pass
         else:
@@ -495,6 +539,7 @@ class Subrack(SkalabBase):
     def getTelemetry(self):
         tkey = ""
         telemetry = {}
+        monitor_tlm = {}
         try:
             for tlmk in self.tlm_keys:
                 tkey = tlmk
@@ -503,40 +548,19 @@ class Subrack(SkalabBase):
                         data = self.client.get_attribute(tlmk)
                         if data["status"] == "OK":
                             telemetry[tlmk] = data["value"]
+                            monitor_tlm[tlmk] = telemetry[tlmk]
+                        else:
+                            monitor_tlm[tlmk] = "NOT AVAILABLE"
+                else:
+                    monitor_tlm[tlmk] = "NOT MONITORED"
         except:
             print("Error reading Telemetry [attribute: %s], skipping..." % tkey)
+            monitor_tlm[tlmk] = f"ERROR{tkey}"
+            self.monitor.from_subrack =  monitor_tlm 
             return
-        self.telemetry = dict(telemetry)
-        for tlmk in telemetry.keys():
-            if tlmk not in self.query_deny:
-                if type(telemetry[tlmk]) is list:
-                    if type(telemetry[tlmk][0]) is list:
-                        for k in range(len(telemetry[tlmk])):
-                            nested_att = ("%s_%d" % (tlmk, k))
-                            if nested_att not in self.data_charts.keys():
-                                self.data_charts[nested_att] = np.zeros(len(telemetry[tlmk][k]) * 201) * np.nan
-                            self.data_charts[nested_att] = \
-                                np.append(self.data_charts[nested_att][len(telemetry[tlmk][k]):],
-                                          telemetry[tlmk][k])
-                            self.telemetry["%s_%d" % (tlmk, k)] = list(telemetry[tlmk][k])
-                        del self.telemetry[tlmk]
-                    else:
-                        if tlmk not in self.data_charts.keys():
-                            self.data_charts[tlmk] = np.zeros(len(telemetry[tlmk]) * 201) * np.nan
-                        self.data_charts[tlmk] = np.append(self.data_charts[tlmk][len(telemetry[tlmk]):], telemetry[tlmk])
-                elif telemetry[tlmk] is not None:
-                    if tlmk not in self.data_charts.keys():
-                        self.data_charts[tlmk] = np.zeros(201) * np.nan
-                    try:
-                        self.data_charts[tlmk] = self.data_charts[tlmk][1:] + [telemetry[tlmk]]
-                    except:
-                        print("ERROR --> key:", tlmk, "\nValue: ", telemetry[tlmk])
-                        pass
-                else:
-                    if tlmk not in self.data_charts.keys():
-                        self.data_charts[tlmk] = np.zeros(201) * np.nan
-                    self.data_charts[tlmk] = self.data_charts[tlmk][1:] + [np.nan]
-        self.writeTlm()
+
+        self.monitor.from_subrack =  monitor_tlm  
+        return telemetry
 
     def writeTlm(self):
         if self.tlm_hdf is not None:
@@ -575,17 +599,20 @@ class Subrack(SkalabBase):
     def readTlm(self):
         while True:
             if self.connected:
-                try:
-                    self.getTelemetry()
-                except:
-                    print("Failed to get Subrack Telemetry!")
-                    pass
-                sleep(0.1)
-                self.signalTlm.emit()
                 cycle = 0.0
                 while cycle < (float(self.profile['SubRack']['query_interval'])) and not self.skipThreadPause:
-                    sleep(0.1)
-                    cycle = cycle + 0.1
+                    try:
+                        telemetry = self.getTelemetry()
+                        self.telemetry = dict(telemetry)
+                        self.signal_to_monitor.emit()
+                    except:
+                        print("Failed to get Subrack Telemetry!")
+                        pass
+                    sleep(float(self.interval_monitor))
+                    cycle = cycle + float(self.interval_monitor)
+                self.chartsTelemetry(telemetry)
+                sleep(0.1)
+                self.signalTlm.emit()
                 self.skipThreadPause = False
             if self.stopThreads:
                 break
@@ -601,23 +628,32 @@ class Subrack(SkalabBase):
             for n, fault in enumerate(self.telemetry["tpm_supply_fault"]):
                 if fault:
                     self.qbutton_tpm[n].setStyleSheet(colors("yellow_on_black"))
+                    self.monitor.qtpm[n].setStyleSheet(colors("yellow_on_black"))
+                    self.monitor.tpm_on_off[n] = False
                 else:
                     if "tpm_present" in self.telemetry.keys():
                         if self.telemetry["tpm_present"][n]:
                             self.qbutton_tpm[n].setStyleSheet(colors("black_on_red"))
+                            self.monitor.qtpm[n].setStyleSheet(colors("black_on_red"))
+                            self.monitor.tpm_on_off[n] = False
                         else:
                             self.qbutton_tpm[n].setStyleSheet(colors("black_on_grey"))
+                            self.monitor.qtpm[n].setStyleSheet(colors("black_on_grey"))
+                            self.monitor.tpm_on_off[n] = False
                     if "tpm_on_off" in self.telemetry.keys():
                         if self.telemetry["tpm_on_off"][n]:
                             self.qbutton_tpm[n].setStyleSheet(colors("black_on_green"))
+                            self.monitor.qtpm[n].setStyleSheet(colors("black_on_green"))
+                            self.monitor.tpm_on_off[n] = True
+            self.signal_to_monitor_for_tpm.emit()
 
         # Fan status on Sliders
-        if ('subrack_fan_speeds' in self.telemetry.keys()) and ('subrack_fan_speeds_percent' in self.telemetry.keys()):
+        if 'subrack_fan_speeds' in self.telemetry.keys() and 'subrack_fan_speeds_percent' in self.telemetry.keys():
             for i in range(4):
                 self.fans[i]['rpm'].setText("%d" % int(self.telemetry['subrack_fan_speeds'][i]))
                 if not self.fans[i]['sliderPressed']:
                     self.fans[i]['slider'].setProperty("value", (int(self.telemetry['subrack_fan_speeds_percent'][i])))
-                if int(self.telemetry['subrack_fan_mode'][i]) == 1:
+                if 'subrack_fan_mode' in self.telemetry.keys() and int(self.telemetry['subrack_fan_mode'][i]) == 1:
                     self.fans[i]['auto'].setStyleSheet(colors("black_on_green"))
                     self.fans[i]['manual'].setStyleSheet(colors("black_on_red"))
                 else:
@@ -644,6 +680,7 @@ class Subrack(SkalabBase):
             if type(self.tlm_hdf) is not None:
                 try:
                     self.tlm_hdf.close()
+                    self.monitor.tlm_hdf_monitor.close()
                 except:
                     pass
             sleep(1)
@@ -731,4 +768,5 @@ if __name__ == "__main__":
                         print("\nTerminated by the user.\n")
                 client.disconnect()
                 del client
+
 
