@@ -117,7 +117,12 @@ class MiniPlots(QtWidgets.QWidget):
         if len(data) != 0:
             if (colore + 'line') in self.plots[int(ant)].keys():
                 if len(self.plots[int(ant)][colore + 'line'].get_ydata()) == len(data):
-                    self.plots[int(ant)][colore + 'line'].set_ydata(data)
+                    self.plots[int(ant)][colore + 'line'].set_data(assex, data)
+                    self.plots[int(ant)][colore + 'line'].set_visible(show_line)
+                    self.plots[int(ant)][colore + 'line'].set_lw(lw)
+                    self.plots[int(ant)][colore + 'line'].set_markersize(markersize)
+                    self.plots[int(ant)][colore + 'line'].set_marker(".")
+                    self.plots[int(ant)][colore + 'line'].set_color(colore)
                     from_scratch = False
             if from_scratch:
                 line, = self.canvas.ax[int(ant)].plot(assex, data, color=colore, lw=lw, markersize=markersize, marker=".")
@@ -250,7 +255,13 @@ class MiniPlots(QtWidgets.QWidget):
 
     def updatePlot(self):
         self.canvas.draw()
+        self.canvas.flush_events()
         self.show()
+
+    def savePicture(self, fname=""):
+        if not fname == "":
+            a = self.canvas.print_figure(fname)
+            print(a)
 
     def plotClear(self):
         # Reset the plot landscape
@@ -309,7 +320,8 @@ def calcolaspettro(dati, nsamples=32768, log=True, adurms=False):
     with np.errstate(divide='ignore', invalid='ignore'):
         mediato[:] = 20 * np.log10(mediato / 127.0)
     d = np.array(dati, dtype=np.int8)
-    adu_rms = np.sqrt(np.mean(np.power(d, 2), 0))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        adu_rms = np.sqrt(np.mean(np.power(d, 2), 0))
     volt_rms = adu_rms * (1.7 / 256.)
     with np.errstate(divide='ignore', invalid='ignore'):
         power_adc = 10 * np.log10(np.power(volt_rms, 2) / 400.) + 30
@@ -367,7 +379,19 @@ def read_data(fmanager=None, hdf5_file="", tile=1, nof_tiles=16):
 def calc_disk_usage(directory=".", pattern="*.hdf5"):
     cmd = "find " + directory + " -type f -name '" + pattern + "' -exec du -ch {} + | grep total"
     try:
-        return subprocess.check_output(cmd, shell=True).split()[0].decode("utf-8")
+        subprocess.check_output(cmd, shell=True).decode("utf-8").split()
+        total = 0
+        unit = 'MB'
+        for r in l:
+            if not 'total' in r:
+                val = float(r.replace(",", ".")[:-1])
+                if 'G' in r:
+                    val = val * 1024
+                total = total + val
+        if len(str(total)) > 3:
+            total = total / 1000.
+            unit = 'GB'
+        return "%d%s" % (total, unit)
     except:
         return "0 MB"
 
@@ -595,7 +619,7 @@ class MyDaq:
             self.station.send_raw_data()
         else:
             for i in range(self.nof_tiles):
-                self.station.tiles[i].send_raw_data(seconds=0.02)
+                self.station.tiles[i].send_raw_data(seconds=0.2)
             #self.station.send_raw_data()
         while not self.data_received == self.nof_tiles:
             time.sleep(0.1)
@@ -705,6 +729,9 @@ class BarPlot(QtWidgets.QWidget):
     def set_ylabel(self, label):
         self.canvas.ax.set_ylabel(label)
 
+    def set_ylim(self, ylim):
+        self.canvas.ax.set_ylim(ylim)
+
     def set_xticklabels(self, labels):
         self.canvas.ax.set_xlim([0, len(labels) + 1])
         self.canvas.ax.set_xticks(np.arange(1, len(labels) + 1))
@@ -732,6 +759,10 @@ class BarPlot(QtWidgets.QWidget):
     def updatePlot(self):
         self.canvas.draw()
         self.show()
+
+    def savePicture(self, fname=""):
+        if not fname == "":
+            self.canvas.print_figure(fname)
 
     def plotClear(self):
         # Reset the plot landscape
@@ -836,6 +867,10 @@ class ChartPlots(QtWidgets.QWidget):
     def updatePlot(self):
         self.canvas.draw()
         #self.show()
+
+    def savePicture(self, fname=""):
+        if not fname == "":
+            self.canvas.print_figure(fname)
 
     def plotClear(self):
         # Reset the plot landscape

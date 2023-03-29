@@ -12,12 +12,12 @@
 
 """
 
-__copyright__ = "Copyright 2022, Istituto di RadioAstronomia, Radiotelescopi di Medicina, INAF, Italy"
+__copyright__ = "Copyright 2023, Istituto di RadioAstronomia, Radiotelescopi di Medicina, INAF, Italy"
 __author__ = "Andrea Mattana"
 __credits__ = ["Andrea Mattana"]
 __license__ = "GPL"
-__version__ = "1.1.2"
-__release__ = "2022-04-14"
+__version__ = "1.3.1"
+__release__ = "2023-03-22"
 __maintainer__ = "Andrea Mattana"
 
 import gc
@@ -39,6 +39,7 @@ from skalab_live import Live
 from skalab_playback import Playback
 from skalab_subrack import Subrack
 from skalab_utils import parse_profile, getTextFromFile
+from skalab_base import SkalabBase
 from pathlib import Path
 
 default_app_dir = str(Path.home()) + "/.skalab/"
@@ -96,24 +97,25 @@ class SkaLab(QtWidgets.QMainWindow):
     def __init__(self, uiFile, profile="Default"):
         """ Initialise main window """
         super(SkaLab, self).__init__()
+        #super(SkalabBase, self).__init__(App="", Profile="", Path="")
         # Load window file
         self.wg = uic.loadUi(uiFile)
         self.setCentralWidget(self.wg)
         self.resize(1210, 970)
         self.setWindowTitle("The SKA in LAB Project")
-
         self.profile = {'App': {'subrack': "",
                                 'live': "",
                                 'playback': ""},
                         'Init': {'station_setup': ""}}
         self.profile_name = ""
         self.profile_file = ""
+        self.text_editor = ""
         self.load_profile(profile)
         self.updateProfileCombo(current=self.profile_name)
 
         self.config_file = ""
         if self.profile_name:
-            self.config_file = self.profile['Init']['station_setup']
+            self.config_file = self.profile['Init']['station_file']
             self.wg.qline_configfile.setText(self.config_file)
         self.tpm_station = None
         self.doInit = False
@@ -138,7 +140,9 @@ class SkaLab(QtWidgets.QMainWindow):
 
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabLiveIndex, True)
         self.wgLiveLayout = QtWidgets.QVBoxLayout()
-        self.wgLive = Live(self.config_file, "skalab_live.ui", size=[1190, 936], profile=self.profile['App']['live'])
+        self.wgLive = Live(self.config_file, "skalab_live.ui", size=[1190, 936],
+                           profile=self.profile['Base']['live'],
+                           swpath=default_app_dir)
         self.wgLive.signalTemp.connect(self.wgLive.updateTempPlot)
         self.wgLive.signalRms.connect(self.wgLive.updateRms)
 
@@ -147,14 +151,17 @@ class SkaLab(QtWidgets.QMainWindow):
 
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabPlayIndex, True)
         self.wgPlayLayout = QtWidgets.QVBoxLayout()
-        self.wgPlay = Playback(self.config_file, "skalab_playback.ui", size=[1190, 936], profile=self.profile['App']['playback'])
+        self.wgPlay = Playback(self.config_file, "skalab_playback.ui", size=[1190, 936],
+                               profile=self.profile['Base']['playback'],
+                               swpath=default_app_dir)
         self.wgPlayLayout.addWidget(self.wgPlay)
         self.wg.qwPlay.setLayout(self.wgPlayLayout)
 
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabSubrackIndex, True)
         self.wgSubrackLayout = QtWidgets.QVBoxLayout()
         self.wgSubrack = Subrack(uiFile="skalab_subrack.ui", size=[1190, 936],
-                                 profile=self.profile['App']['subrack'])
+                                 profile=self.profile['Base']['subrack'],
+                                 swpath=default_app_dir)
         self.wgSubrackLayout.addWidget(self.wgSubrack)
         self.wg.qwSubrack.setLayout(self.wgSubrackLayout)
         self.wgSubrack.signalTlm.connect(self.wgSubrack.updateTlm)
@@ -190,12 +197,32 @@ class SkaLab(QtWidgets.QMainWindow):
 
     def load_events(self):
         self.wg.qbutton_browse.clicked.connect(lambda: self.browse_config())
+        self.wg.qbutton_edit.clicked.connect(lambda: self.edit_config())
         self.wg.qbutton_load_configuration.clicked.connect(lambda: self.setup_config())
         self.wg.qbutton_profile_save.clicked.connect(lambda: self.save_profile(self.wg.qcombo_profiles.currentText()))
         self.wg.qbutton_profile_saveas.clicked.connect(lambda: self.save_as_profile())
         self.wg.qbutton_profile_load.clicked.connect(lambda: self.reload_profile(self.wg.qcombo_profiles.currentText()))
         self.wg.qbutton_profile_delete.clicked.connect(lambda: self.delete_profile(self.wg.qcombo_profiles.currentText()))
         self.wg.qbutton_station_init.clicked.connect(lambda: self.station_init())
+
+    def edit_config(self):
+        if not self.text_editor == "":
+            fname = self.wg.qline_configfile.text()
+            if not fname == "":
+                if os.path.exists(fname):
+                    os.system(self.text_editor + " " + fname + " &")
+                else:
+                    msgBox = QtWidgets.QMessageBox()
+                    msgBox.setText("The selected config file does not exist!")
+                    msgBox.setWindowTitle("Error!")
+                    msgBox.exec_()
+        else:
+            msgBox = QtWidgets.QMessageBox()
+            txt = "\nA text editor is not defined in the current profile file.\n\n['Extras']\ntext_editor = <example: gedit>'\n\n"
+            msgBox.setText(txt)
+            msgBox.setWindowTitle("Warning!")
+            msgBox.setIcon(QtWidgets.QMessageBox.Warning)
+            msgBox.exec_()
 
     def load_profile(self, profile):
         if not profile == "":
@@ -218,15 +245,22 @@ class SkaLab(QtWidgets.QMainWindow):
                 msgBox.setWindowTitle("Error!")
                 msgBox.exec_()
             else:
-                self.config_file = self.profile['Init']['station_setup']
+                self.config_file = self.profile['Init']['station_file']
                 self.wg.qline_configfile.setText(self.config_file)
                 self.populate_table_profile()
+                if 'Extras' in self.profile.keys():
+                    if 'text_editor' in self.profile['Extras'].keys():
+                        self.text_editor = self.profile['Extras']['text_editor']
 
     def reload_profile(self, profile):
         self.load_profile(profile=profile)
         if self.profile.sections():
-            if self.profile['App']['subrack']:
-                self.wgSubrack.load_profile(profile=self.profile['App']['subrack'])
+            if self.profile['Base']['subrack']:
+                self.wgSubrack.load_profile(App="subrack", Profile=self.profile['Base']['subrack'], Path=default_app_dir)
+            if self.profile['Base']['live']:
+                self.wgLive.load_profile(App="live", Profile=self.profile['Base']['live'], Path=default_app_dir)
+            if self.profile['Base']['playback']:
+                self.wgPlay.load_profile(App="playback", Profile=self.profile['Base']['playback'], Path=default_app_dir)
 
     def delete_profile(self, profile):
         if os.path.exists(default_app_dir + profile):
@@ -385,15 +419,15 @@ class SkaLab(QtWidgets.QMainWindow):
                     if self.tpm_station.properly_formed_station:
                         self.wg.qbutton_station_init.setStyleSheet("background-color: rgb(78, 154, 6);")
 
-                        if not self.tpm_station.tiles[0].tpm_version() == "tpm_v1_2":
-                            # ByPass the MCU temperature controls on TPM 1.6
-                            for tile in self.tpm_station.tiles:
-                                tile[0x90000034] = 0xBADC0DE
-                                tile[0x30000518] = 1
-                                time.sleep(0.1)
-                            time.sleep(1)
-                            print("MCU Controls Hacked with \nVal 0xBADC0DE in Reg 0x90000034,"
-                                  "\nVal 0x0000001 in Reg 0x30000518")
+                        # if not self.tpm_station.tiles[0].tpm_version() == "tpm_v1_2":
+                        #     # ByPass the MCU temperature controls on TPM 1.6
+                        #     for tile in self.tpm_station.tiles:
+                        #         tile[0x90000034] = 0xBADC0DE
+                        #         tile[0x30000518] = 1
+                        #         time.sleep(0.1)
+                        #     time.sleep(1)
+                        #     print("MCU Controls Hacked with \nVal 0xBADC0DE in Reg 0x90000034,"
+                        #           "\nVal 0x0000001 in Reg 0x30000518")
 
                         # Switch On the PreADUs
                         for tile in self.tpm_station.tiles:
@@ -422,7 +456,7 @@ class SkaLab(QtWidgets.QMainWindow):
         self.wg.qtable_profile.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
         self.wg.qtable_profile.setObjectName("qtable_profile")
         self.wg.qtable_profile.setColumnCount(1)
-        nrows = 2
+        nrows = len(self.profile.sections())
         for i in self.profile.sections():
             nrows = nrows + len(self.profile[i].keys()) + 1
         self.wg.qtable_profile.setRowCount(nrows)
@@ -597,10 +631,11 @@ class SkaLab(QtWidgets.QMainWindow):
 
     def make_profile(self, profile="Default", subrack="Default", live="Default", playback="Default", config=""):
         conf = configparser.ConfigParser()
-        conf['App'] = {'subrack': subrack,
-                       'live': live,
-                       'playback': playback}
-        conf['Init'] = {'station_setup': config}
+        conf['Base'] = {'subrack': subrack,
+                        'live': live,
+                        'playback': playback}
+        conf['Init'] = {'station_file': config}
+        conf['Extras'] = {'text_editor': self.text_editor}
         if not os.path.exists(default_app_dir):
             os.makedirs(default_app_dir)
         conf_path = default_app_dir + profile
@@ -612,16 +647,19 @@ class SkaLab(QtWidgets.QMainWindow):
 
     def setAutoload(self, load_profile=""):
         conf = configparser.ConfigParser()
-        conf['App'] = {'autoload_profile': load_profile}
+        conf['Base'] = {'autoload_profile': load_profile}
         if not os.path.exists(default_app_dir):
             os.makedirs(default_app_dir)
-        conf_path = default_app_dir + "/skalab.ini"
+        conf_path = default_app_dir + "/startup.ini"
         with open(conf_path, 'w') as configfile:
             conf.write(configfile)
 
     def save_profile(self, this_profile, reload=True):
-        self.make_profile(profile=this_profile, subrack=self.wgSubrack.profile_name, live=self.wgLive.profile_name,
-                          playback=self.wgPlay.profile_name, config=self.config_file)
+        self.make_profile(profile=this_profile,
+                          subrack=self.wgSubrack.profile['Base']['profile'],
+                          live=self.wgLive.profile['Base']['profile'],
+                          playback=self.wgPlay.profile['Base']['profile'],
+                          config=self.config_file)
         if reload:
             self.load_profile(profile=this_profile)
 
@@ -662,10 +700,10 @@ if __name__ == "__main__":
     (opt, args) = parser.parse_args(argv[1:])
 
     app = QtWidgets.QApplication(sys.argv)
-    if os.path.exists(default_app_dir + "skalab.ini"):
-        autoload = parse_profile(default_app_dir + "skalab.ini")
+    if os.path.exists(default_app_dir + "startup.ini"):
+        autoload = parse_profile(default_app_dir + "startup.ini")
         if autoload.sections():
-            profile = autoload["App"]["autoload_profile"]
+            profile = autoload['Base']["autoload_profile"]
     else:
         profile = opt.profile
 

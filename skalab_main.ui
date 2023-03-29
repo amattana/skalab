@@ -274,7 +274,7 @@
        <rect>
         <x>120</x>
         <y>30</y>
-        <width>321</width>
+        <width>221</width>
         <height>31</height>
        </rect>
       </property>
@@ -301,7 +301,7 @@
      <widget class="QPushButton" name="qbutton_browse">
       <property name="geometry">
        <rect>
-        <x>460</x>
+        <x>360</x>
         <y>30</y>
         <width>81</width>
         <height>31</height>
@@ -480,6 +480,19 @@
       </property>
       <property name="alignment">
        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="qbutton_edit">
+      <property name="geometry">
+       <rect>
+        <x>460</x>
+        <y>30</y>
+        <width>81</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Edit</string>
       </property>
      </widget>
     </widget>
@@ -806,6 +819,37 @@ p, li { white-space: pre-wrap; }
        <string>Notes</string>
       </attribute>
       <widget class="QTextEdit" name="Help_Notes">
+       <property name="geometry">
+        <rect>
+         <x>0</x>
+         <y>0</y>
+         <width>1081</width>
+         <height>741</height>
+        </rect>
+       </property>
+       <property name="autoFillBackground">
+        <bool>false</bool>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">background-color: rgb(251, 249, 246);</string>
+       </property>
+       <property name="frameShape">
+        <enum>QFrame::NoFrame</enum>
+       </property>
+       <property name="html">
+        <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Ubuntu'; font-size:11pt; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;br /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+      </widget>
+     </widget>
+     <widget class="QWidget" name="qtab_troubleshooting">
+      <attribute name="title">
+       <string>Troubleshooting</string>
+      </attribute>
+      <widget class="QTextEdit" name="Help_TroubleShooting">
        <property name="geometry">
         <rect>
          <x>0</x>

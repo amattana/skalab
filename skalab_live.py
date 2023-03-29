@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+import copy
+
+from skalab_base import SkalabBase
 import datetime
 import glob
 import math
@@ -18,16 +21,20 @@ from PyQt5.QtCore import Qt
 import pydaq.daq_receiver as daq
 from skalab_utils import MiniPlots, calcolaspettro, closest, MyDaq, get_if_name, BarPlot, ChartPlots, getTextFromFile
 from skalab_utils import parse_profile, ts_to_datestring, dt_to_timestamp, Archive, COLORI, decodeChannelList
-from skalab_preadu import Preadu, bound
+from skalab_preadu import Preadu, PreaduGui, bound
 from pyaavs.station import Station
 from pyaavs import station
 from threading import Thread
 from pydaq.persisters import ChannelFormatFileManager, FileDAQModes
 
+# profile_extension = {
+#     'Live': {
+#         'station_config': "",
+#         'preadu_version': 3.0}}
+
 default_app_dir = str(Path.home()) + "/.skalab/"
 default_profile = "Default"
 profile_filename = "live.ini"
-
 
 configuration = {'tiles': None,
                  'time_delays': None,
@@ -76,41 +83,44 @@ def moving_average(xx, w):
     return np.convolve(xx, np.ones(w), 'valid') / w
 
 
-class Live(QtWidgets.QMainWindow):
+class Live(SkalabBase):
     """ Main UI Window class """
     # Signal for Slots
     signalRms = QtCore.pyqtSignal()
     signalTemp = QtCore.pyqtSignal()
 
-    def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936]):
+    def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936], swpath=""):
         """ Initialise main window """
-        super(Live, self).__init__()
+        self.wg = uic.loadUi(uiFile)
+
+        self.wgProBox = QtWidgets.QWidget(self.wg.qtab_conf)
+        self.wgProBox.setGeometry(QtCore.QRect(1, 1, 800, 860))
+        self.wgProBox.setVisible(True)
+        self.wgProBox.show()
+        #self.wg.qtab_conf = uic.loadUi("skalab_profile.ui")
+        super(Live, self).__init__(App="live", Profile=profile, Path=swpath, parent=self.wgProBox)
+
         # Load window file
         self.connected = False
-        self.wg = uic.loadUi(uiFile)
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
+        self.populate_table_profile()
 
-        self.profile_name = profile
-        if self.profile_name == "":
-            self.profile_name = "Default"
-        self.profile = {}
-        self.profile_file = ""
-        self.load_profile(self.profile_name)
+        self.preadu_version = self.profile['Live']['preadu_version']
 
         # Populate the plots for the Live Spectra
         self.livePlots = MiniPlots(parent=self.wg.qplot_spectra, nplot=16)
         self.monitorPlots = MiniPlots(parent=self.wg.qplot_int_spectra, nplot=16)
-        self.tempBoardPlots = BarPlot(parent=self.wg.qplot_temps_board, size=(3.65, 2.12), xlim=[0, 9],
+        self.tempBoardPlots = BarPlot(parent=self.wg.qplot_temps_board, size=(3.65, 2.12), xlim=[0, 17],
                                       ylabel="Celsius (deg)", xrotation=0, xlabel="Board",
-                                      ylim=[20, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(9))
-        self.tempFpga1Plots = BarPlot(parent=self.wg.qplot_temps_fpga1, size=(3.65, 2.12), xlim=[0, 9],
+                                      ylim=[40, 80], yticks=np.arange(20, 120, 20), xticks=np.arange(17))
+        self.tempFpga1Plots = BarPlot(parent=self.wg.qplot_temps_fpga1, size=(3.65, 2.12), xlim=[0, 17],
                                       ylabel="Celsius (deg)", xrotation=0, xlabel="FPGA1",
-                                      ylim=[20, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(9))
-        self.tempFpga2Plots = BarPlot(parent=self.wg.qplot_temps_fpga2, size=(3.65, 2.12), xlim=[0, 9],
+                                      ylim=[40, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(17))
+        self.tempFpga2Plots = BarPlot(parent=self.wg.qplot_temps_fpga2, size=(3.65, 2.12), xlim=[0, 17],
                                       ylabel="Celsius (deg)", xrotation=0, xlabel="FPGA2",
-                                      ylim=[20, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(9))
-        self.tempChart = ChartPlots(parent=self.wg.qplot_chart, ntraces=8, xlabel="time samples", ylim=[20, 120],
+                                      ylim=[40, 100], yticks=np.arange(20, 120, 20), xticks=np.arange(17))
+        self.tempChart = ChartPlots(parent=self.wg.qplot_chart, ntraces=16, xlabel="time samples", ylim=[40, 80],
                                     ylabel="Board Temp (deg)", size=(11.2, 4), xlim=[0, 200])
         self.rmsChart = ChartPlots(parent=self.wg.qplot_rms_chart, ntraces=32, xlabel="time samples", ylim=[-40, 20],
                                     ylabel="RMS (dBm)", size=(11.2, 6.6), xlim=[0, 200])
@@ -119,7 +129,20 @@ class Live(QtWidgets.QMainWindow):
         self.qw_preadu.setGeometry(QtCore.QRect(10, 180, 1131, 681))
         self.qw_preadu.setVisible(True)
         self.qw_preadu.show()
-        self.preadu = Preadu(parent=self.qw_preadu, debug=0, board_type=0)
+        self.wpreadu = PreaduGui(parent=self.qw_preadu, debug=0, preadu_version=self.preadu_version)
+        if self.preadu_version == "2.0":
+            self.wg.qcombo_preadu_version.setCurrentIndex(3)
+        elif self.preadu_version == "2.1":
+            self.wg.qcombo_preadu_version.setCurrentIndex(2)
+        elif self.preadu_version == "2.2":
+            self.wg.qcombo_preadu_version.setCurrentIndex(1)
+        else:
+            self.wg.qcombo_preadu_version.setCurrentIndex(0)
+        self.preadu = []
+        self.preaduConfUpdated = False
+        self.eq_armed = False
+
+        self.writing_preadu = False
         self.wg.ctrl_preadu.hide()
         self.data_temp_charts = {}
         self.data_rms_charts = {}
@@ -181,6 +204,7 @@ class Live(QtWidgets.QMainWindow):
 
         self.live_input_list = np.arange(1, 17)
         self.live_channels = self.wg.qline_channels.text()
+        self.live_mapping = np.arange(16)
 
         self.xAxisRange = [float(self.wg.qline_spectra_band_from.text()), float(self.wg.qline_spectra_band_to.text())]
         self.yAxisRange = [float(self.wg.qline_spectra_level_min.text()), float(self.wg.qline_spectra_level_max.text())]
@@ -203,13 +227,8 @@ class Live(QtWidgets.QMainWindow):
         self.wg.qbutton_single.clicked.connect(lambda: self.doSingleAcquisition())
         self.wg.qbutton_run.clicked.connect(lambda: self.startContinuousAcquisition())
         self.wg.qbutton_stop.clicked.connect(lambda: self.stopContinuousAcquisition())
+        self.wg.qbutton_save.clicked.connect(lambda: self.savePicture())
 
-        self.wg.qbutton_browse_data_directory.clicked.connect(lambda: self.browse_outdir())
-        self.wg.qbutton_browse_station_config.clicked.connect(lambda: self.browse_config())
-        self.wg.qbutton_load.clicked.connect(lambda: self.load())
-        self.wg.qbutton_saveas.clicked.connect(lambda: self.save_as_profile())
-        self.wg.qbutton_save.clicked.connect(lambda: self.save_profile(this_profile=self.profile_name))
-        self.wg.qbutton_delete.clicked.connect(lambda: self.delete_profile(self.wg.qcombo_profile.currentText()))
         self.wg.qbutton_preadu_setup.clicked.connect(lambda: self.setupPreadu(self.wg.qcombo_preadu_version.currentIndex()))
         self.wg.qbutton_equalize.clicked.connect(lambda: self.equalization())
         self.wg.qline_channels.textChanged.connect(lambda: self.channelsListModified())
@@ -218,7 +237,7 @@ class Live(QtWidgets.QMainWindow):
         self.wg.qradio_rms_power.toggled.connect(lambda: self.customizeRms())
         self.wg.qradio_rms_dsa.toggled.connect(lambda: self.customizeRms())
         self.wg.qradio_rms_chart.toggled.connect(lambda: self.customizeRms())
-        self.wg.qcombo_rms_label.currentIndexChanged.connect(lambda: self.customizeRms())
+        self.wg.qcombo_rms_label.currentIndexChanged.connect(lambda: self.customizeMapping())
         self.wg.qcheck_spectra_grid.stateChanged.connect(self.live_show_spectra_grid)
         self.wg.qradio_raw.toggled.connect(lambda: self.check_raw(self.wg.qradio_raw))
         self.wg.qradio_int_spectra.toggled.connect(lambda: self.check_int_spectra(self.wg.qradio_int_spectra))
@@ -228,39 +247,36 @@ class Live(QtWidgets.QMainWindow):
         self.wg.qcombo_chart.currentIndexChanged.connect(lambda: self.switchChart())
         self.wg.qcombo_tpm.currentIndexChanged.connect(lambda: self.updatePreadu())
 
-    def load_profile(self, profile):
-        self.profile = {}
-        fullpath = default_app_dir + profile + "/" + profile_filename
-        if os.path.exists(fullpath):
-            print("Loading Live Profile: " + profile + " (" + fullpath + ")")
-        else:
-            print("\nThe Live Profile does not exist.\nGenerating a new one in "
-                  + fullpath + "\n")
-            self.make_profile(profile=profile, prodict={})
-        self.profile = parse_profile(fullpath)
-        self.profile_name = profile
-        self.profile_file = fullpath
-        self.wg.qline_configuration_file.setText(self.profile_file)
-        if 'query_interval' in self.profile['App'].keys():
-            self.wg.qline_profile_interval.setText(self.profile['App']['query_interval'])
-        if 'station_config' in self.profile['App'].keys():
-            self.wg.qline_configfile.setText(self.profile['App']['station_config'])
-        if 'data_path' in self.profile['App'].keys():
-            self.wg.qline_output_dir.setText(self.profile['App']['data_path'])
-        if 'temperatures_path' in self.profile['App'].keys():
-            self.wg.qline_temperatures_path.setText(self.profile['App']['temperatures_path'])
-        if 'integrated_spectra_path' in self.profile['App'].keys():
-            self.wg.qline_integrated_spectra_path.setText(self.profile['App']['integrated_spectra_path'])
-        # Overriding Configuration File with parameters
-        self.updateProfileCombo(current=profile)
-        self.populate_table_profile()
-
     def populate_help(self, uifile="skalab_live.ui"):
         with open(uifile) as f:
             data = f.readlines()
         helpkeys = [d[d.rfind('name="Help_'):].split('"')[1] for d in data if 'name="Help_' in d]
         for k in helpkeys:
             self.wg.findChild(QtWidgets.QTextEdit, k).setText(getTextFromFile(k.replace("_", "/")+".html"))
+
+    def savePicture(self):
+        fd = QtWidgets.QFileDialog()
+        fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
+        options = fd.options()
+        base_path = self.profile['Live']['default_path_save_pictures']
+        result = fd.getSaveFileName(caption="Select a File Name to save the picture...",
+                                    directory=base_path,
+                                    filter="Image Files (*.png *.jpg *.bmp *.svg)",
+                                    options=options)[0]
+        if not result == "":
+            if self.wg.qradio_int_spectra.isChecked():
+                self.monitorPlots.savePicture(fname=result)
+                print("Saved Integrated Spectra Monitoring Plots Picture on " + result)
+            elif self.wg.qradio_raw.isChecked():
+                self.livePlots.savePicture(fname=result)
+                print("Saved Live Spectra Picture on " + result)
+            elif self.wg.qradio_temps.isChecked():
+                self.tempChart.savePicture(fname=result)
+                print("Saved Temperatures Chart Picture on " + result)
+            elif self.wg.qradio_rms.isChecked():
+                if self.wg.qradio_rms_chart.isChecked():
+                    self.rmsChart.savePicture(fname=result)
+                    print("Saved RMS Chart Picture on " + result)
 
     def check_raw(self, b):
         if b.isChecked():
@@ -274,6 +290,7 @@ class Live(QtWidgets.QMainWindow):
             #self.wg.ctrl_temps.hide()
             self.wg.ctrl_spectra.show()
             self.wg.ctrl_preadu.hide()
+            self.wg.ctrl_temperature.hide()
             self.wg.ctrl_rms.hide()
             # Show only spectra tstamp
             self.wg.qlabel_tstamp_spectra.show()
@@ -301,6 +318,7 @@ class Live(QtWidgets.QMainWindow):
             # Show only int spectra ctrl
             self.wg.ctrl_spectra.hide()
             self.wg.ctrl_preadu.hide()
+            self.wg.ctrl_temperature.hide()
             self.wg.ctrl_rms.hide()
             # Show only int spectra tstamp
             self.wg.qlabel_tstamp_int_spectra.show()
@@ -328,6 +346,7 @@ class Live(QtWidgets.QMainWindow):
             # Show only spectra ctrl
             self.wg.ctrl_spectra.hide()
             self.wg.ctrl_preadu.hide()
+            self.wg.ctrl_temperature.hide()
             self.wg.ctrl_rms.show()
             # Show only spectra tstamp
             self.wg.qlabel_tstamp_spectra.hide()
@@ -340,7 +359,7 @@ class Live(QtWidgets.QMainWindow):
             self.wg.qbutton_single.setEnabled(False)
             self.wg.qbutton_run.setEnabled(False)
             self.wg.qbutton_stop.setEnabled(False)
-            self.wg.qbutton_save.setEnabled(False)
+            self.wg.qbutton_save.setEnabled(True)
             self.wg.qbutton_export.setEnabled(False)
             self.wg.qcombo_rms_label.setEnabled(True)
             #self.wg.qcombo_tpm.setEnabled(False)
@@ -355,7 +374,7 @@ class Live(QtWidgets.QMainWindow):
             self.wg.qplot_int_spectra.hide()
             # Show only spectra ctrl
             #self.wg.ctrl_rms.hide()
-            #self.wg.ctrl_temps.show()
+            self.wg.ctrl_temperature.show()
             self.wg.ctrl_spectra.hide()
             self.wg.ctrl_preadu.hide()
             self.wg.ctrl_rms.hide()
@@ -370,7 +389,7 @@ class Live(QtWidgets.QMainWindow):
             self.wg.qbutton_single.setEnabled(False)
             self.wg.qbutton_run.setEnabled(False)
             self.wg.qbutton_stop.setEnabled(False)
-            self.wg.qbutton_save.setEnabled(False)
+            self.wg.qbutton_save.setEnabled(True)
             self.wg.qbutton_export.setEnabled(False)
             self.wg.qcombo_rms_label.setEnabled(False)
             self.wg.qcombo_tpm.setEnabled(False)
@@ -383,7 +402,7 @@ class Live(QtWidgets.QMainWindow):
         self.wg.qplot_int_spectra.hide()
         # Show only spectra ctrl
         #self.wg.ctrl_rms.hide()
-        #self.wg.ctrl_temps.show()
+        self.wg.ctrl_temperature.hide()
         self.wg.ctrl_spectra.hide()
         self.wg.ctrl_rms.hide()
         self.wg.ctrl_preadu.show()
@@ -405,9 +424,12 @@ class Live(QtWidgets.QMainWindow):
         self.wg.qcombo_tpm.setEnabled(True)
 
     def setupPreadu(self, version):
-        print("Setting preadu board version: %d" % version)
-        self.preadu.set_preadu_version(version)
-        #self.readDsaConfiguration()
+        if self.connected:
+            print("Setting preadu version: %s" % (self.wg.qcombo_preadu_version.currentText().split()[0]))
+            self.wpreadu.set_preadu_version(self.wg.qcombo_preadu_version.currentText().split()[0])
+            self.updatePreadu()
+            for p in self.preadu:
+                p.set_preadu_version(self.wg.qcombo_preadu_version.currentText().split()[0])
 
     def switchTpm(self):
         if self.connected:
@@ -416,196 +438,12 @@ class Live(QtWidgets.QMainWindow):
 
     def updatePreadu(self):
         if self.connected:
-            self.preadu.setTpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
+            #print("SWITCH to PREADU of TPM %d (Station of %d TPMs)" % (self.wg.qcombo_tpm.currentIndex() + 1, len(self.preaduConf)))
+            self.wpreadu.setConfiguration(conf=self.preaduConf[self.wg.qcombo_tpm.currentIndex()])
+            self.wpreadu.updateRms(self.rms[self.wg.qcombo_tpm.currentIndex()])
 
     def switchChart(self):
         self.drawTempCharts()
-
-    def browse_outdir(self):
-        fd = QtWidgets.QFileDialog()
-        fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
-        options = fd.options()
-        self.folder = fd.getExistingDirectory(self, caption="Choose a directory to save the data",
-                                              directory="/storage/", options=options)
-        self.wg.qline_output_dir.setText(self.folder)
-
-    def browse_config(self):
-        fd = QtWidgets.QFileDialog()
-        fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
-        options = fd.options()
-        self.config_file = fd.getOpenFileName(self, caption="Select a Station Config File...",
-                                              directory="/opt/aavs/config/", options=options)[0]
-        self.wg.qline_configfile.setText(self.config_file)
-
-    def populate_table_profile(self):
-        self.wg.qtable_conf.clearSpans()
-        self.wg.qtable_conf.setGeometry(QtCore.QRect(640, 20, 481, 821))
-        self.wg.qtable_conf.setObjectName("qtable_conf")
-        self.wg.qtable_conf.setColumnCount(1)
-        self.wg.qtable_conf.setWordWrap(True)
-
-        total_rows = 1
-        for i in self.profile.sections():
-            total_rows = total_rows + len(self.profile[i]) + 1
-        self.wg.qtable_conf.setRowCount(total_rows + 2)
-
-        item = QtWidgets.QTableWidgetItem("Profile: " + self.profile_name)
-        item.setTextAlignment(QtCore.Qt.AlignCenter)
-        font = QtGui.QFont()
-        font.setBold(True)
-        font.setWeight(75)
-        item.setFont(font)
-        item.setFlags(QtCore.Qt.ItemIsEnabled)
-        self.wg.qtable_conf.setHorizontalHeaderItem(0, item)
-
-        item = QtWidgets.QTableWidgetItem(" ")
-        item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        item.setFlags(QtCore.Qt.ItemIsEnabled)
-        self.wg.qtable_conf.setVerticalHeaderItem(0, item)
-
-        q = 1
-        for i in self.profile.sections():
-            item = QtWidgets.QTableWidgetItem("[" + i + "]")
-            item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-            item.setFlags(QtCore.Qt.ItemIsEnabled)
-            font = QtGui.QFont()
-            font.setBold(True)
-            font.setWeight(75)
-            item.setFont(font)
-            self.wg.qtable_conf.setVerticalHeaderItem(q, item)
-            q = q + 1
-            for k in self.profile[i]:
-                item = QtWidgets.QTableWidgetItem(k)
-                item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-                item.setFlags(QtCore.Qt.ItemIsEnabled)
-                self.wg.qtable_conf.setVerticalHeaderItem(q, item)
-                item = QtWidgets.QTableWidgetItem(self.profile[i][k])
-                item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-                item.setFlags(QtCore.Qt.ItemIsEnabled)
-                self.wg.qtable_conf.setItem(q, 0, item)
-                q = q + 1
-            item = QtWidgets.QTableWidgetItem(" ")
-            item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-            item.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.wg.qtable_conf.setVerticalHeaderItem(q, item)
-            q = q + 1
-
-        self.wg.qtable_conf.horizontalHeader().setStretchLastSection(True)
-        self.wg.qtable_conf.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wg.qtable_conf.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wg.qtable_conf.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-
-    def make_profile(self, profile: str, prodict: dict):
-        conf = configparser.ConfigParser()
-        conf['App'] = {}
-        if 'App' in prodict.keys() and 'station_config' in prodict['App'].keys():
-            conf['App']['station_config'] = prodict['App']['station_config']
-        else:
-            conf['App']['station_config'] = ""
-        if 'App' in prodict.keys() and 'data_path' in prodict['App'].keys():
-            conf['App']['data_path'] = prodict['App']['data_path']
-        else:
-            conf['App']['data_path'] = ""
-        if 'App' in prodict.keys() and 'temperatures_path' in prodict['App'].keys():
-            conf['App']['temperatures_path'] = prodict['App']['temperatures_path']
-        else:
-            conf['App']['temperatures_path'] = ""
-        if 'App' in prodict.keys() and 'integrated_spectra_path' in prodict['App'].keys():
-            conf['App']['integrated_spectra_path'] = prodict['App']['integrated_spectra_path']
-        else:
-            conf['App']['integrated_spectra_path'] = ""
-        if 'App' in prodict.keys() and 'query_interval' in prodict['App'].keys():
-            conf['App']['query_interval'] = prodict['App']['query_interval']
-        else:
-            conf['App']['query_interval'] = "3"
-        conf['Spectra'] = {}
-        if 'Spectra' in prodict.keys() and 'qline_rbw' in prodict['Spectra'].keys():
-            conf['Spectra']['qline_rbw'] = prodict['Spectra']['qline_rbw']
-        else:
-            conf['Spectra']['qline_rbw'] = "1000"
-        if 'Spectra' in prodict.keys() and 'qline_spectra_level_min' in prodict['Spectra'].keys():
-            conf['Spectra']['qline_spectra_level_min'] = prodict['Spectra']['qline_spectra_level_min']
-        else:
-            conf['Spectra']['qline_spectra_level_min'] = "-100"
-        if 'Spectra' in prodict.keys() and 'qline_spectra_level_max' in prodict['Spectra'].keys():
-            conf['Spectra']['qline_spectra_level_max'] = prodict['Spectra']['qline_spectra_level_max']
-        else:
-            conf['Spectra']['qline_spectra_level_max'] = "0"
-        if 'Spectra' in prodict.keys() and 'qline_spectra_band_from' in prodict['Spectra'].keys():
-            conf['Spectra']['qline_spectra_band_from'] = prodict['Spectra']['qline_spectra_band_from']
-        else:
-            conf['Spectra']['qline_spectra_band_from'] = "1"
-        if 'Spectra' in prodict.keys() and 'qline_spectra_band_to' in prodict['Spectra'].keys():
-            conf['Spectra']['qline_spectra_band_to'] = prodict['Spectra']['qline_spectra_band_to']
-        else:
-            conf['Spectra']['qline_spectra_band_to'] = "400"
-        if 'Spectra' in prodict.keys() and 'qcheck_spectra_grid' in prodict['Spectra'].keys():
-            conf['Spectra']['qcheck_spectra_grid'] = prodict['Spectra']['qcheck_spectra_grid']
-        else:
-            conf['Spectra']['qcheck_spectra_grid'] = "True"
-        if 'Spectra' in prodict.keys() and 'qcheck_spectra_noline' in prodict['Spectra'].keys():
-            conf['Spectra']['qcheck_spectra_noline'] = prodict['Spectra']['qcheck_spectra_noline']
-        else:
-            conf['Spectra']['qcheck_spectra_noline'] = "False"
-        if 'Spectra' in prodict.keys() and 'qcheck_xpol_sp' in prodict['Spectra'].keys():
-            conf['Spectra']['qcheck_xpol_sp'] = prodict['Spectra']['qcheck_xpol_sp']
-        else:
-            conf['Spectra']['qcheck_xpol_sp'] = "True"
-        if 'Spectra' in prodict.keys() and 'qcheck_ypol_sp' in prodict['Spectra'].keys():
-            conf['Spectra']['qcheck_ypol_sp'] = prodict['Spectra']['qcheck_ypol_sp']
-        else:
-            conf['Spectra']['qcheck_ypol_sp'] = "True"
-
-        if not os.path.exists(default_app_dir):
-            os.makedirs(default_app_dir)
-        conf_path = default_app_dir + profile
-        if not os.path.exists(conf_path):
-            os.makedirs(conf_path)
-        conf_path = conf_path + "/" + profile_filename
-        with open(conf_path, 'w') as configfile:
-            conf.write(configfile)
-
-    def updateProfileCombo(self, current):
-        profiles = []
-        for d in os.listdir(default_app_dir):
-            if os.path.exists(default_app_dir + "/" + d + "/" + profile_filename):
-                profiles += [d]
-        if profiles:
-            self.wg.qcombo_profile.clear()
-            for n, p in enumerate(profiles):
-                self.wg.qcombo_profile.addItem(p)
-                if current == p:
-                    self.wg.qcombo_profile.setCurrentIndex(n)
-
-    def load(self):
-        if not self.connected:
-            self.load_profile(self.wg.qcombo_profile.currentText())
-        else:
-            msgBox = QtWidgets.QMessageBox()
-            msgBox.setText("Please switch to OFFLINE first!")
-            msgBox.setWindowTitle("Error!")
-            msgBox.exec_()
-
-    def save_profile(self, this_profile, reload=True):
-        self.make_profile(profile=this_profile,
-                          prodict={'App': {'data_path': self.wg.qline_output_dir.text(),
-                                           'station_config': self.wg.qline_configfile.text(),
-                                           'query_interval': self.wg.qline_profile_interval.text(),
-                                           'temperatures_path': self.wg.qline_temperatures_path.text(),
-                                           'integrated_spectra_path': self.wg.qline_integrated_spectra_path.text()}})
-        if reload:
-            self.load_profile(profile=this_profile)
-
-    def save_as_profile(self):
-        text, ok = QtWidgets.QInputDialog.getText(self, 'Profiles', 'Enter a Profile name:')
-        if ok:
-            self.save_profile(this_profile=text)
-
-    def delete_profile(self, profile):
-        if os.path.exists(default_app_dir + profile):
-            shutil.rmtree(default_app_dir + profile)
-        self.updateProfileCombo(current="")
-        self.load_profile(self.wg.qcombo_profile.currentText())
 
     def connect(self):
         if not self.connected:
@@ -615,14 +453,18 @@ class Live(QtWidgets.QMainWindow):
             if self.newTilesIPs is not None:
                 station.configuration['tiles'] = self.newTilesIPs
             # Test
-            try:
+            if True:
+            #try:
                 # Create station
                 self.tpm_station = Station(station.configuration)
                 # Connect station (program, initialise and configure if required)
                 self.tpm_station.connect()
+                self.preadu = []
                 status = True
                 for t in self.tpm_station.tiles:
                     status = status * t.is_programmed()
+                    self.preadu += [Preadu(tpm=t, preadu_version=self.preadu_version)]
+                self.wpreadu.setConfiguration(conf=self.preadu[self.wg.qcombo_tpm.currentIndex()].readConfiguration())
                 if status:
                     self.tpm_station.tiles[0].get_temperature()
                     #self.wg.qlabel_connection.setText("Connected")
@@ -638,6 +480,11 @@ class Live(QtWidgets.QMainWindow):
                                           17, 16, 19, 18, 21, 20, 23, 22,
                                           24, 25, 26, 27, 28, 29, 30, 31]
                     else:
+                        # This must be verified when PYAAVS will be adapted to TPM1.6
+                        # self.rms_remap = [0, 1, 2, 3, 4, 5, 6, 7,
+                        #                   9, 8, 11, 10, 13, 12, 15, 14,
+                        #                   16, 17, 18, 19, 20, 21, 22, 23,
+                        #                   25, 24, 27, 26, 29, 28, 31, 30]
                         self.rms_remap = np.arange(32)
                     self.connected = True
 
@@ -645,14 +492,15 @@ class Live(QtWidgets.QMainWindow):
                     self.setupDAQ()
                     self.setupArchiveTemperatures()
                     self.ThreadTempPause = False
-                    self.preadu.setTpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
+                    # self.preadu.setTpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
                 else:
                     msgBox = QtWidgets.QMessageBox()
                     msgBox.setText("Some TPM is not programmed,\nplease initialize the Station first!")
                     msgBox.setWindowTitle("Error!")
                     msgBox.setIcon(QtWidgets.QMessageBox.Critical)
                     msgBox.exec_()
-            except Exception as e:
+            else:
+            #except Exception as e:
                 msgBox = QtWidgets.QMessageBox()
                 msgBox.setText("An exception occurred while trying to connect to the Station.\n\nException: " + str(e))
                 msgBox.setWindowTitle("Error!")
@@ -679,8 +527,12 @@ class Live(QtWidgets.QMainWindow):
         if self.rms_file is not None:
             self.closeRms()
         del self.tpm_station
+        for p in self.preadu:
+            del p
         gc.collect()
-        self.closeDAQ()
+        self.preadu = []
+        if self.monitor_daq is not None:
+            self.closeDAQ()
         self.tpm_station = None
         self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
         self.wg.qbutton_connect.setText("OFFLINE")
@@ -703,7 +555,7 @@ class Live(QtWidgets.QMainWindow):
                     print("Failed to get DAQ data!")
                     pass
                 cycle = 0.0
-                while cycle < (int(self.profile['App']['query_interval']) - 1) and not self.skipThreadPause:
+                while cycle < (int(self.profile['Live']['query_interval']) - 1) and not self.skipThreadPause:
                     sleep(0.1)
                     cycle = cycle + 0.1
                 self.skipThreadPause = False
@@ -715,30 +567,40 @@ class Live(QtWidgets.QMainWindow):
         monit_daq = None
         while True:
             if self.connected:
-                if self.initMonitor:
-                    import pydaq.daq_receiver as monit_daq
-                    nof_tiles = len(self.tpm_station.configuration['tiles'])
-                    int_data_port = str(self.tpm_station.configuration['network']['lmc']['lmc_port'])
-                    if self.tpm_station.configuration['network']['lmc']['use_teng']:
-                        int_data_port = str(self.tpm_station.configuration['network']['lmc']['integrated_data_port'])
-                    daq_config = {
-                        "receiver_interface": get_if_name(self.tpm_station.configuration['network']['lmc']['lmc_ip']),
-                        "receiver_ports": int_data_port,
-                        "nof_tiles": nof_tiles,
-                        'directory': self.wg.qline_integrated_spectra_path.text()}
-                    if os.path.exists(self.wg.qline_integrated_spectra_path.text()):
-                        self.monitor_daq = monit_daq
-                        self.monitor_daq.populate_configuration(daq_config)
-                        self.monitor_daq.initialise_daq()
-                        self.monitor_daq.start_integrated_channel_data_consumer()
-                        self.monitor_file_manager = ChannelFormatFileManager(root_path=self.wg.qline_integrated_spectra_path.text(),
-                                                                             daq_mode=FileDAQModes.Integrated)
-                        self.monitor_tstart = dt_to_timestamp(datetime.datetime.utcnow())
-                        self.wg.qlabel_tstamp_int_spectra.setText("Started at " +
-                                                                  ts_to_datestring(self.monitor_tstart) +
-                                                                  " (Period: %3.1f secs)" %
-                                                                  (8 * float(self.tpm_station.configuration['station']['channel_integration_time'])))
-                        self.initMonitor = False
+                if True:
+                    if self.initMonitor:
+                        import pydaq.daq_receiver as monit_daq
+                        nof_tiles = len(self.tpm_station.configuration['tiles'])
+                        int_data_port = str(self.tpm_station.configuration['network']['lmc']['lmc_port'])
+                        int_data_ip = str(self.tpm_station.configuration['network']['lmc']['lmc_ip'])
+                        if self.tpm_station.configuration['network']['lmc']['use_teng']:
+                            int_data_port = str(self.tpm_station.configuration['network']['lmc']['integrated_data_port'])
+                        if not self.tpm_station.configuration['network']['lmc']['use_teng_integrated']:
+                            int_data_ip = str(self.tpm_station.configuration['network']['lmc']['integrated_data_ip'])
+                        int_data_if = get_if_name(int_data_ip)
+                        daq_config = {
+                            "receiver_interface": int_data_if,
+                            "receiver_ports": int_data_port,
+                            "receiver_ip": int_data_ip.encode(),
+                            "nof_tiles": nof_tiles,
+                            'directory': self.profile['Data']['integrated_spectra_path']}
+                        #print(daq_config)
+                        if os.path.exists(self.profile['Data']['integrated_spectra_path']):
+                            self.initMonitor = False
+                            self.monitor_daq = monit_daq
+                            self.monitor_daq.populate_configuration(daq_config)
+                            print("Integrated Data Conf %s:%s on NIC %s" % (int_data_ip, int_data_port, int_data_if))
+                            self.monitor_daq.initialise_daq()
+                            self.monitor_daq.start_integrated_channel_data_consumer()
+                            self.monitor_file_manager = ChannelFormatFileManager(root_path=self.profile['Data']['integrated_spectra_path'],
+                                                                                 daq_mode=FileDAQModes.Integrated)
+                            self.monitor_tstart = dt_to_timestamp(datetime.datetime.utcnow())
+                            self.wg.qlabel_tstamp_int_spectra.setText("Started at " +
+                                                                      ts_to_datestring(self.monitor_tstart) +
+                                                                      " (Period: %3.1f secs)" %
+                                                                      (8 * float(self.tpm_station.configuration['station']['channel_integration_time'])))
+                #except:
+                #    pass
 
                 try:
                     if not self.ThreadTempPause:
@@ -747,11 +609,15 @@ class Live(QtWidgets.QMainWindow):
                         self.commBusy = True
                         self.readTemperatures()
                         sleep(0.1)
-                        self.preaduConf = []
-                        for t in self.tpm_station.tiles:
-                            while self.preadu.Busy:
-                                time.sleep(0.2)
-                            self.preaduConf += [self.preadu.readConfiguration(t)]
+                        self.tmpPreaduConf = []
+                        for t in range(len(self.tpm_station.tiles)):
+                            time.sleep(0.05)
+                            while self.preadu[t].Busy:
+                                time.sleep(0.1)
+                            self.tmpPreaduConf += [self.preadu[t].readConfiguration()]
+                        if not self.preaduConf == self.tmpPreaduConf:
+                            self.preaduConfUpdated = True
+                        self.preaduConf = copy.deepcopy(self.tmpPreaduConf)
                         sleep(0.1)
                         self.readRms()
                         sleep(0.1)
@@ -763,12 +629,48 @@ class Live(QtWidgets.QMainWindow):
                 except:
                     print("Failed to get RMS and/or Temperature data!")
                     self.commBusy = False
-                    self.preadu.Busy = False
+                    # self.preadu.Busy = False
                     pass
                 cycle = 0.0
-                while cycle < float(self.wg.qline_profile_interval.text()) and not self.stopThreads:
+                while cycle < float(self.profile['Live']['query_interval']) and not self.stopThreads:
                     sleep(0.1)
                     cycle = cycle + 0.1
+                    if self.connected:
+                        # Apply New Conf from Preadu GUI
+                        if self.wpreadu.write_armed and not self.preadu[self.wg.qcombo_tpm.currentIndex()].Busy and self.connected:
+                            self.writing_preadu = True
+                            # for i in range(self.wpreadu.inputs):
+                            #     self.preadu[self.wg.qcombo_tpm.currentIndex()].preadu.set_register_value(nrx=i, value=int("0x" + self.wpreadu.records[i]['value'].text(), 16))
+                            # print(self.wpreadu.tpmConf, self.wpreadu.guiConf)
+                            self.preadu[self.wg.qcombo_tpm.currentIndex()].write_configuration(self.wpreadu.guiConf)
+                            self.wpreadu.write_armed = False
+                            self.wpreadu.setConfiguration(self.wpreadu.guiConf)
+                            time.sleep(0.2)
+                            self.writing_preadu = False
+                        # Apply Equalization from Live Gui
+                        if self.eq_armed and self.connected:
+                            print("Applying Equalization")
+                            if self.wg.qradio_eq_this.isChecked():
+                                tiles = [self.wg.qcombo_tpm.currentIndex()]
+                            else:
+                                tiles = range(len(self.tpm_station.tiles))
+                            for t in tiles:
+                                #print("TILE-%02d" % (t+1))
+                                self.preadu[t].write_configuration(self.preaduConf[t])
+                                time.sleep(0.1)
+                            self.tmpPreaduConf = []
+                            for t in range(len(self.tpm_station.tiles)):
+                                time.sleep(0.05)
+                                while self.preadu[t].Busy:
+                                    time.sleep(0.1)
+                                self.tmpPreaduConf += [self.preadu[t].readConfiguration()]
+                            if not self.preaduConf == self.tmpPreaduConf:
+                                self.preaduConf = copy.deepcopy(self.tmpPreaduConf)
+                            self.updatePreadu()
+                                #self.wpreadu.setConfiguration(conf=self.preaduConf[self.wg.qcombo_tpm.currentIndex()])
+                            self.eq_armed = False
+                            self.writing_preadu = False
+
             if self.stopThreads:
                 #self.closeRms()
                 break
@@ -776,7 +678,7 @@ class Live(QtWidgets.QMainWindow):
 
     def plotMonitor(self, forcePlot=False):
         if self.monitor_daq is not None:
-            ipath = self.wg.qline_integrated_spectra_path.text()
+            ipath = self.profile['Data']['integrated_spectra_path']
             if ipath[-1] != "/":
                 ipath += "/"
             if glob.glob(ipath + "*channel_integ_*hdf5"):
@@ -789,6 +691,7 @@ class Live(QtWidgets.QMainWindow):
                         self.wg.qlabel_tstamp_int_spectra.setText(ts_to_datestring(timestamps[0][0]) +
                                                                   " (Period: %3.1f secs)" %
                                                                   (8 * float(self.tpm_station.configuration['station']['channel_integration_time'])))
+                        #print("PLOTTO ORA IL ", ts_to_datestring(timestamps[0][0]))
                         for i in range(16):
                             # Plot X Pol
                             spettro = monitorData[:, remap[i], 0, -1]
@@ -807,6 +710,10 @@ class Live(QtWidgets.QMainWindow):
                                                         show_line=True)
                         self.monitorPlots.updatePlot()
                         self.monitorPrecTstamp = timestamps[0][0]
+                #     else:
+                #         print("Uguale al precedente")
+                # else:
+                #     print("Non ancora pronto: ", ts_to_datestring(timestamps[0][0]), "  vs start:", ts_to_datestring(self.monitor_tstart))
 
     def readRms(self):
         if self.connected:
@@ -833,62 +740,62 @@ class Live(QtWidgets.QMainWindow):
 
     def equalization(self):
         if self.connected:
-            dsa_remap = [15, 14, 13, 12, 11, 10, 9, 8,
-                         16, 17, 18, 19, 20, 21, 22, 23,
-                         7, 6, 5, 4, 3, 2, 1, 0,
-                         24, 25, 26, 27, 28, 29, 30, 31]
-            #dsa_remap=range(32)
             self.ThreadTempPause = True
             self.wg.qbutton_equalize.setEnabled(False)
             self.wg.qbutton_equalize.setStyleSheet("background-color: rgb(237, 212, 0);")
-            for iter in range(3):
-                #print("\n\nLEVEL EQUALIZATION (iter %d/3)" % (iter + 1))
+            for iter in range(1):
+                # print("\n\nLEVEL EQUALIZATION (iter %d/3)" % (iter + 1))
                 self.readRms()
-                if self.wg.qradio_eq_this.isChecked():
-                    tiles = [self.tpm_station.tiles[int(self.wg.qcombo_tpm.currentIndex())]]
-                    RMS = [self.rms[self.wg.qcombo_tpm.currentIndex()]]
-                else:
-                    tiles = self.tpm_station.tiles
+                if len(self.rms) == len(self.tpm_station.tiles):
+                    if self.wg.qradio_eq_this.isChecked():
+                        tiles = [int(self.wg.qcombo_tpm.currentIndex())]
+                    else:
+                        tiles = range(len(self.tpm_station.tiles))
                     RMS = self.rms
-                target = float(self.wg.qline_eqvalue.text())
-                if self.wg.qcombo_equnit.currentIndex() == 0:  # ADU RMS
-                    for b, t in enumerate(tiles):
-                        #print("\n Equalize TPM-%02d to RMS %3.1f" % (b, target))
-                        self.preadu.setTpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
-                        #self.preadu.setTpm(t, self.preaduConf[self.wg.qcombo_tpm.currentIndex()])
-                        #dsa = self.preadu.read_dsa()
-                        for i in range(len(RMS[b])):
-                            rms = RMS[b][self.preadu.chan_remap[i]]
-                            if old_div(rms, target) > 0:
-                                with np.errstate(divide='ignore', invalid='ignore'):
-                                    attenuation = 20 * math.log10(old_div(rms, target))
-                            else:
-                                attenuation = 0
-                            #print(i, "\tRMS: %d\tDSA: " % int(round(rms)), dsa[i], "\tDIFF ATT: %3.1f\t" % attenuation,
-                            #      "NEW DSA: %3.1f\t" % (bound(int(round(dsa[i] + attenuation)))))
-                            #dsa[i] = bound(int(round(dsa[i] + attenuation)))
-                            self.preaduConf[b][self.preadu.spi_remap[i]]['dsa'] = \
-                                bound(int(round(self.preaduConf[b][self.preadu.spi_remap[i]]['dsa'] + attenuation)))
-                            self.preadu.preadu.set_rx_attenuation(i, self.preaduConf[b][self.preadu.spi_remap[i]]['dsa'])
-                            self.preaduConf[b][self.preadu.spi_remap[i]]['code'] = self.preadu.preadu.rx[i].value
-                        self.preadu.write_configuration()
-                        #self.readDsaConfiguration()
-                else:
-                    for b, t in enumerate(tiles):
-                        self.preadu.setTpm(t)
-                        for i in range(len(RMS[b])):
-                            rms = RMS[b][i]  # rms_remap[i]]
-                            with np.errstate(divide='ignore', invalid='ignore'):
-                                power = 10 * np.log10(np.power((rms * (1.7 / 256.)), 2) / 400.) + 30 + 12
-                            if power == (-np.inf):
-                                power = -30
-                            self.preaduConf[b][i]['dsa'] = bound(int(round(self.preaduConf[b][i]['dsa'] + (power - target))))
-                            #print("INPUT-%02d, Level: %3.1f" % (i, power))
-                            self.preadu.preadu.set_rx_attenuation(i, self.preaduConf[b][i]['dsa'])
-                            self.preaduConf[b][i]['code'] = self.preadu.preadu.rx[i].value
-                        self.preadu.write_configuration()
+                    target = float(self.wg.qline_eqvalue.text())
+                    if self.wg.qcombo_equnit.currentIndex() == 0:  # ADU RMS
+                        for t in tiles:
+                            #print("Tiles", tiles, "t", t, "len(RMS)", len(RMS), self.rms[self.wg.qcombo_tpm.currentIndex()])
+                            for i in range(len(RMS[t])):
+                                rms = RMS[t][i]
+                                if old_div(rms, target) > 0:
+                                    with np.errstate(divide='ignore', invalid='ignore'):
+                                        attenuation = 20 * math.log10(old_div(rms, target))
+                                else:
+                                    attenuation = 0
+                                dsa = self.wpreadu.staticRx.rx[self.preaduConf[t][i]['version']].op_get_attenuation(self.preaduConf[t][i]['code'])
+                                new_dsa = bound(int(round(dsa + attenuation)))
+                                self.preaduConf[t][i]['code'] = self.wpreadu.staticRx.rx[self.preaduConf[t][i]['version']].op_set_attenuation(self.preaduConf[t][i]['code'], new_dsa)
+                        self.writing_preadu = True
+                        self.eq_armed = True
+                        while self.writing_preadu:
+                            # wait for the write operation completed by the process
+                            time.sleep(0.1)
+                        #self.preadu.write_configuration()
                         time.sleep(0.2)
-                    self.preadu.setTpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
+                    else:
+                        for t in tiles:
+                            for i in range(len(RMS[t])):
+                                rms = RMS[t][i]  # rms_remap[i]]
+                                with np.errstate(divide='ignore', invalid='ignore'):
+                                    power = 10 * np.log10(np.power((rms * (1.7 / 256.)), 2) / 400.) + 30 + 12
+                                if power == (-np.inf):
+                                    power = -30
+                                dsa = self.wpreadu.staticRx.rx[self.preaduConf[t][i]['version']].op_get_attenuation(self.preaduConf[t][i]['code'])
+                                new_dsa = bound(int(round(dsa + (power - target))))
+                                self.preaduConf[t][i]['code'] = self.wpreadu.staticRx.rx[self.preaduConf[t][i]['version']].op_set_attenuation(self.preaduConf[t][i]['code'], new_dsa)
+                                #print("TPM-%02d INPUT-%02d, Level: %3.1f, Old DSA %d, New DSA %d" % (b+1, i, power, dsa, new_dsa))
+                                #print(i, self.preadu.preadu.get_register_value(nrx=i), self.preaduConf[b][i]['dsa'])
+                            self.eq_armed = True
+                            self.writing_preadu = True
+                            while self.writing_preadu:
+                                # wait for the write operation completed by the process
+                                time.sleep(0.1)
+                            #self.preadu.write_configuration()
+                            time.sleep(0.2)
+                        # self.preadu.setTpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
+                else:
+                    print("ERROR Reading RMS (len=%d instead of %d)" % (len(self.rms), len(self.tpm_station.tiles)))
             self.wg.qbutton_equalize.setEnabled(True)
             self.wg.qbutton_equalize.setStyleSheet("")
             self.ThreadTempPause = False
@@ -921,16 +828,17 @@ class Live(QtWidgets.QMainWindow):
             self.rms_file.close()
 
     def setupDAQ(self):
-        ddd = "/storage/daq/tmp/"
-        self.tpm_nic_name = get_if_name(self.station_configuration['network']['lmc']['lmc_ip'])
-        if self.tpm_nic_name == "":
-            print("Connection Error! (ETH Card name ERROR)")
+        self.tpm_nic_name == ""
+        if not self.profile['Data']['daq_path'] == "":
+            self.tpm_nic_name = get_if_name(self.station_configuration['network']['lmc']['lmc_ip'])
+            if self.tpm_nic_name == "":
+                print("Connection Error! (ETH Card name ERROR)")
         if not self.tpm_nic_name == "":
-            if os.path.exists(ddd):
+            if os.path.exists(self.profile['Data']['daq_path']):
                 self.mydaq = MyDaq(daq, self.tpm_nic_name, self.tpm_station, len(self.station_configuration['tiles']),
-                                   directory=ddd)
+                                   directory=self.profile['Data']['daq_path'])
                 print("DAQ Initialized, NIC: %s, NofTiles: %d, Data Directory: %s" %
-                      (self.tpm_nic_name, len(self.station_configuration['tiles']), ddd))
+                      (self.tpm_nic_name, len(self.station_configuration['tiles']), self.profile['Data']['daq_path']))
             else:
                 print("DAQ Error: a valid data directory is required.")
 
@@ -941,7 +849,7 @@ class Live(QtWidgets.QMainWindow):
 
     def setupArchiveTemperatures(self):
         if self.connected:
-            self.temp_path = self.profile['App']['temperatures_path']
+            self.temp_path = self.profile['Data']['temperatures_path']
             if not self.temp_path == "":
                 if not self.temp_path[-1] == "/":
                     self.temp_path = self.temp_path + "/"
@@ -973,7 +881,8 @@ class Live(QtWidgets.QMainWindow):
         self.qp_rms = []
         for t in range(len(self.station_configuration['tiles'])):
             self.qw_rms += [QtWidgets.QWidget(self.qwRms)]
-            self.qw_rms[t].setGeometry(QtCore.QRect(width * (t % s), height * int((t / s)), width, height))
+            self.qw_rms[t].setGeometry(QtCore.QRect(int(width * (t % s)), int(height * int((t / s))), int(width),
+                                                    int(height)))
             title = self.wg.qcombo_tpm.itemText(t)
             self.qp_rms += [BarPlot(parent=self.qw_rms[t], size=((width/100), (height/100)), xlim=[0, 33],
                                     ylabel="ADU RMS", xrotation=90, xlabel="", ylim=[0, 40],
@@ -981,6 +890,23 @@ class Live(QtWidgets.QMainWindow):
                                     labelpad=10)]
         self.qwRmsMainLayout.insertWidget(0, self.qwRms)
         self.qwRms.show()
+
+    def customizeMapping(self):
+        self.customizeRms()
+        if self.wg.qcombo_rms_label.currentIndex() == 1:
+            # ADU RF Receivers Polarization X-Y remapping
+            self.live_mapping = np.arange(16)
+        elif self.wg.qcombo_rms_label.currentIndex() == 2:
+            # TPM 1.2 Fibre Mapping
+            self.live_mapping = np.arange(16)
+        elif self.wg.qcombo_rms_label.currentIndex() == 3:
+            # TPM 1.6 RF Rx
+            self.live_mapping = [12, 13, 14, 15, 3, 2, 1, 0, 8, 9, 10, 11, 7, 6, 5, 4]
+        elif self.wg.qcombo_rms_label.currentIndex() == 4:
+            # TPM 1.6 Fibre Mapping
+            self.live_mapping = [12, 13, 14, 15, 3, 2, 1, 0, 8, 9, 10, 11, 7, 6, 5, 4]
+        else:
+            self.live_mapping = np.arange(16)
 
     def customizeRms(self):
         self.wg.qline_rms_level_min.setEnabled(True)
@@ -1042,12 +968,15 @@ class Live(QtWidgets.QMainWindow):
     def updateRms(self):
         if self.connected:
             if self.rms:
-                self.preadu.updateRms(self.rms[self.wg.qcombo_tpm.currentIndex()])
+                self.wpreadu.updateRms(self.rms[self.wg.qcombo_tpm.currentIndex()])
+                if self.preaduConfUpdated:
+                    self.wpreadu.setConfiguration(conf=self.preaduConf[self.wg.qcombo_tpm.currentIndex()])
+                    self.preaduConfUpdated = False
             if self.wg.qradio_rms_chart.isChecked():
                 self.drawRmsCharts()
             else:
                 if len(self.rms) == len(self.tpm_station.tiles):
-                    dsa_remap = np.arange(32)
+
                     # self.wg.qlabel_tstamp_rms.setText(ts_to_datestring(dt_to_timestamp(datetime.datetime.utcnow())))
                     # ADU Map
                     rms_remap = np.arange(32)
@@ -1086,7 +1015,8 @@ class Live(QtWidgets.QMainWindow):
                             if self.wg.qradio_rms_adu.isChecked():
                                 self.qp_rms[t].plotBar(self.rms[t][rms_remap[i]], i, colors[i])
                             elif self.wg.qradio_rms_dsa.isChecked():
-                                self.qp_rms[t].plotBar(self.preaduConf[t][i]['dsa'], i, 'r')
+                                #self.qp_rms[t].plotBar(self.preaduConf[t][i]['dsa'], i, 'r')
+                                self.qp_rms[t].plotBar(self.wpreadu.staticRx.rx[self.preaduConf[t][i]['version']].op_get_attenuation(self.preaduConf[t][i]['code']), i, 'r')
                             with np.errstate(divide='ignore', invalid='ignore'):
                                 power = 10 * np.log10(np.power((self.rms[t][rms_remap[i]] * (1.7 / 256.)), 2) / 400.) + 30 + 12
                             if power == -np.inf:
@@ -1106,7 +1036,14 @@ class Live(QtWidgets.QMainWindow):
 
     def updateTempPlot(self):
         # Draw Bars
-        #print("TEMPERATURE: ", self.temperatures)
+        try:
+            ymin = float(self.wg.qline_bar_level_min.text())
+        except:
+            ymin = 40
+        try:
+            ymax = float(self.wg.qline_bar_level_max.text())
+        except:
+            ymax = 80
         if self.connected:
             if not self.temperatures == []:
                 if len(self.temperatures) == len(self.tpm_station.tiles):
@@ -1125,6 +1062,9 @@ class Live(QtWidgets.QMainWindow):
                 self.tempBoardPlots.set_xlabel("No data available!")
                 self.tempFpga1Plots.set_xlabel("No data available!")
                 self.tempFpga2Plots.set_xlabel("No data available!")
+            self.tempBoardPlots.set_ylim([ymin, ymax])
+            self.tempFpga1Plots.set_ylim([ymin, ymax])
+            self.tempFpga2Plots.set_ylim([ymin, ymax])
             self.tempBoardPlots.updatePlot()
             self.tempFpga1Plots.updatePlot()
             self.tempFpga2Plots.updatePlot()
@@ -1141,7 +1081,15 @@ class Live(QtWidgets.QMainWindow):
         elif self.wg.qcombo_chart.currentIndex() == 2:
             self.tempChart.set_ylabel("TPM FPGA2 Temperatures (deg)")
         # Chart: TPM Temperatures
-        self.tempChart.set_ylim([20, 120])
+        try:
+            ymin = float(self.wg.qline_chart_level_min.text())
+        except:
+            ymin = 40
+        try:
+            ymax = float(self.wg.qline_chart_level_max.text())
+        except:
+            ymax = 80
+        self.tempChart.set_ylim([ymin, ymax])
         for i in range(len(self.data_temp_charts.keys())):
             self.tempChart.plotCurve(data=np.array(self.data_temp_charts["TPM-%02d" % (i + 1)]).transpose()[
                 self.wg.qcombo_chart.currentIndex()], trace=i, color=COLORI[i])
@@ -1180,7 +1128,7 @@ class Live(QtWidgets.QMainWindow):
             #self.livePlots.plotClear()
             for n, i in enumerate(self.live_input_list):
                 # Plot X Pol
-                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 0, :],
+                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][self.live_mapping[i - 1], 0, :],
                                                 self.nsamples)
                 self.livePlots.plotCurve(self.asse_x, spettro, n, xAxisRange=xAxisRange,
                                          yAxisRange=yAxisRange, title="INPUT-%02d" % i,
@@ -1189,7 +1137,7 @@ class Live(QtWidgets.QMainWindow):
                                          show_line=self.wg.qcheck_xpol_sp.isChecked())
 
                 # Plot Y Pol
-                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][i - 1, 1, :],
+                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][self.live_mapping[i - 1], 1, :],
                                               self.nsamples)
                 self.livePlots.plotCurve(self.asse_x, spettro, n, xAxisRange=xAxisRange,
                                          yAxisRange=yAxisRange, colore="g", rfpower=rms,
@@ -1334,7 +1282,7 @@ if __name__ == "__main__":
 
     if not opt.nogui:
         app = QtWidgets.QApplication(sys.argv)
-        window = Live(config=opt.config, uiFile="skalab_live.ui")
+        window = Live(config=opt.config, uiFile="skalab_live.ui", swpath=default_app_dir)
         window.signalTemp.connect(window.updateTempPlot)
         window.signalRms.connect(window.updateRms)
         sys.exit(app.exec_())
@@ -1351,7 +1299,7 @@ if __name__ == "__main__":
             if not opt.config == "":
                 station_config = opt.config
             else:
-                station_config = profile['App']['station_config']
+                station_config = profile['Base']['station_file']
             if not station_config == "":
                 station.load_configuration_file(station_config)
                 # Create station
@@ -1361,8 +1309,8 @@ if __name__ == "__main__":
 
                 if opt.temperatures:
                     temp_path = ""
-                    if "temperatures_path" in profile['App'].keys():
-                        temp_path = profile['App']['temperatures_path']
+                    if "temperatures_path" in profile['Base'].keys():
+                        temp_path = profile['Base']['temperatures_path']
                     if not temp_path == "":
                         if not temp_path[-1] == "/":
                             temp_path = temp_path + "/"
