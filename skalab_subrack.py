@@ -490,7 +490,7 @@ class Subrack(SkalabBase):
             self.plotPsu.set_xlabel("No data available")
         self.plotPsu.updatePlot()
         if (MgnTraces[0] in self.telemetry.keys()) and (MgnTraces[1] in self.telemetry.keys()):
-            self.plotMgnTemp.set_xlabel("SubRack Temperatures")
+            self.plotMgnTemp.set_xlabel("SubRack Temps")
             for n, k in enumerate(MgnTraces):
                 self.plotMgnTemp.plotBar(data=self.telemetry[k][0], bar=(n * 2), color=COLORI[(n * 2)])
                 self.plotMgnTemp.plotBar(data=self.telemetry[k][1], bar=(1 + n * 2), color=COLORI[(1 + n * 2)])
