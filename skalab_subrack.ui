@@ -132,59 +132,6 @@
       </rect>
      </property>
     </widget>
-    <widget class="QWidget" name="qw_messages" native="true">
-     <property name="geometry">
-      <rect>
-       <x>350</x>
-       <y>240</y>
-       <width>791</width>
-       <height>231</height>
-      </rect>
-     </property>
-     <widget class="QTabWidget" name="qtabLog">
-      <property name="geometry">
-       <rect>
-        <x>10</x>
-        <y>0</y>
-        <width>771</width>
-        <height>231</height>
-       </rect>
-      </property>
-      <property name="font">
-       <font>
-        <weight>50</weight>
-        <bold>false</bold>
-       </font>
-      </property>
-      <property name="autoFillBackground">
-       <bool>false</bool>
-      </property>
-      <property name="styleSheet">
-       <string notr="true"/>
-      </property>
-      <property name="currentIndex">
-       <number>0</number>
-      </property>
-      <widget class="QWidget" name="tabLog">
-       <property name="styleSheet">
-        <string notr="true"/>
-       </property>
-       <attribute name="title">
-        <string>Log   </string>
-       </attribute>
-      </widget>
-      <widget class="QWidget" name="tabWarning">
-       <attribute name="title">
-        <string>Warnings   </string>
-       </attribute>
-      </widget>
-      <widget class="QWidget" name="tabError">
-       <attribute name="title">
-        <string>Errors   cnt: 0  </string>
-       </attribute>
-      </widget>
-     </widget>
-    </widget>
     <widget class="QPushButton" name="qbutton_connect">
      <property name="geometry">
       <rect>
@@ -958,54 +905,9 @@
       <set>Qt::AlignCenter</set>
      </property>
     </widget>
-    <widget class="QPushButton" name="qbutton_clear_log">
-     <property name="geometry">
-      <rect>
-       <x>1060</x>
-       <y>240</y>
-       <width>71</width>
-       <height>21</height>
-      </rect>
-     </property>
-     <property name="toolTip">
-      <string extracomment="Clear Text on the Current Tab">Clear Text on the Current Tab</string>
-     </property>
-     <property name="statusTip">
-      <string/>
-     </property>
-     <property name="whatsThis">
-      <string/>
-     </property>
-     <property name="text">
-      <string>Clear</string>
-     </property>
-    </widget>
-    <widget class="QPushButton" name="qbutton_reset_error_cnt">
-     <property name="geometry">
-      <rect>
-       <x>970</x>
-       <y>240</y>
-       <width>71</width>
-       <height>21</height>
-      </rect>
-     </property>
-     <property name="toolTip">
-      <string>Reset Error Counter</string>
-     </property>
-     <property name="toolTipDuration">
-      <number>-1</number>
-     </property>
-     <property name="statusTip">
-      <string/>
-     </property>
-     <property name="text">
-      <string>Reset</string>
-     </property>
-    </widget>
     <zorder>qlabel_message</zorder>
     <zorder>qcombo_chart</zorder>
     <zorder>qplot_chart_tpm</zorder>
-    <zorder>qw_messages</zorder>
     <zorder>qbutton_connect</zorder>
     <zorder>qplot_mgn_temp</zorder>
     <zorder>qplot_psu</zorder>
@@ -1020,8 +922,6 @@
     <zorder>qbutton_clear_chart</zorder>
     <zorder>qlabel_tstamp</zorder>
     <zorder>qline_ip</zorder>
-    <zorder>qbutton_clear_log</zorder>
-    <zorder>qbutton_reset_error_cnt</zorder>
    </widget>
    <widget class="QWidget" name="qtab_conf">
     <attribute name="title">

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from skalab_base import SkalabBase
+from skalab_log import SkalabLog
 import gc
 import os.path
 import glob
@@ -18,7 +19,6 @@ from pathlib import Path
 import h5py
 import logging
 
-# Uncomment below for terminal log messages
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 MgnTraces = ['board_temperatures', 'backplane_temperatures']
@@ -115,28 +115,6 @@ def populateCharts(form):
     return qbuttons
 
 
-class QTextEditLogger(logging.Handler):
-    def __init__(self, parent, level=logging.INFO, caption=None):
-        super().__init__()
-        self.widget = QtWidgets.QPlainTextEdit(parent)
-        self.widget.setReadOnly(True)
-        self.level = level
-        self.caption = caption
-        self.total = 0
-
-    def emit(self, record):
-        if (record.levelno == self.level) or (self.level == logging.INFO):
-            msg = self.format(record)
-            self.widget.appendPlainText(msg)
-            if self.caption is not None:
-                # self.caption.setFont(font_bold())
-                self.total = self.total + 1
-                self.caption.setTabText(2, record.levelname[0] + record.levelname[1:].lower() +
-                                        "s  cnt:%s" % str(self.total).rjust(3, " ") + " (*)")
-    def clear(self):
-        self.widget.clear()
-
-
 class Subrack(SkalabBase):
     """ Main UI Window class """
     # Signal for Slots
@@ -155,6 +133,12 @@ class Subrack(SkalabBase):
         self.wgProBox.setGeometry(QtCore.QRect(1, 1, 800, 860))
         self.wgProBox.setVisible(True)
         self.wgProBox.show()
+        self.qw_log = QtWidgets.QWidget(self.wg.qtab_app)
+        self.qw_log.setGeometry(QtCore.QRect(350, 240, 791, 231))
+        self.qw_log.setVisible(True)
+        self.qw_log.show()
+        self.logs = SkalabLog(parent=self.qw_log)
+
         super(Subrack, self).__init__(App="subrack", Profile=profile, Path=swpath, parent=self.wgProBox)
         self.connected = False
         self.populate_table_profile()
@@ -207,8 +191,6 @@ class Subrack(SkalabBase):
         self.wg.qplot_chart_tpm.setVisible(False)
 
         self.populate_help()
-        self.setLogs()
-
 
     def load_events(self):
         self.wg.qbutton_connect.clicked.connect(lambda: self.connect())
@@ -224,51 +206,6 @@ class Subrack(SkalabBase):
             #self.fans[i]['slider'].valueChanged.connect(lambda state, g=i: self.cmdSetFanSpeed(fan_id=g))
             self.fans[i]['slider'].sliderPressed.connect(lambda g=i: self.sliderPressed(fan_id=g))
             self.fans[i]['slider'].sliderReleased.connect(lambda g=i: self.cmdSetFanSpeed(fan_id=g))
-
-    def setLogs(self):
-        self.wg.qtabLog.currentChanged.connect(self.logChanged)
-        self.wg.qbutton_clear_log.clicked.connect(self.clearLog)
-        self.wg.qbutton_reset_error_cnt.clicked.connect(self.resetCnt)
-        self.logInfo = QTextEditLogger(self)
-        self.logInfo.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-        logging.getLogger().addHandler(self.logInfo)
-        self.logInfo.setLevel(logging.INFO)
-        layoutInfo = QtWidgets.QVBoxLayout()
-        layoutInfo.addWidget(self.logInfo.widget)
-        self.wg.tabLog.setLayout(layoutInfo)
-
-        self.logWarning = QTextEditLogger(self, level=logging.WARNING)
-        self.logWarning.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-        logging.getLogger().addHandler(self.logWarning)
-        self.logWarning.setLevel(logging.WARNING)
-        layoutWarning = QtWidgets.QVBoxLayout()
-        layoutWarning.addWidget(self.logWarning.widget)
-        self.wg.tabWarning.setLayout(layoutWarning)
-
-        self.logError = QTextEditLogger(self, level=logging.ERROR, caption=self.wg.qtabLog)
-        self.logError.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-        logging.getLogger().addHandler(self.logError)
-        self.logError.setLevel(logging.ERROR)
-        layoutError = QtWidgets.QVBoxLayout()
-        layoutError.addWidget(self.logError.widget)
-        self.wg.tabError.setLayout(layoutError)
-
-    def logChanged(self):
-        if "(*)" in self.wg.qtabLog.tabText(self.wg.qtabLog.currentIndex()):
-            self.wg.qtabLog.setTabText(self.wg.qtabLog.currentIndex(),
-                                       self.wg.qtabLog.tabText(self.wg.qtabLog.currentIndex())[:-3])
-
-    def clearLog(self):
-        if self.wg.qtabLog.currentIndex() == 0:
-            self.logInfo.clear()
-        elif self.wg.qtabLog.currentIndex() == 1:
-            self.logWarning.clear()
-        else:
-            self.logError.clear()
-
-    def resetCnt(self):
-        self.logError.total = 0
-        self.wg.qtabLog.setTabText(2, "Errors  cnt:  0")
 
     def reload(self, ip=None, port=None):
         if ip is not None:
