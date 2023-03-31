@@ -137,7 +137,7 @@ class Subrack(SkalabBase):
         self.qw_log.setGeometry(QtCore.QRect(350, 240, 791, 231))
         self.qw_log.setVisible(True)
         self.qw_log.show()
-        self.logs = SkalabLog(parent=self.qw_log)
+        self.logs = SkalabLog(parent=self.qw_log, logname='subrack')
 
         super(Subrack, self).__init__(App="subrack", Profile=profile, Path=swpath, parent=self.wgProBox)
         self.connected = False
