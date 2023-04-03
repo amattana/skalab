@@ -2,6 +2,7 @@
 import copy
 
 from skalab_base import SkalabBase
+from skalab_log import SkalabLog
 import datetime
 import glob
 import math
@@ -97,8 +98,9 @@ class Live(SkalabBase):
         self.wgProBox.setGeometry(QtCore.QRect(1, 1, 800, 860))
         self.wgProBox.setVisible(True)
         self.wgProBox.show()
-        #self.wg.qtab_conf = uic.loadUi("skalab_profile.ui")
+
         super(Live, self).__init__(App="live", Profile=profile, Path=swpath, parent=self.wgProBox)
+        self.logs = SkalabLog(parent=self.wg.qw_log, profile=self.profile)
 
         # Load window file
         self.connected = False
@@ -247,7 +249,7 @@ class Live(SkalabBase):
         self.wg.qcombo_chart.currentIndexChanged.connect(lambda: self.switchChart())
         self.wg.qcombo_tpm.currentIndexChanged.connect(lambda: self.updatePreadu())
 
-    def populate_help(self, uifile="skalab_live.ui"):
+    def populate_help(self, uifile="Gui/skalab_live.ui"):
         with open(uifile) as f:
             data = f.readlines()
         helpkeys = [d[d.rfind('name="Help_'):].split('"')[1] for d in data if 'name="Help_' in d]
@@ -1282,7 +1284,7 @@ if __name__ == "__main__":
 
     if not opt.nogui:
         app = QtWidgets.QApplication(sys.argv)
-        window = Live(config=opt.config, uiFile="skalab_live.ui", swpath=default_app_dir)
+        window = Live(config=opt.config, uiFile="Gui/skalab_live.ui", swpath=default_app_dir)
         window.signalTemp.connect(window.updateTempPlot)
         window.signalRms.connect(window.updateRms)
         sys.exit(app.exec_())

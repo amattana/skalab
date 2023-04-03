@@ -133,13 +133,13 @@ class Subrack(SkalabBase):
         self.wgProBox.setGeometry(QtCore.QRect(1, 1, 800, 860))
         self.wgProBox.setVisible(True)
         self.wgProBox.show()
-        self.qw_log = QtWidgets.QWidget(self.wg.qtab_app)
-        self.qw_log.setGeometry(QtCore.QRect(350, 240, 791, 231))
-        self.qw_log.setVisible(True)
-        self.qw_log.show()
-        self.logs = SkalabLog(parent=self.qw_log, logname='subrack')
+        # self.qw_log = QtWidgets.QWidget(self.wg.qtab_app)
+        # self.qw_log.setGeometry(QtCore.QRect(350, 240, 791, 231))
+        # self.qw_log.setVisible(True)
+        # self.qw_log.show()
 
         super(Subrack, self).__init__(App="subrack", Profile=profile, Path=swpath, parent=self.wgProBox)
+        self.logs = SkalabLog(parent=self.wg.qw_log, profile=self.profile)
         self.connected = False
         self.populate_table_profile()
         self.reload(ip=ip, port=port)
@@ -211,11 +211,11 @@ class Subrack(SkalabBase):
         if ip is not None:
             self.ip = ip
         else:
-            self.ip = str(self.profile['SubRack']['ip'])
+            self.ip = str(self.profile['Subrack']['ip'])
         if port is not None:
             self.port = port
         else:
-            self.port = int(self.profile['SubRack']['port'])
+            self.port = int(self.profile['Subrack']['port'])
         self.wg.qline_ip.setText("%s (%d)" % (self.ip, self.port))
         if 'Query' in self.profile.keys():
             if 'once' in self.profile['Query'].keys():
@@ -225,7 +225,7 @@ class Subrack(SkalabBase):
             if 'deny' in self.profile['Query'].keys():
                 self.query_tiles = list(self.profile['Query']['tiles'].split(","))
 
-    def populate_help(self, uifile="skalab_subrack.ui"):
+    def populate_help(self, uifile="Gui/skalab_subrack.ui"):
         with open(uifile) as f:
             data = f.readlines()
         helpkeys = [d[d.rfind('name="Help_'):].split('"')[1] for d in data if 'name="Help_' in d]
@@ -443,8 +443,8 @@ class Subrack(SkalabBase):
         # self.plotTpmTemp.updatePlot()
 
     def setup_hdf5(self):
-        if not self.profile['SubRack']['data_path'] == "":
-            fname = self.profile['SubRack']['data_path']
+        if not self.profile['Subrack']['data_path'] == "":
+            fname = self.profile['Subrack']['data_path']
             if not fname[-1] == "/":
                 fname = fname + "/"
             fname += datetime.datetime.strftime(datetime.datetime.utcnow(), "subrack_tlm_%Y-%m-%d_%H%M%S.h5")
@@ -598,7 +598,7 @@ class Subrack(SkalabBase):
                     logging.log(logging.WARNING, "Failed to get Subrack Telemetry!")
                     pass
                 cycle = 0.0
-                while cycle < (float(self.profile['SubRack']['query_interval'])) and not self.skipThreadPause:
+                while cycle < (float(self.profile['Subrack']['query_interval'])) and not self.skipThreadPause:
                     sleep(0.1)
                     cycle = cycle + 0.1
                 self.skipThreadPause = False
@@ -687,7 +687,7 @@ if __name__ == "__main__":
 
     if not opt.nogui:
         app = QtWidgets.QApplication(sys.argv)
-        window = Subrack(ip=opt.ip, port=opt.port, uiFile="skalab_subrack.ui", profile=opt.profile, swpath=default_app_dir)
+        window = Subrack(ip=opt.ip, port=opt.port, uiFile="Gui/skalab_subrack.ui", profile=opt.profile, swpath=default_app_dir)
         window.signalTlm.connect(window.updateTlm)
         sys.exit(app.exec_())
     else:

@@ -51,7 +51,7 @@ class QTextEditLogger(logging.Handler):
 
 class SkalabLog(QtWidgets.QMainWindow):
     """ SkaLab Log class """
-    def __init__(self, parent, logname='Default.log'):
+    def __init__(self, parent, profile=None):
         super().__init__(parent=None)
         self.wg = parent
         self.qtabLog = QtWidgets.QTabWidget(self.wg)
@@ -90,26 +90,27 @@ class SkalabLog(QtWidgets.QMainWindow):
 
         # Set up default logging (and remove existing loggers)
         self.root_logger = logging.getLogger()
-        formatter = logging.Formatter("%(asctime)-25s %(levelname)-10s%(threadName)s - %(message)s")
+        formatter = logging.Formatter("%(asctime)-25s %(levelname)-10s %(threadName)s - %(message)s")
         logging.Formatter.converter = time.gmtime
         self.root_logger.setLevel(logging.INFO)
         self.root_logger.handlers = []
 
         # Set file handler
+        logname = default_app_dir + "/log"
+        if profile is not None:
+            if 'log' in profile[profile['Base']['app']].keys():
+                logname = profile[profile['Base']['app']]['log']
+                if not logname[-1] == "/":
+                    logname = logname + "/"
+                logname = logname + profile['Base']['app']
         pname = Path(logname)
         pname.mkdir(parents=True, exist_ok=True)
-        fname = logname + "/" + logname[logname.rfind("/") + 1:].upper() + \
-                datetime.datetime.strftime(datetime.datetime.utcnow(), "_%Y-%m-%d_%H%M%S.txt")
+        fname = logname + "/" + logname[logname.rfind("/") + 1:].lower() + \
+                datetime.datetime.strftime(datetime.datetime.utcnow(), "_log_%Y-%m-%d_%H%M%S.txt")
         self.file_handler = TimedRotatingFileHandler(fname, when="h", interval=1, backupCount=180, utc=True)
         self.file_handler.setFormatter(formatter)
         self.file_handler.setLevel(logging.INFO)
         self.root_logger.addHandler(self.file_handler)
-
-        # Set console handler
-        self.console_handler = logging.StreamHandler()
-        self.console_handler.setFormatter(formatter)
-        self.console_handler.setLevel(logging.INFO)
-        self.root_logger.addHandler(self.console_handler)
 
         self.logInfo = QTextEditLogger(self)
         self.logInfo.setFormatter(formatter)
@@ -137,6 +138,12 @@ class SkalabLog(QtWidgets.QMainWindow):
 
         logging.info("Log File: " + fname)
         logging.info("Logging Time is set to UTC")
+
+        # Set console handler
+        self.console_handler = logging.StreamHandler()
+        self.console_handler.setFormatter(formatter)
+        self.console_handler.setLevel(logging.INFO)
+        self.root_logger.addHandler(self.console_handler)
 
     def logChanged(self):
         if "(*)" in self.qtabLog.tabText(self.qtabLog.currentIndex()):

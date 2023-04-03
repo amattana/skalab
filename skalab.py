@@ -140,7 +140,7 @@ class SkaLab(QtWidgets.QMainWindow):
 
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabLiveIndex, True)
         self.wgLiveLayout = QtWidgets.QVBoxLayout()
-        self.wgLive = Live(self.config_file, "skalab_live.ui", size=[1190, 936],
+        self.wgLive = Live(self.config_file, "Gui/skalab_live.ui", size=[1190, 936],
                            profile=self.profile['Base']['live'],
                            swpath=default_app_dir)
         self.wgLive.signalTemp.connect(self.wgLive.updateTempPlot)
@@ -151,7 +151,7 @@ class SkaLab(QtWidgets.QMainWindow):
 
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabPlayIndex, True)
         self.wgPlayLayout = QtWidgets.QVBoxLayout()
-        self.wgPlay = Playback(self.config_file, "skalab_playback.ui", size=[1190, 936],
+        self.wgPlay = Playback(self.config_file, "Gui/skalab_playback.ui", size=[1190, 936],
                                profile=self.profile['Base']['playback'],
                                swpath=default_app_dir)
         self.wgPlayLayout.addWidget(self.wgPlay)
@@ -159,7 +159,7 @@ class SkaLab(QtWidgets.QMainWindow):
 
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabSubrackIndex, True)
         self.wgSubrackLayout = QtWidgets.QVBoxLayout()
-        self.wgSubrack = Subrack(uiFile="skalab_subrack.ui", size=[1190, 936],
+        self.wgSubrack = Subrack(uiFile="Gui/skalab_subrack.ui", size=[1190, 936],
                                  profile=self.profile['Base']['subrack'],
                                  swpath=default_app_dir)
         self.wgSubrackLayout.addWidget(self.wgSubrack)
@@ -280,7 +280,7 @@ class SkaLab(QtWidgets.QMainWindow):
                 if current == p:
                     self.wg.qcombo_profiles.setCurrentIndex(n)
 
-    def populate_help(self, uifile="skalab_main.ui"):
+    def populate_help(self, uifile="Gui/skalab_main.ui"):
         with open(uifile) as f:
             data = f.readlines()
         helpkeys = [d[d.rfind('name="Help_'):].split('"')[1] for d in data if 'name="Help_' in d]
@@ -707,5 +707,5 @@ if __name__ == "__main__":
     else:
         profile = opt.profile
 
-    window = SkaLab("skalab_main.ui", profile=profile)
+    window = SkaLab("Gui/skalab_main.ui", profile=profile)
     sys.exit(app.exec_())

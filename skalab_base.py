@@ -9,7 +9,7 @@ class SkalabBase(QtWidgets.QMainWindow):
         super().__init__()
         self.connected = False
         self.profile = {}
-        self.wgProfile = uic.loadUi("skalab_profile.ui", parent)
+        self.wgProfile = uic.loadUi("Gui/skalab_profile.ui", parent)
         self.wgProfile.qbutton_load.clicked.connect(lambda: self.load())
         self.wgProfile.qbutton_saveas.clicked.connect(lambda: self.save_as_profile())
         self.wgProfile.qbutton_save.clicked.connect(lambda: self.save_profile())

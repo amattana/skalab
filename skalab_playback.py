@@ -201,7 +201,7 @@ class Playback(SkalabBase):
             msgBox.setWindowTitle("Error!")
             msgBox.exec_()
 
-    def populate_help(self, uifile="skalab_playback.ui"):
+    def populate_help(self, uifile="Gui/skalab_playback.ui"):
         with open(uifile) as f:
             data = f.readlines()
         helpkeys = [d[d.rfind('name="Help_'):].split('"')[1] for d in data if 'name="Help_' in d]
@@ -779,6 +779,6 @@ if __name__ == "__main__":
     (conf, args) = parser.parse_args(argv[1:])
 
     app = QtWidgets.QApplication(sys.argv)
-    window = Playback(config=conf.config, uiFile="skalab_playback.ui")
+    window = Playback(config=conf.config, uiFile="Gui/skalab_playback.ui")
 
     sys.exit(app.exec_())
