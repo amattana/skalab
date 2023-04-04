@@ -27,19 +27,20 @@ class QTextEditLogger(logging.Handler):
         html_header += "<meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">p, li "
         html_header += "{ white-space: pre-wrap; }</style></head><body style=\" font-family:\"Courier\";"
         html_header += "font-size:11pt; font-weight:400; font-style:normal;\">"
-        self.widget.append(html_header)
+        self.widget.insertHtml(html_header)
 
     def emit(self, record):
         if (record.levelno == self.level) or (self.level == logging.INFO):
             msg = self.format(record)
             if record.levelno == logging.INFO:
-                fancymsg = "<span style='font-weight:600; color:#22b80e;'>" + msg + "</span>"
+                fancymsg = "\n<span style='font-weight:600; color:#22b80e;'>" + msg + "</span><br>"
             elif record.levelno == logging.ERROR:
-                fancymsg = "<span style='font-weight:600; color:#ff0000;'>" + msg + "</span>"
+                fancymsg = "\n<span style='font-weight:600; color:#ff0000;'>" + msg + "</span><br>"
             else:
-                fancymsg = "<span style='font-weight:600; color:#ff7800;'>" + msg + "</span>"
+                fancymsg = "\n<span style='font-weight:600; color:#ff7800;'>" + msg + "</span><br>"
 
-            self.widget.append(fancymsg)
+            self.widget.insertHtml(fancymsg)
+            self.widget.ensureCursorVisible()
             if self.caption is not None:
                 self.total = self.total + 1
                 self.caption.setTabText(2, record.levelname[0] + record.levelname[1:].lower() +
@@ -88,7 +89,6 @@ class SkalabLog(QtWidgets.QMainWindow):
         self.qtabLog.currentChanged.connect(self.logChanged)
         #self.qtabLog.show()
 
-        # Set up default logging (and remove existing loggers)
         self.root_logger = logging.getLogger()
         formatter = logging.Formatter("%(asctime)-25s %(levelname)-10s %(threadName)s - %(message)s")
         logging.Formatter.converter = time.gmtime
@@ -190,7 +190,7 @@ if __name__ == "__main__":
         os.mkdir(default_app_dir)
     fname = default_app_dir + "/testlog"
 
-    slog = SkalabLog(parent=wg, logname=fname)
+    slog = SkalabLog(parent=wg)
     slog.testFunc()
     wg.show()
     wg.raise_()

@@ -19,7 +19,10 @@ from pathlib import Path
 import h5py
 import logging
 
+__name__ = "subrack"
+logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
 
 MgnTraces = ['board_temperatures', 'backplane_temperatures']
 default_app_dir = str(Path.home()) + "/.skalab/"
