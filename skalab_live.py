@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import copy
-
 from skalab_base import SkalabBase
 from skalab_log import SkalabLog
 import datetime
@@ -8,6 +7,7 @@ import glob
 import math
 import os
 import shutil
+import logging
 import sys
 import gc
 import time
@@ -15,7 +15,6 @@ from pathlib import Path
 import configparser
 from time import sleep
 from past.utils import old_div
-
 import numpy as np
 from PyQt5 import QtWidgets, uic, QtCore, QtGui
 from PyQt5.QtCore import Qt
@@ -27,11 +26,6 @@ from pyaavs.station import Station
 from pyaavs import station
 from threading import Thread
 from pydaq.persisters import ChannelFormatFileManager, FileDAQModes
-
-# profile_extension = {
-#     'Live': {
-#         'station_config': "",
-#         'preadu_version': 3.0}}
 
 default_app_dir = str(Path.home()) + "/.skalab/"
 default_profile = "Default"
@@ -268,17 +262,17 @@ class Live(SkalabBase):
         if not result == "":
             if self.wg.qradio_int_spectra.isChecked():
                 self.monitorPlots.savePicture(fname=result)
-                print("Saved Integrated Spectra Monitoring Plots Picture on " + result)
+                logging.info("Saved Integrated Spectra Monitoring Plots Picture on " + result)
             elif self.wg.qradio_raw.isChecked():
                 self.livePlots.savePicture(fname=result)
-                print("Saved Live Spectra Picture on " + result)
+                logging.info("Saved Live Spectra Picture on " + result)
             elif self.wg.qradio_temps.isChecked():
                 self.tempChart.savePicture(fname=result)
-                print("Saved Temperatures Chart Picture on " + result)
+                logging.info("Saved Temperatures Chart Picture on " + result)
             elif self.wg.qradio_rms.isChecked():
                 if self.wg.qradio_rms_chart.isChecked():
                     self.rmsChart.savePicture(fname=result)
-                    print("Saved RMS Chart Picture on " + result)
+                    logging.info("Saved RMS Chart Picture on " + result)
 
     def check_raw(self, b):
         if b.isChecked():
@@ -427,7 +421,7 @@ class Live(SkalabBase):
 
     def setupPreadu(self, version):
         if self.connected:
-            print("Setting preadu version: %s" % (self.wg.qcombo_preadu_version.currentText().split()[0]))
+            logging.info("Setting preadu version: %s" % (self.wg.qcombo_preadu_version.currentText().split()[0]))
             self.wpreadu.set_preadu_version(self.wg.qcombo_preadu_version.currentText().split()[0])
             self.updatePreadu()
             for p in self.preadu:
@@ -440,7 +434,7 @@ class Live(SkalabBase):
 
     def updatePreadu(self):
         if self.connected:
-            #print("SWITCH to PREADU of TPM %d (Station of %d TPMs)" % (self.wg.qcombo_tpm.currentIndex() + 1, len(self.preaduConf)))
+            #logging.info("SWITCH to PREADU of TPM %d (Station of %d TPMs)" % (self.wg.qcombo_tpm.currentIndex() + 1, len(self.preaduConf)))
             self.wpreadu.setConfiguration(conf=self.preaduConf[self.wg.qcombo_tpm.currentIndex()])
             self.wpreadu.updateRms(self.rms[self.wg.qcombo_tpm.currentIndex()])
 
@@ -554,7 +548,7 @@ class Live(SkalabBase):
                         sleep(0.1)
                         self.RunBusy = False
                 except:
-                    print("Failed to get DAQ data!")
+                    logging.error("Failed to get DAQ data!")
                     pass
                 cycle = 0.0
                 while cycle < (int(self.profile['Live']['query_interval']) - 1) and not self.skipThreadPause:
@@ -586,12 +580,12 @@ class Live(SkalabBase):
                             "receiver_ip": int_data_ip.encode(),
                             "nof_tiles": nof_tiles,
                             'directory': self.profile['Data']['integrated_spectra_path']}
-                        #print(daq_config)
+                        #logging.debug(daq_config)
                         if os.path.exists(self.profile['Data']['integrated_spectra_path']):
                             self.initMonitor = False
                             self.monitor_daq = monit_daq
                             self.monitor_daq.populate_configuration(daq_config)
-                            print("Integrated Data Conf %s:%s on NIC %s" % (int_data_ip, int_data_port, int_data_if))
+                            logging.info("Integrated Data Conf %s:%s on NIC %s" % (int_data_ip, int_data_port, int_data_if))
                             self.monitor_daq.initialise_daq()
                             self.monitor_daq.start_integrated_channel_data_consumer()
                             self.monitor_file_manager = ChannelFormatFileManager(root_path=self.profile['Data']['integrated_spectra_path'],
@@ -629,7 +623,7 @@ class Live(SkalabBase):
                         self.signalTemp.emit()
                         self.signalRms.emit()
                 except:
-                    print("Failed to get RMS and/or Temperature data!")
+                    logging.warning("Failed to get RMS and/or Temperature data!")
                     self.commBusy = False
                     # self.preadu.Busy = False
                     pass
@@ -643,7 +637,7 @@ class Live(SkalabBase):
                             self.writing_preadu = True
                             # for i in range(self.wpreadu.inputs):
                             #     self.preadu[self.wg.qcombo_tpm.currentIndex()].preadu.set_register_value(nrx=i, value=int("0x" + self.wpreadu.records[i]['value'].text(), 16))
-                            # print(self.wpreadu.tpmConf, self.wpreadu.guiConf)
+                            # logging.debug(self.wpreadu.tpmConf, self.wpreadu.guiConf)
                             self.preadu[self.wg.qcombo_tpm.currentIndex()].write_configuration(self.wpreadu.guiConf)
                             self.wpreadu.write_armed = False
                             self.wpreadu.setConfiguration(self.wpreadu.guiConf)
@@ -651,13 +645,13 @@ class Live(SkalabBase):
                             self.writing_preadu = False
                         # Apply Equalization from Live Gui
                         if self.eq_armed and self.connected:
-                            print("Applying Equalization")
+                            logging.info("Applying Equalization")
                             if self.wg.qradio_eq_this.isChecked():
                                 tiles = [self.wg.qcombo_tpm.currentIndex()]
                             else:
                                 tiles = range(len(self.tpm_station.tiles))
                             for t in tiles:
-                                #print("TILE-%02d" % (t+1))
+                                #logging.debug("TILE-%02d" % (t+1))
                                 self.preadu[t].write_configuration(self.preaduConf[t])
                                 time.sleep(0.1)
                             self.tmpPreaduConf = []
@@ -693,7 +687,7 @@ class Live(SkalabBase):
                         self.wg.qlabel_tstamp_int_spectra.setText(ts_to_datestring(timestamps[0][0]) +
                                                                   " (Period: %3.1f secs)" %
                                                                   (8 * float(self.tpm_station.configuration['station']['channel_integration_time'])))
-                        #print("PLOTTO ORA IL ", ts_to_datestring(timestamps[0][0]))
+                        #logging.debug("PLOTTO ORA IL ", ts_to_datestring(timestamps[0][0]))
                         for i in range(16):
                             # Plot X Pol
                             spettro = monitorData[:, remap[i], 0, -1]
@@ -713,9 +707,9 @@ class Live(SkalabBase):
                         self.monitorPlots.updatePlot()
                         self.monitorPrecTstamp = timestamps[0][0]
                 #     else:
-                #         print("Uguale al precedente")
+                #         logging.debug("Uguale al precedente")
                 # else:
-                #     print("Non ancora pronto: ", ts_to_datestring(timestamps[0][0]), "  vs start:", ts_to_datestring(self.monitor_tstart))
+                #     logging.debug("Non ancora pronto: ", ts_to_datestring(timestamps[0][0]), "  vs start:", ts_to_datestring(self.monitor_tstart))
 
     def readRms(self):
         if self.connected:
@@ -746,7 +740,7 @@ class Live(SkalabBase):
             self.wg.qbutton_equalize.setEnabled(False)
             self.wg.qbutton_equalize.setStyleSheet("background-color: rgb(237, 212, 0);")
             for iter in range(1):
-                # print("\n\nLEVEL EQUALIZATION (iter %d/3)" % (iter + 1))
+                # logging.debug("\n\nLEVEL EQUALIZATION (iter %d/3)" % (iter + 1))
                 self.readRms()
                 if len(self.rms) == len(self.tpm_station.tiles):
                     if self.wg.qradio_eq_this.isChecked():
@@ -757,7 +751,7 @@ class Live(SkalabBase):
                     target = float(self.wg.qline_eqvalue.text())
                     if self.wg.qcombo_equnit.currentIndex() == 0:  # ADU RMS
                         for t in tiles:
-                            #print("Tiles", tiles, "t", t, "len(RMS)", len(RMS), self.rms[self.wg.qcombo_tpm.currentIndex()])
+                            #logging.debug("Tiles", tiles, "t", t, "len(RMS)", len(RMS), self.rms[self.wg.qcombo_tpm.currentIndex()])
                             for i in range(len(RMS[t])):
                                 rms = RMS[t][i]
                                 if old_div(rms, target) > 0:
@@ -786,8 +780,8 @@ class Live(SkalabBase):
                                 dsa = self.wpreadu.staticRx.rx[self.preaduConf[t][i]['version']].op_get_attenuation(self.preaduConf[t][i]['code'])
                                 new_dsa = bound(int(round(dsa + (power - target))))
                                 self.preaduConf[t][i]['code'] = self.wpreadu.staticRx.rx[self.preaduConf[t][i]['version']].op_set_attenuation(self.preaduConf[t][i]['code'], new_dsa)
-                                #print("TPM-%02d INPUT-%02d, Level: %3.1f, Old DSA %d, New DSA %d" % (b+1, i, power, dsa, new_dsa))
-                                #print(i, self.preadu.preadu.get_register_value(nrx=i), self.preaduConf[b][i]['dsa'])
+                                #logging.debug("TPM-%02d INPUT-%02d, Level: %3.1f, Old DSA %d, New DSA %d" % (b+1, i, power, dsa, new_dsa))
+                                #logging.debug(i, self.preadu.preadu.get_register_value(nrx=i), self.preaduConf[b][i]['dsa'])
                             self.eq_armed = True
                             self.writing_preadu = True
                             while self.writing_preadu:
@@ -797,7 +791,7 @@ class Live(SkalabBase):
                             time.sleep(0.2)
                         # self.preadu.setTpm(self.tpm_station.tiles[self.wg.qcombo_tpm.currentIndex()])
                 else:
-                    print("ERROR Reading RMS (len=%d instead of %d)" % (len(self.rms), len(self.tpm_station.tiles)))
+                    logging.warning("RMS pkt does not match expected len (len=%d instead of %d)" % (len(self.rms), len(self.tpm_station.tiles)))
             self.wg.qbutton_equalize.setEnabled(True)
             self.wg.qbutton_equalize.setStyleSheet("")
             self.ThreadTempPause = False
@@ -818,7 +812,7 @@ class Live(SkalabBase):
                 self.data_temp_charts[k] = [[np.nan, np.nan, np.nan]] * 201
             self.data_temp_charts[k] = self.data_temp_charts[k][1:] + [tris]
 
-            #print("TPM-%02d Temperatures: Board %3.1f,\tFPGA-0 %3.1f,\tFPGA-1 %3.1f" %
+            #logging.debug("TPM-%02d Temperatures: Board %3.1f,\tFPGA-0 %3.1f,\tFPGA-1 %3.1f" %
             #      (n + 1, tris[0], tris[1], tris[2]))
 
     def closeTemp(self):
@@ -834,15 +828,15 @@ class Live(SkalabBase):
         if not self.profile['Data']['daq_path'] == "":
             self.tpm_nic_name = get_if_name(self.station_configuration['network']['lmc']['lmc_ip'])
             if self.tpm_nic_name == "":
-                print("Connection Error! (ETH Card name ERROR)")
+                logging.error("Connection Error! (ETH Card name ERROR)")
         if not self.tpm_nic_name == "":
             if os.path.exists(self.profile['Data']['daq_path']):
                 self.mydaq = MyDaq(daq, self.tpm_nic_name, self.tpm_station, len(self.station_configuration['tiles']),
                                    directory=self.profile['Data']['daq_path'])
-                print("DAQ Initialized, NIC: %s, NofTiles: %d, Data Directory: %s" %
+                logging.info("DAQ Initialized, NIC: %s, NofTiles: %d, Data Directory: %s" %
                       (self.tpm_nic_name, len(self.station_configuration['tiles']), self.profile['Data']['daq_path']))
             else:
-                print("DAQ Error: a valid data directory is required.")
+                logging.error("DAQ Error: a valid data directory is required.")
 
     def closeDAQ(self):
         self.mydaq.close()
@@ -1031,7 +1025,7 @@ class Live(SkalabBase):
                                 self.qp_rms[t].markers[pol].set_markeredgecolor(colors[pol])
                         self.qp_rms[t].updatePlot()
                 else:
-                    print("ERROR Reading RMS: got less data (tiles = %d)" % len(self.rms))
+                    logging.warning("RMS Length mismatch: got less data (tiles = %d)" % len(self.rms))
 
     def updatePlots(self):
         self.plotAcquisition()
@@ -1122,7 +1116,7 @@ class Live(SkalabBase):
         yAxisRange = (float(self.wg.qline_spectra_level_min.text()),
                       float(self.wg.qline_spectra_level_max.text()))
 
-        # print("RECEIVED DATA: %d" % len(self.live_data[int(self.wg.qcombo_tpm.currentIndex())]))
+        # logging.debug("RECEIVED DATA: %d" % len(self.live_data[int(self.wg.qcombo_tpm.currentIndex())]))
         lw = 1
         if self.wg.qcheck_spectra_noline.isChecked():
             lw = 0
@@ -1221,9 +1215,9 @@ class Live(SkalabBase):
                         "Are you sure you want to export %d files?" % (len(self.input_list)),
                         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
             if result == QtWidgets.QMessageBox.Yes:
-                print("Saving data")
+                logging.debug("Saving data")
             else:
-                print("ciao")
+                logging.debug("ciao")
 
     def channelsListModified(self):
         if not self.wg.qline_channels.text() == self.live_channels:
@@ -1292,9 +1286,9 @@ if __name__ == "__main__":
         profile = []
         fullpath = default_app_dir + opt.profile + "/" + profile_filename
         if not os.path.exists(fullpath):
-            print("\nThe Live Profile does not exist.\n")
+            logging.error("\nThe Live Profile does not exist.\n")
         else:
-            print("Loading Live Profile: " + opt.profile + " (" + fullpath + ")")
+            logging.info("Loading Live Profile: " + opt.profile + " (" + fullpath + ")")
             profile = parse_profile(fullpath)
             profile_name = profile
             profile_file = fullpath
@@ -1327,20 +1321,20 @@ if __name__ == "__main__":
                                     tris = [tile.get_temperature(),  tile.get_fpga0_temperature(),
                                             tile.get_fpga1_temperature()]
                                     temp_file.write(name=("TPM-%02d" % (n + 1)), data=tris)
-                                    print("TPM-%02d Temperatures: Board %3.1f,\tFPGA-0 %3.1f,\tFPGA-1 %3.1f" %
+                                    logging.info("TPM-%02d Temperatures: Board %3.1f,\tFPGA-0 %3.1f,\tFPGA-1 %3.1f" %
                                           (n + 1, tris[0], tris[1], tris[2]))
                                 sleep(1)
                             except KeyboardInterrupt:
-                                print("\n\nTerminated by the user.\n\n")
+                                logging.info("\n\nTerminated by the user.\n\n")
                                 temp_file.close()
-                                print("File closed: ", temp_path + fname, "\n")
+                                logging.info("File closed: ", temp_path + fname, "\n")
                                 break
                             except:
-                                print("ERROR SAVING TEMPERATURES!")
+                                logging.error("ERROR SAVING TEMPERATURES!")
                                 temp_file.close()
-                                print("File closed: ", temp_path + fname, "\n")
+                                logging.info("File closed: ", temp_path + fname, "\n")
                                 break
                     else:
-                        print("There is no any temperatures path specified in the profile file.\n")
+                        logging.warning("There is no any temperatures path specified in the profile file.\n")
             else:
-                print("The profile File doesn't have a Station Configuration File.\n")
+                logging.error("The profile File doesn't have a Station Configuration File.\n")
