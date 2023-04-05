@@ -40,7 +40,8 @@ class QTextEditLogger(logging.Handler):
                 fancymsg = "\n<span style='font-weight:600; color:#ff7800;'>" + msg + "</span><br>"
 
             self.widget.insertHtml(fancymsg)
-            self.widget.ensureCursorVisible()
+            #self.widget.ensureCursorVisible()
+            self.widget.moveCursor(QtGui.QTextCursor.End)
             if self.caption is not None:
                 self.total = self.total + 1
                 self.caption.setTabText(2, record.levelname[0] + record.levelname[1:].lower() +
