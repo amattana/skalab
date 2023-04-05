@@ -457,7 +457,7 @@ class Subrack(SkalabBase):
                 self.logger.logger.info("Connecting to Subrack %s:%d..." % (self.ip, int(self.port)))
                 self.client = WebHardwareClient(self.ip, self.port)
                 if self.client.connect():
-                    self.logger.logger.info("Successfully connected" % (self.ip, int(self.port)))
+                    self.logger.logger.info("Successfully connected")
                     self.tlm_keys = self.client.execute_command("list_attributes")["retvalue"]
                     self.logger.logger.info("Querying list of Subrack API attributes")
                     for tlmk in self.tlm_keys:
