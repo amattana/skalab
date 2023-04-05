@@ -94,7 +94,7 @@ class SkalabLog(QtWidgets.QMainWindow):
             self.logger = logging.getLogger(logname)
         else:
             self.logger = logging.getLogger('root')
-        formatter = logging.Formatter("%(asctime)-25s %(levelname)-10s - %(threadName)s - %(message)s")
+        formatter = logging.Formatter("%(asctime)-25s %(levelname)s - %(threadName)s - %(message)s")
         logging.Formatter.converter = time.gmtime
         self.logger.handlers = []
 
