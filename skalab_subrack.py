@@ -19,11 +19,6 @@ from pathlib import Path
 import h5py
 import logging
 
-__name__ = "subrack"
-logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-
 MgnTraces = ['board_temperatures', 'backplane_temperatures']
 default_app_dir = str(Path.home()) + "/.skalab/"
 default_profile = "Default"
@@ -136,13 +131,9 @@ class Subrack(SkalabBase):
         self.wgProBox.setGeometry(QtCore.QRect(1, 1, 800, 860))
         self.wgProBox.setVisible(True)
         self.wgProBox.show()
-        # self.qw_log = QtWidgets.QWidget(self.wg.qtab_app)
-        # self.qw_log.setGeometry(QtCore.QRect(350, 240, 791, 231))
-        # self.qw_log.setVisible(True)
-        # self.qw_log.show()
 
         super(Subrack, self).__init__(App="subrack", Profile=profile, Path=swpath, parent=self.wgProBox)
-        self.logs = SkalabLog(parent=self.wg.qw_log, profile=self.profile)
+        self.logger = SkalabLog(parent=self.wg.qw_log, logname=__name__, profile=self.profile)
         self.connected = False
         self.populate_table_profile()
         self.reload(ip=ip, port=port)
@@ -463,10 +454,12 @@ class Subrack(SkalabBase):
     def connect(self):
         if not self.wg.qline_ip.text() == "":
             if not self.connected:
-                logging.log(logging.INFO, "Connecting to Subrack %s:%d..." % (self.ip, int(self.port)))
+                self.logger.logger.info("Connecting to Subrack %s:%d..." % (self.ip, int(self.port)))
                 self.client = WebHardwareClient(self.ip, self.port)
                 if self.client.connect():
+                    self.logger.logger.info("Successfully connected" % (self.ip, int(self.port)))
                     self.tlm_keys = self.client.execute_command("list_attributes")["retvalue"]
+                    self.logger.logger.info("Querying list of Subrack API attributes")
                     for tlmk in self.tlm_keys:
                         if tlmk in self.query_once:
                             data = self.client.get_attribute(tlmk)
@@ -476,6 +469,9 @@ class Subrack(SkalabBase):
                                 self.telemetry[tlmk] = data["info"]
                     if 'api_version' in self.telemetry.keys():
                         self.wg.qlabel_message.setText("SubRack API version: " + self.telemetry['api_version'])
+                        self.logger.logger.info("Subrack API version" + self.telemetry['api_version'])
+                    else:
+                        self.logger.logger.warning("The Subrack is running with a very old API version!")
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")
                     self.wg.qbutton_connect.setText("ONLINE")
                     self.wg.frame_tpm.setEnabled(True)
@@ -486,7 +482,7 @@ class Subrack(SkalabBase):
                     self.getTelemetry()
                 else:
                     self.wg.qlabel_message.setText("The SubRack server does not respond!")
-                    logging.log(logging.ERROR, "Unable to connect to the SubRack server %s:%d" % (self.ip, int(self.port)))
+                    self.logger.logger.error("Unable to connect to the SubRack server %s:%d" % (self.ip, int(self.port)))
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
                     self.wg.qbutton_connect.setText("OFFLINE")
                     self.wg.frame_tpm.setEnabled(False)
@@ -522,7 +518,7 @@ class Subrack(SkalabBase):
                         if data["status"] == "OK":
                             telemetry[tlmk] = data["value"]
         except:
-            logging.log(logging.ERROR, "Error reading Telemetry [attribute: %s], skipping..." % tkey)
+            self.logger.logger.error("Error reading Telemetry [attribute: %s], skipping..." % tkey)
             return
         self.telemetry = dict(telemetry)
         for tlmk in telemetry.keys():
@@ -548,7 +544,7 @@ class Subrack(SkalabBase):
                     try:
                         self.data_charts[tlmk] = self.data_charts[tlmk][1:] + [telemetry[tlmk]]
                     except:
-                        logging.log(logging.ERROR, "ERROR --> key:", tlmk, "\nValue: ", telemetry[tlmk])
+                        self.logger.logger.error("ERROR --> key:", tlmk, "\nValue: ", telemetry[tlmk])
                         pass
                 else:
                     if tlmk not in self.data_charts.keys():
@@ -568,7 +564,7 @@ class Subrack(SkalabBase):
                             self.tlm_hdf.create_dataset(tlmk, data=[[self.telemetry[tlmk]]],
                                                         chunks=True, maxshape=(None, 1))
                     except:
-                        logging.log(logging.ERROR, "HDF5 WRITE TLM ERROR in ", tlmk, "\nData: ", self.telemetry[tlmk])
+                        self.logger.logger.error("HDF5 WRITE TLM ERROR in ", tlmk, "\nData: ", self.telemetry[tlmk])
                 else:
                     if type(self.telemetry[tlmk]) is list:
                         self.tlm_hdf[tlmk].resize((self.tlm_hdf[tlmk].shape[0] +
@@ -598,7 +594,7 @@ class Subrack(SkalabBase):
                     sleep(0.1)
                     self.signalTlm.emit()
                 except:
-                    logging.log(logging.WARNING, "Failed to get Subrack Telemetry!")
+                    self.logger.logger.warning("Failed to get Subrack Telemetry!")
                     pass
                 cycle = 0.0
                 while cycle < (float(self.profile['Subrack']['query_interval'])) and not self.skipThreadPause:
@@ -658,7 +654,7 @@ class Subrack(SkalabBase):
         if result == QtWidgets.QMessageBox.Yes:
             event.accept()
             self.stopThreads = True
-            logging.log(logging.INFO, "Stopping Threads")
+            self.logger.logger.info("Stopping Threads")
             if type(self.tlm_hdf) is not None:
                 try:
                     self.tlm_hdf.close()
@@ -688,6 +684,7 @@ if __name__ == "__main__":
                       type="str", default="", help="Output Directory [Default: "", it means do not save data]")
     (opt, args) = parser.parse_args(argv[1:])
 
+    subrack_logger = logging.getLogger(__name__)
     if not opt.nogui:
         app = QtWidgets.QApplication(sys.argv)
         window = Subrack(ip=opt.ip, port=opt.port, uiFile="Gui/skalab_subrack.ui", profile=opt.profile, swpath=default_app_dir)
@@ -697,9 +694,9 @@ if __name__ == "__main__":
         profile = []
         fullpath = default_app_dir + opt.profile + "/" + profile_filename
         if not os.path.exists(fullpath):
-            logging.log(logging.ERROR, "\nThe SubRack Profile does not exist.\n")
+            subrack_logger.error("\nThe SubRack Profile does not exist.\n")
         else:
-            logging.log(logging.INFO, "Loading SubRack Profile: " + opt.profile + " (" + fullpath + ")")
+            subrack_logger.info("Loading SubRack Profile: " + opt.profile + " (" + fullpath + ")")
             profile = parse_profile(fullpath)
             profile_name = profile
             profile_file = fullpath
@@ -724,29 +721,29 @@ if __name__ == "__main__":
                     connected = True
                     tlm_keys = client.execute_command("list_attributes")["retvalue"]
                 else:
-                    logging.log(logging.ERROR, "Unable to connect to the Webserver on %s:%d" % (opt.ip, opt.port))
+                    subrack_logger.error("Unable to connect to the Webserver on %s:%d" % (opt.ip, opt.port))
             if connected:
                 if opt.single:
-                    logging.log(logging.INFO, "SINGLE REQUEST")
+                    subrack_logger.info("SINGLE REQUEST")
                     tstamp = dt_to_timestamp(datetime.datetime.utcnow())
                     attributes = {}
-                    logging.log(logging.INFO, "\nTstamp: %d\tDateTime: %s\n" % (tstamp, ts_to_datestring(tstamp)))
+                    subrack_logger.info("\nTstamp: %d\tDateTime: %s\n" % (tstamp, ts_to_datestring(tstamp)))
                     for att in tlm_keys:
                         attributes[att] = client.get_attribute(att)["value"]
-                        logging.log(logging.INFO, "%s\t%s" % (att, str(attributes[att])))
+                        subrack_logger.info("%s\t%s" % (att, str(attributes[att])))
                 else:
                     try:
-                        logging.log(logging.INFO, "CONTINUOUS REQUESTS")
+                        subrack_logger.info("CONTINUOUS REQUESTS")
                         while True:
                             tstamp = dt_to_timestamp(datetime.datetime.utcnow())
                             attributes = {}
-                            logging.log(logging.INFO, "\nTstamp: %d\tDateTime: %s\n" % (tstamp, ts_to_datestring(tstamp)))
+                            subrack_logger.info("\nTstamp: %d\tDateTime: %s\n" % (tstamp, ts_to_datestring(tstamp)))
                             for att in subAttr:
                                 attributes[att] = client.get_attribute(att)["value"]
-                                logging.log(logging.INFO, "%s\t%s" % (att, str(attributes[att])))
+                                subrack_logger.info("%s\t%s" % (att, str(attributes[att])))
                             sleep(opt.interval)
                     except KeyboardInterrupt:
-                        logging.log(logging.INFO, "\nTerminated by the user.\n")
+                        subrack_logger.info("\nTerminated by the user.\n")
                 client.disconnect()
                 del client
 

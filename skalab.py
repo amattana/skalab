@@ -46,6 +46,10 @@ default_app_dir = str(Path.home()) + "/.skalab/"
 default_profile = "Default"
 profile_filename = "skalab.ini"
 
+import logging
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
 COLORI = ["b", "g"]
 
 configuration = {'tiles': None,
