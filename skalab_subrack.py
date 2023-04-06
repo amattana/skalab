@@ -471,8 +471,10 @@ class Subrack(SkalabBase):
             fname = self.profile['SubRack']['data_path']
             if not fname[-1] == "/":
                 fname = fname + "/"
+                if  os.path.exists(str(Path.home()) + fname) != True:
+                    os.makedirs(str(Path.home()) + fname)
             fname += datetime.datetime.strftime(datetime.datetime.utcnow(), "subrack_tlm_%Y-%m-%d_%H%M%S.h5")
-            return h5py.File(fname, 'a')
+            return h5py.File(str(Path.home()) + fname, 'a')
         else:
             msgBox = QtWidgets.QMessageBox()
             msgBox.setText("Please Select a valid path to save the Subrack data and save it into the current profile")

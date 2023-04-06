@@ -28,21 +28,15 @@ subrack_attribute = {
                 "subrack_fan_speeds_percent": [None]*8,
                 }
 
-subrack_table_attr = {"tpm_voltages":[None]*16,
-                "tpm_currents":[None]*16,
-                "tpm_temperatures":[None]*16,
-                "tpm_supply_fault":[None]*16
-                }
-
-tile_table_attr =  {
-                "fpga0_temp": [None]*16,
-                "fpga1_temp": [None]*16,
-                }
-values_from_tile = {
-                "fpga0_temp": [None]*8,
-                "fpga1_temp": [None]*8,
-                }
-
+tile_table_attr =  {"FPGA0": [None]*16,
+                    "FPGA1": [None]*16,
+                    "board":[None]*16,
+                    "DDR0_VREF":[None]*16,
+                    "VIN":[None]*16,
+                    "MON_5V0":[None]*16,
+                    "FE0_mVA":[None]*16,
+                    "FE1_mVA":[None]*16,
+                    }
 
 def populate_table(qtable, attribute):
     j = 0
@@ -121,9 +115,9 @@ class Monitor(SkalabBase):
         # Set variable
         self.from_subrack = {}
         self.interval_monitor = self.profile['Monitor']['query_interval']
-        self.Alarm = dict(subrack_table_attr, **tile_table_attr, **subrack_attribute)
-        for k in self.Alarm.keys():
-            self.Alarm[k] = [False]*8
+        self.alarm = dict(tile_table_attr, **subrack_attribute)
+        for k in self.alarm.keys():
+            self.alarm[k] = [False]*8
         self.tlm_hdf_monitor = None
         # Populate table
         populate_subrack_ps(self.wg.sub_frame, subrack_attribute)
@@ -132,7 +126,6 @@ class Monitor(SkalabBase):
         self.qtpm = populateSlots(self.wg.frame_subrack)
         self.populate_tile_instance()
         self.load_warning_alarm_values()
-        populate_table(self.wg.qtable_subrack,subrack_table_attr)
         populate_table(self.wg.qtable_tile, tile_table_attr)
         
         # Start thread
@@ -159,14 +152,11 @@ class Monitor(SkalabBase):
             for i in range(16):
                 self.qled_alert[int(i/2)].Colour = Led.Grey
                 self.qled_alert[int(i/2)].value = False  
-                for attr in self.Alarm:
-                    self.Alarm[attr][int(i/2)] = False
+                for attr in self.alarm:
+                    self.alarm[attr][int(i/2)] = False
                     if attr in tile_table_attr:
                         tile_table_attr[attr][i].setText(str(""))
                         tile_table_attr[attr][i].setStyleSheet("color: black; background:white")  
-                    elif attr in subrack_table_attr:      
-                        subrack_table_attr[attr][i].setText(str(""))
-                        subrack_table_attr[attr][i].setStyleSheet("color: black; background:white")
                     elif attr in subrack_attribute:
                         try:
                             subrack_attribute[attr][int(i/2)].setText(str(""))
@@ -182,16 +172,20 @@ class Monitor(SkalabBase):
         self.bitfile = self.profile['Monitor']['bitfile']
 
     def load_warning_alarm_values(self):
-        self.warning = self.profile['Warning']
-        self.alarm = self.profile['Alarm']
+        self.subrack_warning = self.profile['Subrack Warning']
+        self.tpm_warning = self.profile['TPM Warning']
+        self.warning = dict(self.tpm_warning, **self.subrack_warning)
+        self.subrack_alarm = self.profile['Subrack Alarm']
+        self.tpm_alarm = self.profile['TPM Alarm']
+        self.alarm_values = dict(self.tpm_alarm, **self.subrack_alarm)
         for attr in self.warning:
             self.warning[attr] = eval(self.warning[attr])
-            self.alarm[attr] = eval(self.alarm[attr])
+            self.alarm_values[attr] = eval(self.alarm_values[attr])
             if self.warning[attr][0] == None: self.warning[attr][0] = -float('inf')
-            if self.alarm[attr][0]   == None: self.alarm[attr][0]   = -float('inf')
+            if self.alarm_values[attr][0]   == None: self.alarm_values[attr][0]   = -float('inf')
             if self.warning[attr][1] == None: self.warning[attr][1] =  float('inf')
-            if self.alarm[attr][1]   == None: self.alarm[attr][1]   =  float('inf')   
-        populate_warning_alarm_table(self.wg.true_table, self.warning, self.alarm)
+            if self.alarm_values[attr][1]   == None: self.alarm_values[attr][1]   =  float('inf')   
+        populate_warning_alarm_table(self.wg.true_table, self.warning, self.alarm_values)
 
     def tpm_status_changed(self):
         if self.check_tpm_tm.is_alive():
@@ -214,58 +208,50 @@ class Monitor(SkalabBase):
         while True:
             self.wait_check_tpm.wait()
             # Get tm from tpm
-            for j in range(8):
-                if self.tpm_on_off[j]:
+            for i in range(0,15,2):
+                index = int(i/2)
+                if self.tpm_on_off[index]:
                     try:
-                        temperature = [round(self.tpm_active[j].get_temperature(),1),
-                                    round(self.tpm_active[j].get_fpga0_temperature(),1),
-                                    round(self.tpm_active[j].get_fpga1_temperature(),1)]
+                        L = list(self.tpm_active[index].get_health_status().values())
+                        tpm_monitoring_points = {}
+                        for d in L:
+                            tpm_monitoring_points.update(d)
                     except:
-                        print("Failed to get TPM Telemetry!")
-                        temperature = ["ERROR"] * 3
-                else:
-                    temperature = ["NOT AVAILABLE"] * 3
-                i = 1
-                for attr in tile_table_attr:
-                    values_from_tile[attr][j] = temperature[i]
-                    i+=1
-
-            if self.wg.check_savedata.isChecked(): self.saveTlm(values_from_tile)
-
-            for attr in tile_table_attr:
-                for i in range(0,15,2):
-                    value = values_from_tile[attr][int(i/2)]
-                    tile_table_attr[attr][i].setStyleSheet("color: black; background:white")
-                    tile_table_attr[attr][i].setText(str(value))
-                    tile_table_attr[attr][i].setAlignment(QtCore.Qt.AlignCenter)
-                    with self._lock_tab1:
-                        if not(type(value)==str or type(value)==str) and not(self.alarm[attr][0] <= value <= self.alarm[attr][1]):
-                            # # tile_table_attr[attr][i].setStyleSheet("color: white; background:red")  
-                            # segmentation error or free() pointer error
-                            tile_table_attr[attr][i+1].setText(str(value))
-                            tile_table_attr[attr][i+1].setStyleSheet("color: white; background:red")
-                            tile_table_attr[attr][i+1].setAlignment(QtCore.Qt.AlignCenter)
-                            self.Alarm[attr][int(i/2)] = True
-                            with self._lock_led:
-                                self.qled_alert[int(i/2)].Colour = Led.Red
-                                self.qled_alert[int(i/2)].value = True
-                        elif not(type(value)==str or type(value)==str) and not(self.warning[attr][0] <= value <= self.warning[attr][1]):
-                            if not self.Alarm[attr][int(i/2)]:
+                        print("Failed to get TPM Telemetry.")
+                        tpm_monitoring_points = "ERROR"
+                        continue
+            #if self.wg.check_savedata.isChecked(): self.saveTlm(tpm_monitoring_points)
+                    for attr in tile_table_attr:
+                        value = tpm_monitoring_points[attr]
+                        tile_table_attr[attr][i].setStyleSheet("color: black; background:white")
+                        tile_table_attr[attr][i].setText(str(value))
+                        tile_table_attr[attr][i].setAlignment(QtCore.Qt.AlignCenter)
+                        with self._lock_tab1:
+                            if not(type(value)==str or type(value)==str) and not(self.alarm_values[attr][0] <= value <= self.alarm_values[attr][1]):
+                                # # tile_table_attr[attr][i].setStyleSheet("color: white; background:red")  
+                                # segmentation error or free() pointer error
                                 tile_table_attr[attr][i+1].setText(str(value))
-                                tile_table_attr[attr][i+1].setStyleSheet("color: white; background:orange")
+                                tile_table_attr[attr][i+1].setStyleSheet("color: white; background:red")
                                 tile_table_attr[attr][i+1].setAlignment(QtCore.Qt.AlignCenter)
-                                if self.qled_alert[int(i/2)].Colour==4:
-                                    with self._lock_led:
-                                        self.qled_alert[int(i/2)].Colour=Led.Orange
-                                        self.qled_alert[int(i/2)].value = True
+                                self.alarm[attr][int(i/2)] = True
+                                with self._lock_led:
+                                    self.qled_alert[int(i/2)].Colour = Led.Red
+                                    self.qled_alert[int(i/2)].value = True
+                            elif not(type(value)==str or type(value)==str) and not(self.warning[attr][0] <= value <= self.warning[attr][1]):
+                                if not self.alarm[attr][int(i/2)]:
+                                    tile_table_attr[attr][i+1].setText(str(value))
+                                    tile_table_attr[attr][i+1].setStyleSheet("color: white; background:orange")
+                                    tile_table_attr[attr][i+1].setAlignment(QtCore.Qt.AlignCenter)
+                                    if self.qled_alert[int(i/2)].Colour==4:
+                                        with self._lock_led:
+                                            self.qled_alert[int(i/2)].Colour=Led.Orange
+                                            self.qled_alert[int(i/2)].value = True
             sleep(float(self.interval_monitor))    
 
 
     def read_subrack_attribute(self):
         for attr in self.from_subrack:
-            if attr in subrack_table_attr:
-                self.write_subrack_attribute(attr,subrack_table_attr,True)
-            elif attr in subrack_attribute:
+            if attr in subrack_attribute:
                 self.write_subrack_attribute(attr,subrack_attribute,False)
 
     def write_subrack_attribute(self,attr,table,led_flag):
@@ -278,18 +264,18 @@ class Monitor(SkalabBase):
             table[attr][ind].setAlignment(QtCore.Qt.AlignCenter)
             with self._lock_tab2:
                 #print("write2")
-                if not(type(value)==str or type(value)==bool) and not(self.alarm[attr][0] <= value <= self.alarm[attr][1]):
+                if not(type(value)==str or type(value)==bool) and not(self.alarm_values[attr][0] <= value <= self.alarm_values[attr][1]):
                     table[attr][ind+1].setText(str(value))
                     table[attr][ind+1].setStyleSheet("color: white; background:red")
                     table[attr][ind+1].setAlignment(QtCore.Qt.AlignCenter)
-                    self.Alarm[attr][int(ind/2)] = True
+                    self.alarm[attr][int(ind/2)] = True
                     if led_flag:
                         with self._lock_led:
                             self.qled_alert[int(ind/2)].Colour = Led.Red
                             self.qled_alert[int(ind/2)].value = True
                 elif not(type(value)==str or type(value)==bool) and not(self.warning[attr][0] <= value <= self.warning[attr][1]):
                     #print("write3")
-                    if not self.Alarm[attr][int(ind/2)]:
+                    if not self.alarm[attr][int(ind/2)]:
                         table[attr][ind+1].setText(str(value))
                         table[attr][ind+1].setStyleSheet("color: white; background:orange")
                         table[attr][ind+1].setAlignment(QtCore.Qt.AlignCenter)
@@ -305,8 +291,10 @@ class Monitor(SkalabBase):
                 fname = self.profile['Monitor']['data_path']
                 if not fname[-1] == "/":
                     fname = fname + "/"
+                    if  os.path.exists(str(Path.home()) + fname) != True:
+                        os.makedirs(str(Path.home()) + fname)
                 fname += datetime.datetime.strftime(datetime.datetime.utcnow(), "monitor_tlm_%Y-%m-%d_%H%M%S.h5")
-                self.tlm_hdf_monitor = h5py.File(fname, 'a')
+                self.tlm_hdf_monitor = h5py.File(str(Path.home()) + fname, 'a')
                 return self.tlm_hdf_monitor
             else:
                 msgBox = QtWidgets.QMessageBox()
@@ -318,7 +306,7 @@ class Monitor(SkalabBase):
 
     def saveTlm(self,data_tile):
         if self.tlm_hdf_monitor:
-            for attr in data_tile:
+            for attr in tile_table_attr:
                 data_tile[attr][:] = [0.0 if type(x) is str else x for x in data_tile[attr]]
                 if attr not in self.tlm_hdf_monitor:
                     try:

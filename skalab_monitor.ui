@@ -26,7 +26,7 @@
     </rect>
    </property>
    <property name="currentIndex">
-    <number>1</number>
+    <number>0</number>
    </property>
    <widget class="QWidget" name="qtab_app">
     <attribute name="title">
@@ -76,86 +76,12 @@
      <property name="frameShadow">
       <enum>QFrame::Raised</enum>
      </property>
-     <widget class="QTableWidget" name="qtable_subrack">
+     <widget class="QTableWidget" name="qtable_tile">
       <property name="geometry">
        <rect>
         <x>0</x>
         <y>30</y>
-        <width>531</width>
-        <height>581</height>
-       </rect>
-      </property>
-      <property name="lineWidth">
-       <number>1</number>
-      </property>
-      <property name="midLineWidth">
-       <number>0</number>
-      </property>
-      <property name="rowCount">
-       <number>8</number>
-      </property>
-      <property name="columnCount">
-       <number>4</number>
-      </property>
-      <attribute name="horizontalHeaderMinimumSectionSize">
-       <number>54</number>
-      </attribute>
-      <attribute name="horizontalHeaderDefaultSectionSize">
-       <number>130</number>
-      </attribute>
-      <attribute name="verticalHeaderVisible">
-       <bool>false</bool>
-      </attribute>
-      <attribute name="verticalHeaderMinimumSectionSize">
-       <number>24</number>
-      </attribute>
-      <attribute name="verticalHeaderDefaultSectionSize">
-       <number>67</number>
-      </attribute>
-      <attribute name="verticalHeaderHighlightSections">
-       <bool>false</bool>
-      </attribute>
-      <attribute name="verticalHeaderShowSortIndicator" stdset="0">
-       <bool>false</bool>
-      </attribute>
-      <attribute name="verticalHeaderStretchLastSection">
-       <bool>false</bool>
-      </attribute>
-      <row/>
-      <row/>
-      <row/>
-      <row/>
-      <row/>
-      <row/>
-      <row/>
-      <row/>
-      <column>
-       <property name="text">
-        <string>Tpm Voltage</string>
-       </property>
-      </column>
-      <column>
-       <property name="text">
-        <string>Tpm Current</string>
-       </property>
-      </column>
-      <column>
-       <property name="text">
-        <string>Tpm Temperature</string>
-       </property>
-      </column>
-      <column>
-       <property name="text">
-        <string>Tpm PS fault</string>
-       </property>
-      </column>
-     </widget>
-     <widget class="QTableWidget" name="qtable_tile">
-      <property name="geometry">
-       <rect>
-        <x>530</x>
-        <y>30</y>
-        <width>401</width>
+        <width>931</width>
         <height>571</height>
        </rect>
       </property>
@@ -169,7 +95,7 @@
        <number>8</number>
       </property>
       <property name="columnCount">
-       <number>2</number>
+       <number>5</number>
       </property>
       <attribute name="horizontalHeaderMinimumSectionSize">
        <number>54</number>
@@ -213,63 +139,22 @@
         <string>FPGA1 Temp</string>
        </property>
       </column>
+      <column>
+       <property name="text">
+        <string>Volatage</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>Temperature</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>Current</string>
+       </property>
+      </column>
      </widget>
-    </widget>
-    <widget class="QLabel" name="label">
-     <property name="geometry">
-      <rect>
-       <x>350</x>
-       <y>202</y>
-       <width>101</width>
-       <height>21</height>
-      </rect>
-     </property>
-     <property name="maximumSize">
-      <size>
-       <width>16777215</width>
-       <height>16777215</height>
-      </size>
-     </property>
-     <property name="layoutDirection">
-      <enum>Qt::LeftToRight</enum>
-     </property>
-     <property name="styleSheet">
-      <string notr="true">background-color: rgb(238, 238, 236);</string>
-     </property>
-     <property name="text">
-      <string>FROM SUBRACK</string>
-     </property>
-     <property name="alignment">
-      <set>Qt::AlignCenter</set>
-     </property>
-    </widget>
-    <widget class="QLabel" name="label_2">
-     <property name="geometry">
-      <rect>
-       <x>880</x>
-       <y>200</y>
-       <width>101</width>
-       <height>21</height>
-      </rect>
-     </property>
-     <property name="maximumSize">
-      <size>
-       <width>16777215</width>
-       <height>16777215</height>
-      </size>
-     </property>
-     <property name="layoutDirection">
-      <enum>Qt::LeftToRight</enum>
-     </property>
-     <property name="styleSheet">
-      <string notr="true">background-color: rgb(238, 238, 236);</string>
-     </property>
-     <property name="text">
-      <string>FROM TILE</string>
-     </property>
-     <property name="alignment">
-      <set>Qt::AlignCenter</set>
-     </property>
     </widget>
     <widget class="QFrame" name="sub_frame">
      <property name="geometry">
@@ -568,8 +453,6 @@
     <zorder>sub_frame</zorder>
     <zorder>frame_tpm</zorder>
     <zorder>frame_subrack</zorder>
-    <zorder>label</zorder>
-    <zorder>label_2</zorder>
     <zorder>subrack_button</zorder>
     <zorder>check_savedata</zorder>
    </widget>
