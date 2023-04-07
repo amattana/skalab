@@ -215,7 +215,7 @@ class Playback(SkalabBase):
         self.wg.qcombo_tpm.clear()
         for n, i in enumerate(station.configuration['tiles']):
             if n in tpm_list:
-                self.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (n + 1, i))
+                self.wg.qcombo_tpm.addItem("TILE-%02d (%s)" % (n + 1, i))
 
     # def reload(self):
     #     self.wg.qline_configfile.setText(self.profile['Playback']['station_file'])
@@ -536,7 +536,13 @@ class Playback(SkalabBase):
         elif self.wg.qradio_avg.isChecked():
             pass
         elif self.wg.qradio_power.isChecked():
-            pass
+            result = QtWidgets.QMessageBox.question(self, "Export Data...",
+                        "Are you sure you want to export %d files?" % (len(self.input_list)),
+                        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+            if result == QtWidgets.QMessageBox.Yes:
+                print("Saving data")
+            else:
+                print("ciao")
         elif self.wg.qradio_raw.isChecked():
             result = QtWidgets.QMessageBox.question(self, "Export Data...",
                         "Are you sure you want to export %d files?" % (len(self.input_list)),
