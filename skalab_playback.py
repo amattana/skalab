@@ -435,6 +435,7 @@ class Playback(SkalabBase):
                     self.powerPlots.plotPower(range(len(mov_avg)), mov_avg, n, colore="g",
                                               show_line=self.wg.qcheck_ypol_power.isChecked(), lw=lw)
                 self.powerPlots.updatePlot()
+                self.wg.qbutton_export.setEnabled(True)
                 #print("First tstamp: %d" % int(self.data[0]['timestamp']))
                 #print("Last  tstamp: %d" % int(self.data[self.nof_files - 1]['timestamp']))
 
