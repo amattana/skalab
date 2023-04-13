@@ -14,9 +14,7 @@ class QTextEditLogger(logging.Handler):
         super().__init__()
         self.widget = QtWidgets.QTextEdit(parent)
         self.widget.setFont(QtGui.QFont("Courier New", 10))
-        #self.widget.setStyleSheet("background-color: rgb(0, 0, 0);")
         self.widget.setStyleSheet("background-color: rgb(255, 255, 255);")
-        # self.widget.setStyleSheet("font-weight: Bold")
         self.widget.setReadOnly(True)
         self.level = level
         self.caption = caption
@@ -40,7 +38,6 @@ class QTextEditLogger(logging.Handler):
                 fancymsg = "\n<span style='font-weight:600; color:#ff7800;'>" + msg + "</span><br>"
 
             self.widget.insertHtml(fancymsg)
-            #self.widget.ensureCursorVisible()
             self.widget.moveCursor(QtGui.QTextCursor.End)
             if self.caption is not None:
                 self.total = self.total + 1
@@ -136,16 +133,25 @@ class SkalabLog(QtWidgets.QMainWindow):
         layoutError.addWidget(self.logError.widget)
         self.tabError.setLayout(layoutError)
 
-        logging.info("Log File: " + fname)
-        logging.info("Logging Time is set to UTC")
 
         # Set console handler
-        self.console_handler = logging.StreamHandler(stream=sys.stdout)
-        self.console_handler.setFormatter(formatter)
-        self.console_handler.setLevel(logging.INFO)
-        self.logger.addHandler(self.console_handler)
+        # self.console_handler = logging.StreamHandler(stream=sys.stdout)
+        # self.console_handler.setFormatter(formatter)
+        # self.console_handler.setLevel(logging.INFO)
+        # self.logger.addHandler(self.console_handler)
         self.logger.setLevel(logging.INFO)
-        
+        self.logger.propagate = False
+        self.logger.info("Log File: " + fname)
+        self.logger.info("Logging Time is set to UTC")
+
+    def info(self, msg):
+        self.logger.info(msg)
+
+    def warning(self, msg):
+        self.logger.warning(msg)
+
+    def error(self, msg):
+        self.logger.error(msg)
 
     def logChanged(self):
         if "(*)" in self.qtabLog.tabText(self.qtabLog.currentIndex()):
@@ -170,9 +176,9 @@ class SkalabLog(QtWidgets.QMainWindow):
         self.qbutton_test.setText("TEST")
 
     def testLog(self):
-        logging.log(logging.INFO, "TESTING INFO")
-        logging.log(logging.WARN, "TESTING WARNING")
-        logging.log(logging.ERROR, "TESTING ERROR")
+        self.logger.info("TESTING INFO")
+        self.logger.warning("TESTING WARNING")
+        self.logger.error("TESTING ERROR")
 
 
 if __name__ == "__main__":
@@ -192,7 +198,7 @@ if __name__ == "__main__":
         os.mkdir(default_app_dir)
     fname = default_app_dir + "/testlog"
 
-    slog = SkalabLog(parent=wg)
+    slog = SkalabLog(parent=wg, logname=__name__)
     slog.testFunc()
     wg.show()
     wg.raise_()

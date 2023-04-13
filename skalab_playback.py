@@ -80,7 +80,7 @@ class Playback(SkalabBase):
         self.wgProBox.setVisible(True)
         self.wgProBox.show()
         super(Playback, self).__init__(App="playback", Profile=profile, Path=swpath, parent=self.wgProBox)
-        self.logger = SkalabLog(parent=self.wg.qw_log, logname=__name__, profile=self.profile)
+        self.log = SkalabLog(parent=self.wg.qw_log, logname=__name__, profile=self.profile)
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
 
@@ -569,16 +569,17 @@ class Playback(SkalabBase):
             pass
         elif self.wg.qradio_power.isChecked():
             result = QtWidgets.QMessageBox.question(self, "Export Data...",
-                        "Are you sure you want to export %d files?" % (len(self.input_list)),
+                        "Are you sure you want to export %d files?\n(both x-y pols will be saved)" % (len(self.input_list)*2),
                         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
             if result == QtWidgets.QMessageBox.Yes:
                 fpath = str(QtWidgets.QFileDialog.getExistingDirectory(self, "Select a destination Directory"))
-                print("Saving data in " + fpath)
-                for k in self.move_avg.keys():
-                    print("Saving: " + fpath + "/" + k + ".txt")
-                    with open(fpath + "/" + k + ".txt", "w") as f:
-                        for n, d in enumerate(self.move_avg[k]):
-                            f.write("%d\t%6.3f\n" % (self.power_x[n], d))
+                if os.path.exists(fpath) and fpath:
+                    self.log.info("Saving data in " + fpath)
+                    for k in self.move_avg.keys():
+                        self.log.info("Saving: " + fpath + "/" + k + ".txt")
+                        with open(fpath + "/" + k + ".txt", "w") as f:
+                            for n, d in enumerate(self.move_avg[k]):
+                                f.write("%d\t%6.3f\n" % (self.power_x[n], d))
 
             else:
                 print("ciao")
