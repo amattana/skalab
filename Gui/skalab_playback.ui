@@ -1671,7 +1671,7 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>190</y>
+       <y>180</y>
        <width>1131</width>
        <height>681</height>
       </rect>
@@ -2376,6 +2376,21 @@
     <attribute name="title">
      <string>Configuration</string>
     </attribute>
+   </widget>
+   <widget class="QWidget" name="tab">
+    <attribute name="title">
+     <string>Log</string>
+    </attribute>
+    <widget class="QWidget" name="qw_log" native="true">
+     <property name="geometry">
+      <rect>
+       <x>3</x>
+       <y>0</y>
+       <width>1131</width>
+       <height>864</height>
+      </rect>
+     </property>
+    </widget>
    </widget>
    <widget class="QWidget" name="tabHelp">
     <attribute name="title">
