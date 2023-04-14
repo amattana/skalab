@@ -231,8 +231,9 @@ class MiniPlots(QtWidgets.QWidget):
                                    enumerate((np.array(range(delta_h)) + datetime.datetime.utcfromtimestamp(
                                        t_start).hour) % 24)]
 
-                self.canvas.ax[int(ant)].set_xticks(xticks)
-                self.canvas.ax[int(ant)].set_xticklabels(xticklabels, rotation=90, fontsize=8)
+                self.canvas.ax[int(ant)].set_xticks(xticks[int(len(xticks) / 7 / 2)::int(len(xticks) / 7)])
+                self.canvas.ax[int(ant)].set_xticklabels(
+                    xticklabels[int(len(xticklabels) / 7 / 2)::int(len(xticklabels) / 7)], rotation=90, fontsize=8)
 
     def showGrid(self, show_grid=True):
         for i in range(self.nplot):
@@ -295,8 +296,7 @@ class MiniPlots(QtWidgets.QWidget):
 
     def savePicture(self, fname=""):
         if not fname == "":
-            a = self.canvas.print_figure(fname)
-            print(a)
+            self.canvas.print_figure(fname)
 
     def plotClear(self):
         # Reset the plot landscape
