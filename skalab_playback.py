@@ -1,5 +1,8 @@
 #!/usr/bin/env python
+import datetime
+
 from skalab_base import SkalabBase
+from skalab_log import SkalabLog
 import shutil
 import sys
 import os
@@ -71,7 +74,7 @@ configuration = {'tiles': None,
 class Playback(SkalabBase):
     """ Main UI Window class """
 
-    def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936], swpath=""):
+    def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936], swpath=default_app_dir):
         """ Initialise main window """
         self.wg = uic.loadUi(uiFile)
         self.wgProBox = QtWidgets.QWidget(self.wg.qtab_conf)
@@ -79,6 +82,7 @@ class Playback(SkalabBase):
         self.wgProBox.setVisible(True)
         self.wgProBox.show()
         super(Playback, self).__init__(App="playback", Profile=profile, Path=swpath, parent=self.wgProBox)
+        self.log = SkalabLog(parent=self.wg.qw_log, logname=__name__, profile=self.profile)
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
 
@@ -130,6 +134,7 @@ class Playback(SkalabBase):
         self.show_raw_grid = self.wg.qcheck_raw_grid.isChecked()
         self.show_rms_grid = self.wg.qcheck_rms_grid.isChecked()
         self.show_power_grid = self.wg.qcheck_power_grid.isChecked()
+        self.move_avg = {}
 
         self.input_list = np.arange(1, 17)
         self.channels_line = self.wg.qline_channels.text()
@@ -181,6 +186,7 @@ class Playback(SkalabBase):
         self.wg.qcheck_xpol_sp.stateChanged.connect(self.cb_show_xline)
         self.wg.qcheck_ypol_sp.stateChanged.connect(self.cb_show_yline)
         self.wg.qcheck_rms.stateChanged.connect(self.cb_show_rms)
+        self.wg.qbutton_save.clicked.connect(lambda: self.savePicture())
 
     def setup_config(self):
         if not self.config_file == "":
@@ -193,7 +199,7 @@ class Playback(SkalabBase):
             self.wg.qcombo_tpm.clear()
             self.tiles = []
             for n, i in enumerate(station.configuration['tiles']):
-                self.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (n + 1, i))
+                self.wg.qcombo_tpm.addItem("TILE-%02d (%s)" % (n + 1, i))
                 self.tiles += [i]
         else:
             msgBox = QtWidgets.QMessageBox()
@@ -201,21 +207,18 @@ class Playback(SkalabBase):
             msgBox.setWindowTitle("Error!")
             msgBox.exec_()
 
-    def populate_help(self, uifile="skalab_playback.ui"):
+    def populate_help(self, uifile="Gui/skalab_playback.ui"):
         with open(uifile) as f:
             data = f.readlines()
         helpkeys = [d[d.rfind('name="Help_'):].split('"')[1] for d in data if 'name="Help_' in d]
         for k in helpkeys:
             self.wg.findChild(QtWidgets.QTextEdit, k).setText(getTextFromFile(k.replace("_", "/")+".html"))
 
-    def play_tpm_update(self, tpm_list=None):
+    def play_tpm_update(self):
         # Update TPM list
-        if tpm_list is None:
-            tpm_list = []
         self.wg.qcombo_tpm.clear()
-        for n, i in enumerate(station.configuration['tiles']):
-            if n in tpm_list:
-                self.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (n + 1, i))
+        for i in self.data_tiles:
+            self.wg.qcombo_tpm.addItem("TILE-%02d" % (i + 1))
 
     # def reload(self):
     #     self.wg.qline_configfile.setText(self.profile['Playback']['station_file'])
@@ -229,12 +232,16 @@ class Playback(SkalabBase):
         self.wg.qline_datapath.setText(self.folder)
         self.check_dir()
         self.calc_data_volume()
+        if not self.data_tiles:
+            self.wg.qbutton_load.setEnabled(False)
+        else:
+            self.wg.qbutton_load.setEnabled(True)
 
     def check_dir(self):
         if not self.wg.qline_datapath.text() == "":
             self.data_tiles = findtiles(directory=self.wg.qline_datapath.text())
             self.wg.qlabel_dircheck.setText("Found HDF5 Raw files for %d Tiles" % len(self.data_tiles))
-            self.play_tpm_update(self.data_tiles)
+            self.play_tpm_update()
 
     def calc_data_volume(self):
         if not self.wg.qline_datapath.text() == "":
@@ -244,15 +251,16 @@ class Playback(SkalabBase):
                                  int(self.data_tiles[self.wg.qcombo_tpm.currentIndex()])) +
                         ", Data Volume: " + calc_disk_usage(self.wg.qline_datapath.text(),
                         "raw_burst_%d_*.hdf5" % int(self.data_tiles[self.wg.qcombo_tpm.currentIndex()])))
+                #print("raw_burst_%d_*.hdf5" % int(self.data_tiles[self.wg.qcombo_tpm.currentIndex()]))
 
     def load_data(self):
         if not self.wg.qline_datapath.text() == "":
             if os.path.isdir(self.wg.qline_datapath.text()):
-                lista = sorted(glob.glob(self.wg.qline_datapath.text() +
-                                         "/raw_burst_%d_*hdf5" % int(self.data_tiles[self.wg.qcombo_tpm.currentIndex()])))
+                lista = sorted(glob.glob(self.wg.qline_datapath.text() + "/raw_burst_%d_*hdf5" % int(
+                    self.data_tiles[self.wg.qcombo_tpm.currentIndex()])))
                 self.nof_files = len(lista)
                 if self.nof_files:
-                    progress_format = "TPM-%02d   " % (self.data_tiles[self.wg.qcombo_tpm.currentIndex()] + 1) + "%p%"
+                    progress_format = "TILE-%02d   " % (self.data_tiles[self.wg.qcombo_tpm.currentIndex()] + 1) + "%p%"
                     self.wg.qprogress_load.setFormat(progress_format)
 
                     file_manager = RawFormatFileManager(root_path=self.wg.qline_datapath.text(),
@@ -339,6 +347,7 @@ class Playback(SkalabBase):
                                                           stopfreq=xAxisRange[1], title="INPUT-%02d" % int(tpm_input),
                                                           wclim=wclim)
                 self.spectrogramPlots.updatePlot()
+                self.wg.qbutton_save.setEnabled(True)
 
         elif self.wg.qradio_avg.isChecked():
             lw = 1
@@ -386,6 +395,7 @@ class Playback(SkalabBase):
                 self.wg.qcheck_rms.setEnabled(True)
                 self.wg.qcheck_spectra_grid.setEnabled(True)
                 self.miniPlots.updatePlot()
+                self.wg.qbutton_save.setEnabled(True)
             else:
                 msgBox = QtWidgets.QMessageBox()
                 msgBox.setText("Please LOAD a data set first...")
@@ -393,50 +403,76 @@ class Playback(SkalabBase):
                 msgBox.exec_()
 
         elif self.wg.qradio_power.isChecked():
-            lw = 1
-            if self.wg.qcheck_power_noline.isChecked():
-                lw = 0
-            if not self.data == []:
-                xAxisRange = (float(self.wg.qline_power_sample_start.text()),
-                              float(self.wg.qline_power_sample_stop.text()))
-                yAxisRange = (float(self.wg.qline_power_level_min.text()),
-                              float(self.wg.qline_power_level_max.text()))
-                self.powerPlots.plotClear()
-                for n, i in enumerate(self.input_list):
-                    for npol, pol in enumerate(["Pol-X", "Pol-Y"]):
-                        self.power["Input-%02d_%s" % (i, pol)] = []
-                        self.power["Input-%02d_%s_adc-clip" % (i, pol)] = []
-                for k in range(self.nof_files):
+            move_avg_len = int(float(self.wg.qline_movavgwdw.text()))
+            if self.wg.qcheck_movavg.isChecked() and (move_avg_len < 2):
+                self.log.error("Invalid Moving Average Window Length. It must be greater than 1. (found %d)"
+                               % move_avg_len)
+            else:
+                lw = 1
+                if self.wg.qcheck_power_noline.isChecked():
+                    lw = 0
+                if not self.data == []:
+                    xAxisRange = (float(self.wg.qline_power_sample_start.text()),
+                                  float(self.wg.qline_power_sample_stop.text()))
+                    yAxisRange = (float(self.wg.qline_power_level_min.text()),
+                                  float(self.wg.qline_power_level_max.text()))
+                    self.powerPlots.plotClear()
                     for n, i in enumerate(self.input_list):
                         for npol, pol in enumerate(["Pol-X", "Pol-Y"]):
-                            if 127 in self.data[k]['data'][i - 1, npol, :] or \
-                                    -128 in self.data[k]['data'][i - 1, npol, :]:
-                                self.power["Input-%02d_%s_adc-clip" % (i, pol)] += [self.data[k]['timestamp']]
-                            spettro, rms = calcolaspettro(self.data[k]['data'][i - 1, npol, :], self.nsamples, log=False)
-                            bandpower = np.sum(spettro[closest(self.asse_x, float(self.wg.qline_power_band_from.text())): closest(self.asse_x, float(self.wg.qline_power_band_to.text()))])
-                            if not len(self.power["Input-%02d_%s" % (i, pol)]):
-                                self.power["Input-%02d_%s" % (i, pol)] = [linear2dB(bandpower)]
-                            else:
-                                self.power["Input-%02d_%s" % (i, pol)] += [linear2dB(bandpower)]
-                    self.wg.qprogress_plot.setValue(int((k + 1) * 100 / self.nof_files))
+                            self.power["Input-%02d_%s" % (i, pol)] = []
+                            self.power["Input-%02d_%s_adc-clip" % (i, pol)] = []
+                    self.power_x = []
+                    for k in range(self.nof_files):
+                        self.power_x += [self.data[k]['timestamp']]
+                        for n, i in enumerate(self.input_list):
+                            for npol, pol in enumerate(["Pol-X", "Pol-Y"]):
+                                if 127 in self.data[k]['data'][i - 1, npol, :] or \
+                                        -128 in self.data[k]['data'][i - 1, npol, :]:
+                                    self.power["Input-%02d_%s_adc-clip" % (i, pol)] += [self.data[k]['timestamp']]
+                                spettro, rms = calcolaspettro(self.data[k]['data'][i - 1, npol, :], self.nsamples, log=False)
+                                bandpower = np.sum(spettro[closest(self.asse_x, float(self.wg.qline_power_band_from.text())): closest(self.asse_x, float(self.wg.qline_power_band_to.text()))])
+                                if not len(self.power["Input-%02d_%s" % (i, pol)]):
+                                    self.power["Input-%02d_%s" % (i, pol)] = [linear2dB(bandpower)]
+                                else:
+                                    self.power["Input-%02d_%s" % (i, pol)] += [linear2dB(bandpower)]
+                        self.wg.qprogress_plot.setValue(int((k + 1) * 100 / self.nof_files))
 
-                for n, i in enumerate(self.input_list):
-                    # Plot X Pol
-                    mov_avg = self.power["Input-%02d_Pol-X" % i]
+                    if not self.wg.qcheck_datetime.isChecked():
+                        self.power_x = range(len(self.power_x))
+                    self.move_avg = {}
                     if self.wg.qcheck_movavg.isChecked():
-                        mov_avg = moving_average(self.power["Input-%02d_Pol-X" % i], int(self.wg.qline_movavgwdw.text()))
-                    self.powerPlots.plotPower(range(len(mov_avg)), mov_avg, n, xAxisRange=xAxisRange,
-                                              yAxisRange=yAxisRange, title="INPUT-%02d" % i, xLabel="time samples",
-                                              yLabel="dB", colore="b", grid=self.show_power_grid, lw=lw,
-                                              show_line=self.wg.qcheck_xpol_power.isChecked())
-                    mov_avg = self.power["Input-%02d_Pol-Y" % i]
-                    if self.wg.qcheck_movavg.isChecked():
-                        mov_avg = moving_average(self.power["Input-%02d_Pol-Y" % i], int(self.wg.qline_movavgwdw.text()))
-                    self.powerPlots.plotPower(range(len(mov_avg)), mov_avg, n, colore="g",
-                                              show_line=self.wg.qcheck_ypol_power.isChecked(), lw=lw)
-                self.powerPlots.updatePlot()
-                #print("First tstamp: %d" % int(self.data[0]['timestamp']))
-                #print("Last  tstamp: %d" % int(self.data[self.nof_files - 1]['timestamp']))
+                        if move_avg_len > len(self.power_x):
+                            self.log.error("Invalid Moving Average Window Length. "
+                                           "Forced to the maximum allowed length as size of data vector %d" % len(x))
+                            move_avg_len = len(self.power_x)
+                            self.power_x = [self.power_x[int(move_avg_len / 2)]]
+                        elif move_avg_len == 2:
+                            self.power_x = self.power_x[1:]
+                        else:
+                            self.power_x = self.power_x[int(move_avg_len / 2): - (move_avg_len - (int(move_avg_len / 2))) + 1]
+                        xAxisRange = (self.power_x[0], self.power_x[-1])
+                    for n, i in enumerate(self.input_list):
+                        # Plot X Pol
+                        self.move_avg["Input-%02d_Pol-X" % i] = self.power["Input-%02d_Pol-X" % i].copy()
+                        if self.wg.qcheck_movavg.isChecked():
+                            self.move_avg["Input-%02d_Pol-X" % i] = moving_average(self.power["Input-%02d_Pol-X" % i].copy(), move_avg_len)
+
+                        self.powerPlots.plotPower(self.power_x, self.move_avg["Input-%02d_Pol-X" % i], n, xAxisRange=xAxisRange,
+                                                  yAxisRange=yAxisRange, title="INPUT-%02d" % i, xLabel="time samples",
+                                                  yLabel="dB", colore="b", grid=self.show_power_grid, lw=lw,
+                                                  show_line=self.wg.qcheck_xpol_power.isChecked(),
+                                                  xdatetime=self.wg.qcheck_datetime.isChecked())
+                        self.move_avg["Input-%02d_Pol-Y" % i] = self.power["Input-%02d_Pol-Y" % i].copy()
+                        if self.wg.qcheck_movavg.isChecked():
+                            self.move_avg["Input-%02d_Pol-Y" % i] = moving_average(self.power["Input-%02d_Pol-Y" % i].copy(), move_avg_len)
+                        self.powerPlots.plotPower(self.power_x, self.move_avg["Input-%02d_Pol-Y" % i], n, xAxisRange=xAxisRange,
+                                                  colore="g", show_line=self.wg.qcheck_ypol_power.isChecked(), lw=lw,
+                                                  xdatetime=self.wg.qcheck_datetime.isChecked())
+                    self.powerPlots.updatePlot()
+                    self.wg.qbutton_export.setEnabled(True)
+                    self.wg.qbutton_save.setEnabled(True)
+                    # print("First tstamp: %d" % int(self.data[0]['timestamp']))
+                    # print("Last  tstamp: %d" % int(self.data[self.nof_files - 1]['timestamp']))
 
         elif self.wg.qradio_raw.isChecked():
             if 1 <= int(self.wg.qline_raw_filenum.text()) <= self.nof_files:
@@ -536,7 +572,19 @@ class Playback(SkalabBase):
         elif self.wg.qradio_avg.isChecked():
             pass
         elif self.wg.qradio_power.isChecked():
-            pass
+            result = QtWidgets.QMessageBox.question(self, "Export Data...",
+                        "Are you sure you want to export %d files?\n(both x-y pols will be saved)" % (len(self.input_list)*2),
+                        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+            if result == QtWidgets.QMessageBox.Yes:
+                fpath = str(QtWidgets.QFileDialog.getExistingDirectory(self, "Select a destination Directory"))
+                if os.path.exists(fpath) and fpath:
+                    self.log.info("Saving data in " + fpath)
+                    for k in self.move_avg.keys():
+                        self.log.info("Saving: " + fpath + "/" + k + ".txt")
+                        with open(fpath + "/" + k + ".txt", "w") as f:
+                            for n, d in enumerate(self.move_avg[k]):
+                                f.write("%d\t%6.3f\n" % (self.power_x[n], d))
+
         elif self.wg.qradio_raw.isChecked():
             result = QtWidgets.QMessageBox.question(self, "Export Data...",
                         "Are you sure you want to export %d files?" % (len(self.input_list)),
@@ -545,6 +593,40 @@ class Playback(SkalabBase):
                 print("Saving data")
             else:
                 print("ciao")
+
+    def savePicture(self):
+        if self.wg.qradio_spectrogram.isChecked():
+            result = QtWidgets.QMessageBox.question(self, "Export Data...",
+                        "Are you sure you want to save this picture?",
+                        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+            if result == QtWidgets.QMessageBox.Yes:
+                fpath = str(QtWidgets.QFileDialog.getExistingDirectory(self, "Select a destination Directory"))
+                if os.path.exists(fpath) and fpath:
+                    tnow = datetime.datetime.strftime(datetime.datetime.utcnow(), "TILE-%02d_SPECTOGRAM_SAVED_ON_%Y-%m-%d_%H%M%S.png")
+                    self.log.info("Saving: " + fpath + "/" + tnow)
+                    self.spectrogramPlots.savePicture(fpath + "/" + tnow)
+        elif self.wg.qradio_avg.isChecked():
+            result = QtWidgets.QMessageBox.question(self, "Export Data...",
+                        "Are you sure you want to save this picture?",
+                        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+            if result == QtWidgets.QMessageBox.Yes:
+                fpath = str(QtWidgets.QFileDialog.getExistingDirectory(self, "Select a destination Directory"))
+                if os.path.exists(fpath) and fpath:
+                    tnow = datetime.datetime.strftime(datetime.datetime.utcnow(), "TILE-%02d_AVERAGED_SPECTRA_SAVED_ON_%Y-%m-%d_%H%M%S.png")
+                    self.log.info("Saving: " + fpath + "/" + tnow)
+                    self.miniPlots.savePicture(fpath + "/" + tnow)
+        elif self.wg.qradio_raw.isChecked():
+            pass
+        elif self.wg.qradio_power.isChecked():
+            result = QtWidgets.QMessageBox.question(self, "Export Data...",
+                        "Are you sure you want to save this picture?",
+                        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+            if result == QtWidgets.QMessageBox.Yes:
+                fpath = str(QtWidgets.QFileDialog.getExistingDirectory(self, "Select a destination Directory"))
+                if os.path.exists(fpath) and fpath:
+                    tnow = datetime.datetime.strftime(datetime.datetime.utcnow(), "TILE-%02d_POWER_SAVED_ON_%Y-%m-%d_%H%M%S.png")
+                    self.log.info("Saving: " + fpath + "/" + tnow)
+                    self.powerPlots.savePicture(fpath + "/" + tnow)
 
     def reformat_plots(self):
         try:
@@ -774,11 +856,13 @@ if __name__ == "__main__":
     from sys import argv, stdout
 
     parser = OptionParser(usage="usage: %station_playback [options]")
-    parser.add_option("--config", action="store", dest="config",
-                      type="str", default=None, help="Configuration file [default: None]")
-    (conf, args) = parser.parse_args(argv[1:])
+    parser.add_option("--profile", action="store", dest="profile",
+                      type="str", default="Default", help="Profile file")
+    (opt, args) = parser.parse_args(argv[1:])
 
     app = QtWidgets.QApplication(sys.argv)
-    window = Playback(config=conf.config, uiFile="skalab_playback.ui")
+    window = Playback(profile=opt.profile, uiFile="Gui/skalab_playback.ui")
+    window.resize(1160, 900)
+    window.setWindowTitle("SKALAB Playback")
 
     sys.exit(app.exec_())

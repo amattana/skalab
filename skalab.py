@@ -40,11 +40,16 @@ from skalab_playback import Playback
 from skalab_subrack import Subrack
 from skalab_monitor import Monitor
 from skalab_utils import parse_profile, getTextFromFile
+from skalab_base import SkalabBase
 from pathlib import Path
 
 default_app_dir = str(Path.home()) + "/.skalab/"
 default_profile = "Default"
 profile_filename = "skalab.ini"
+
+import logging
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
 
 COLORI = ["b", "g"]
 
@@ -154,7 +159,7 @@ class SkaLab(QtWidgets.QMainWindow):
 
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabLiveIndex, True)
         self.wgLiveLayout = QtWidgets.QVBoxLayout()
-        self.wgLive = Live(self.config_file, "skalab_live.ui", size=[1190, 936],
+        self.wgLive = Live(self.config_file, "Gui/skalab_live.ui", size=[1190, 936],
                            profile=self.profile['Base']['live'],
                            swpath=default_app_dir)
         self.wgLive.signalTemp.connect(self.wgLive.updateTempPlot)
@@ -165,7 +170,7 @@ class SkaLab(QtWidgets.QMainWindow):
 
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabPlayIndex, True)
         self.wgPlayLayout = QtWidgets.QVBoxLayout()
-        self.wgPlay = Playback(self.config_file, "skalab_playback.ui", size=[1190, 936],
+        self.wgPlay = Playback(self.config_file, "Gui/skalab_playback.ui", size=[1190, 936],
                                profile=self.profile['Base']['playback'],
                                swpath=default_app_dir)
         self.wgPlayLayout.addWidget(self.wgPlay)
@@ -173,7 +178,7 @@ class SkaLab(QtWidgets.QMainWindow):
 
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabSubrackIndex, True)
         self.wgSubrackLayout = QtWidgets.QVBoxLayout()
-        self.wgSubrack = Subrack(uiFile="skalab_subrack.ui", size=[1190, 936],
+        self.wgSubrack = Subrack(uiFile="Gui/skalab_subrack.ui", size=[1190, 936],
                                  profile=self.profile['Base']['subrack'],
                                  swpath=default_app_dir)
         self.wgSubrackLayout.addWidget(self.wgSubrack)
@@ -298,7 +303,7 @@ class SkaLab(QtWidgets.QMainWindow):
                 if current == p:
                     self.wg.qcombo_profiles.setCurrentIndex(n)
 
-    def populate_help(self, uifile="skalab_main.ui"):
+    def populate_help(self, uifile="Gui/skalab_main.ui"):
         with open(uifile) as f:
             data = f.readlines()
         helpkeys = [d[d.rfind('name="Help_'):].split('"')[1] for d in data if 'name="Help_' in d]
@@ -650,7 +655,6 @@ class SkaLab(QtWidgets.QMainWindow):
     def make_profile(self, profile="Default", subrack="Default", monitor="Default", live="Default", playback="Default", config=""):
         conf = configparser.ConfigParser()
         conf['Base'] = {'subrack': subrack,
-                        'monitor': monitor,
                         'live': live,
                         'playback': playback}
         conf['Init'] = {'station_file': config}
@@ -676,7 +680,6 @@ class SkaLab(QtWidgets.QMainWindow):
     def save_profile(self, this_profile, reload=True):
         self.make_profile(profile=this_profile,
                           subrack=self.wgSubrack.profile['Base']['profile'],
-                          monitor=self.wgMonitor.profile['Base']['profile'],
                           live=self.wgLive.profile['Base']['profile'],
                           playback=self.wgPlay.profile['Base']['profile'],
                           config=self.config_file)
@@ -728,5 +731,5 @@ if __name__ == "__main__":
     else:
         profile = opt.profile
 
-    window = SkaLab("skalab_main.ui", profile=profile)
+    window = SkaLab("Gui/skalab_main.ui", profile=profile)
     sys.exit(app.exec_())

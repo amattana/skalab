@@ -9,7 +9,7 @@ class SkalabBase(QtWidgets.QMainWindow):
         super().__init__()
         self.connected = False
         self.profile = {}
-        self.wgProfile = uic.loadUi("skalab_profile.ui", parent)
+        self.wgProfile = uic.loadUi("Gui/skalab_profile.ui", parent)
         self.wgProfile.qbutton_load.clicked.connect(lambda: self.load())
         self.wgProfile.qbutton_saveas.clicked.connect(lambda: self.save_as_profile())
         self.wgProfile.qbutton_save.clicked.connect(lambda: self.save_profile())
@@ -45,7 +45,6 @@ class SkalabBase(QtWidgets.QMainWindow):
     def readConfig(self, fname):
         profile = {}
         confparser = configparser.ConfigParser()
-        confparser.optionxform = str
         confparser.read(fname)
         for s in confparser.sections():
             if not s in profile.keys():
@@ -234,7 +233,7 @@ class SkalabBase(QtWidgets.QMainWindow):
                     for s in self.profile.keys():
                         for k in self.profile[s].keys():
                             if k == key.text():
-                                self.wgProfile.qline_edit_value.setText(str(self.profile[s][k]))
+                                self.wgProfile.qline_edit_value.setText(self.profile[s][k])
                     item = self.wgProfile.qtable_conf.item(row, col)
                     if item:
                         self.wgProfile.qline_edit_newvalue.setText(item.text())

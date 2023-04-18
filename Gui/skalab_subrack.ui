@@ -132,16 +132,6 @@
       </rect>
      </property>
     </widget>
-    <widget class="QWidget" name="qplot_tpm_temp" native="true">
-     <property name="geometry">
-      <rect>
-       <x>350</x>
-       <y>240</y>
-       <width>501</width>
-       <height>231</height>
-      </rect>
-     </property>
-    </widget>
     <widget class="QPushButton" name="qbutton_connect">
      <property name="geometry">
       <rect>
@@ -161,9 +151,9 @@
     <widget class="QWidget" name="qplot_mgn_temp" native="true">
      <property name="geometry">
       <rect>
-       <x>860</x>
-       <y>240</y>
-       <width>281</width>
+       <x>750</x>
+       <y>0</y>
+       <width>201</width>
        <height>231</height>
       </rect>
      </property>
@@ -171,9 +161,9 @@
     <widget class="QWidget" name="qplot_psu" native="true">
      <property name="geometry">
       <rect>
-       <x>860</x>
+       <x>940</x>
        <y>0</y>
-       <width>281</width>
+       <width>201</width>
        <height>231</height>
       </rect>
      </property>
@@ -183,7 +173,7 @@
       <rect>
        <x>350</x>
        <y>0</y>
-       <width>501</width>
+       <width>411</width>
        <height>231</height>
       </rect>
      </property>
@@ -915,10 +905,19 @@
       <set>Qt::AlignCenter</set>
      </property>
     </widget>
+    <widget class="QWidget" name="qw_log" native="true">
+     <property name="geometry">
+      <rect>
+       <x>350</x>
+       <y>240</y>
+       <width>791</width>
+       <height>231</height>
+      </rect>
+     </property>
+    </widget>
     <zorder>qlabel_message</zorder>
     <zorder>qcombo_chart</zorder>
     <zorder>qplot_chart_tpm</zorder>
-    <zorder>qplot_tpm_temp</zorder>
     <zorder>qbutton_connect</zorder>
     <zorder>qplot_mgn_temp</zorder>
     <zorder>qplot_psu</zorder>
@@ -933,6 +932,7 @@
     <zorder>qbutton_clear_chart</zorder>
     <zorder>qlabel_tstamp</zorder>
     <zorder>qline_ip</zorder>
+    <zorder>qw_log</zorder>
    </widget>
    <widget class="QWidget" name="qtab_conf">
     <attribute name="title">
