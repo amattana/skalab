@@ -8,7 +8,7 @@
    Supported Devices are:
 
       - TPM_1_2 and TPM_1_6
-      - SubRack with WebServer API
+      - Subrack with WebServer API
 
 """
 
@@ -383,7 +383,7 @@ class SkaLab(QtWidgets.QMainWindow):
                     else:
                         if not np.array_equal(tpm_ip_list, tpm_ip_from_subrack_short):
                             msgBox = QtWidgets.QMessageBox()
-                            message = "STATION\nIPs provided by the SubRack are different from what defined in the " \
+                            message = "STATION\nIPs provided by the Subrack are different from what defined in the " \
                                       "config file.\nINIT will use the new assigned IPs."
                             msgBox.setText(message)
                             msgBox.setWindowTitle("WARNING: IP mismatch")

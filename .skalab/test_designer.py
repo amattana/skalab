@@ -184,7 +184,7 @@ class Ui_Form(object):
         self.qcombo_profile.setItemText(0, _translate("Form", "Default"))
         self.qbutton_load.setText(_translate("Form", "Load"))
         self.qlabel_conf_label_6.setText(_translate("Form", "Subrack IP:"))
-        self.qlabel_conf_label_7.setText(_translate("Form", "SubRack Port:"))
+        self.qlabel_conf_label_7.setText(_translate("Form", "Subrack Port:"))
         self.qline_profile_port.setText(_translate("Form", "8081"))
         self.qlabel_conf_label_8.setText(_translate("Form", "Query Interval:"))
         self.qlabel_conf_label_9.setText(_translate("Form", "(sec)"))

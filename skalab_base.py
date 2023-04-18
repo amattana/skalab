@@ -45,6 +45,7 @@ class SkalabBase(QtWidgets.QMainWindow):
     def readConfig(self, fname):
         profile = {}
         confparser = configparser.ConfigParser()
+        confparser.optionxform = str
         confparser.read(fname)
         for s in confparser.sections():
             if not s in profile.keys():

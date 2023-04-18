@@ -545,7 +545,7 @@
    </widget>
    <widget class="QWidget" name="qtabSubrack">
     <attribute name="title">
-     <string>SubRack</string>
+     <string>Subrack</string>
     </attribute>
     <widget class="QWidget" name="qwSubrack" native="true">
      <property name="geometry">

@@ -157,7 +157,7 @@ class Subrack(SkalabBase):
 
         # self.plotMgnTemp = BarPlot(parent=self.wg.qplot_mgn_temp, size=(2.7, 2.3), xlim=[0, 5], ylim=[0, 60],
         self.plotMgnTemp = BarPlot(parent=self.wg.qplot_mgn_temp, size=(2, 2.3), xlim=[0, 5], ylim=[0, 60],
-                                   ylabel="Temperature (deg)", xrotation=0, xlabel="SubRack Temps",
+                                   ylabel="Temperature (deg)", xrotation=0, xlabel="Subrack Temps",
                                    yticks=[0, 10, 20, 30, 40, 50, 60], xticks=["", "M1", "M2", "B1", "B2"])
                                    # yticks=[0, 10, 20, 30, 40, 50, 60], xticks=["", "Mgn-1", "Mgn-2", "Bck-1", "Bck-2"])
 
@@ -167,7 +167,7 @@ class Subrack(SkalabBase):
                                yticks=np.arange(0, 1400, 200))
 
         self.plotChartMgn = ChartPlots(parent=self.wg.qplot_chart_mgn, ntraces=4, xlabel="time samples", ylim=[0, 60],
-                                       ylabel="SubRack Temperatures", size=(11.3, 3.45), xlim=[0, 200])
+                                       ylabel="Subrack Temperatures", size=(11.3, 3.45), xlim=[0, 200])
 
         self.plotChartTpm = ChartPlots(parent=self.wg.qplot_chart_tpm, ntraces=8, xlabel="time samples", ylim=[0, 120],
                                        ylabel="TPM Power", size=(11.3, 3.45), xlim=[0, 200])
@@ -423,7 +423,7 @@ class Subrack(SkalabBase):
             self.plotPsu.set_xlabel("No data available")
         self.plotPsu.updatePlot()
         if (MgnTraces[0] in self.telemetry.keys()) and (MgnTraces[1] in self.telemetry.keys()):
-            self.plotMgnTemp.set_xlabel("SubRack Temps")
+            self.plotMgnTemp.set_xlabel("Subrack Temps")
             for n, k in enumerate(MgnTraces):
                 self.plotMgnTemp.plotBar(data=self.telemetry[k][0], bar=(n * 2), color=COLORI[(n * 2)])
                 self.plotMgnTemp.plotBar(data=self.telemetry[k][1], bar=(1 + n * 2), color=COLORI[(1 + n * 2)])
@@ -470,7 +470,7 @@ class Subrack(SkalabBase):
                             else:
                                 self.telemetry[tlmk] = data["info"]
                     if 'api_version' in self.telemetry.keys():
-                        self.wg.qlabel_message.setText("SubRack API version: " + self.telemetry['api_version'])
+                        self.wg.qlabel_message.setText("Subrack API version: " + self.telemetry['api_version'])
                         self.logger.logger.info("Subrack API version: " + self.telemetry['api_version'])
                     else:
                         self.logger.logger.warning("The Subrack is running with a very old API version!")
@@ -483,8 +483,8 @@ class Subrack(SkalabBase):
                     self.tlm_hdf = self.setup_hdf5()
                     self.getTelemetry()
                 else:
-                    self.wg.qlabel_message.setText("The SubRack server does not respond!")
-                    self.logger.logger.error("Unable to connect to the SubRack server %s:%d" % (self.ip, int(self.port)))
+                    self.wg.qlabel_message.setText("The Subrack server does not respond!")
+                    self.logger.logger.error("Unable to connect to the Subrack server %s:%d" % (self.ip, int(self.port)))
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
                     self.wg.qbutton_connect.setText("OFFLINE")
                     self.wg.frame_tpm.setEnabled(False)
@@ -555,8 +555,8 @@ class Subrack(SkalabBase):
         self.writeTlm()
 
     def setup_hdf5(self):
-        if not self.profile['SubRack']['data_path'] == "":
-            fname = self.profile['SubRack']['data_path']
+        if not self.profile['Subrack']['data_path'] == "":
+            fname = self.profile['Subrack']['data_path']
             if not fname[-1] == "/":
                 fname = fname + "/"
                 if  os.path.exists(str(Path.home()) + fname) != True:
@@ -586,7 +586,7 @@ class Subrack(SkalabBase):
                             else:
                                 self.telemetry[tlmk] = data["info"]
                     if 'api_version' in self.telemetry.keys():
-                        self.wg.qlabel_message.setText("SubRack API version: " + self.telemetry['api_version'])
+                        self.wg.qlabel_message.setText("Subrack API version: " + self.telemetry['api_version'])
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")
                     self.wg.qbutton_connect.setText("ONLINE")
                     self.monitor.wg.subrack_button.setStyleSheet("background-color: rgb(78, 154, 6);")
@@ -598,7 +598,7 @@ class Subrack(SkalabBase):
                     self.tlm_hdf = self.setup_hdf5()
                     self.getTelemetry()
                 else:
-                    self.wg.qlabel_message.setText("The SubRack server does not respond!")
+                    self.wg.qlabel_message.setText("The Subrack server does not respond!")
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
                     self.monitor.wg.subrack_button.setStyleSheet("background-color: rgb(204, 0, 0);")
                     self.wg.qbutton_connect.setText("OFFLINE")
@@ -782,9 +782,9 @@ if __name__ == "__main__":
     parser.add_option("--profile", action="store", dest="profile",
                       type="str", default="Default", help="Subrack Profile to load")
     parser.add_option("--ip", action="store", dest="ip",
-                      type="str", default=None, help="SubRack IP address [default: None]")
+                      type="str", default=None, help="Subrack IP address [default: None]")
     parser.add_option("--port", action="store", dest="port",
-                      type="int", default=8081, help="SubRack WebServer Port [default: 8081]")
+                      type="int", default=8081, help="Subrack WebServer Port [default: 8081]")
     parser.add_option("--interval", action="store", dest="interval",
                       type="int", default=5, help="Time interval (sec) between telemetry requests [default: 5]")
     parser.add_option("--nogui", action="store_true", dest="nogui",
@@ -805,9 +805,9 @@ if __name__ == "__main__":
         profile = []
         fullpath = default_app_dir + opt.profile + "/" + profile_filename
         if not os.path.exists(fullpath):
-            subrack_logger.error("\nThe SubRack Profile does not exist.\n")
+            subrack_logger.error("\nThe Subrack Profile does not exist.\n")
         else:
-            subrack_logger.info("Loading SubRack Profile: " + opt.profile + " (" + fullpath + ")")
+            subrack_logger.info("Loading Subrack Profile: " + opt.profile + " (" + fullpath + ")")
             profile = parse_profile(fullpath)
             profile_name = profile
             profile_file = fullpath

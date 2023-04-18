@@ -5,6 +5,7 @@ from pyaavs.tile_wrapper import Tile
 from PyQt5 import QtWidgets, uic, QtCore
 from hardware_client import WebHardwareClient
 from skalab_base import SkalabBase
+from skalab_log import SkalabLog
 from skalab_utils import dt_to_timestamp, ts_to_datestring, parse_profile, COLORI, Led, getTextFromFile, colors
 from threading import Thread, Event, Lock
 from time import sleep
@@ -12,6 +13,7 @@ import datetime
 from pathlib import Path
 import h5py
 import numpy as np
+import logging
 
 
 default_app_dir = str(Path.home()) + "/.skalab/"
@@ -150,6 +152,7 @@ class Monitor(SkalabBase):
         self.wgProBox.setVisible(True)
         self.wgProBox.show()
         super(Monitor, self).__init__(App="monitor", Profile=profile, Path=swpath, parent=self.wgProBox)
+        self.logger = SkalabLog(parent=self.wg.qw_log, logname=__name__, profile=self.profile)
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
         self.load_events_monitor()
@@ -259,7 +262,7 @@ class Monitor(SkalabBase):
                         for d in L:
                             tpm_monitoring_points.update(d)
                     except:
-                        print(f"Failed to get TPM Telemetry. Are you turning off TPM#{index+1}?")
+                        monitor_logger.warning(f"Failed to get TPM Telemetry. Are you turning off TPM#{index+1}?")
                         tpm_monitoring_points = "ERROR"
                         continue
             #if self.wg.check_savedata.isChecked(): self.saveTlm(tpm_monitoring_points)
@@ -351,7 +354,7 @@ class Monitor(SkalabBase):
                     try:
                         self.tlm_hdf_monitor.create_dataset(attr, data=np.asarray([data_tile[attr]]), chunks = True, maxshape =(None,None))
                     except:
-                        print("WRITE TLM ERROR in ", attr, "\nData: ", data_tile[attr])
+                        monitor_logger.error("WRITE TLM ERROR in ", attr, "\nData: ", data_tile[attr])
                 else:
                     self.tlm_hdf_monitor[attr].resize((self.tlm_hdf_monitor[attr].shape[0] +
                                                 np.asarray([self.tlm_hdf_monitor[attr]]).shape[0]), axis=0)
@@ -405,9 +408,9 @@ class MonitorSubrack(Monitor):
         self.show()
         self.skipThreadPause = False
         self.processTlm = Thread(target=self.readTlm, daemon=True)
-        self.processTlm.start()
-        self._subrack_lock = Lock()
         self.wait_check_subrack = Event()
+        self._subrack_lock = Lock()
+        self.processTlm.start()
 
     def load_events_subrack(self):
         self.wg.subrack_button.clicked.connect(lambda: self.connect())
@@ -418,11 +421,11 @@ class MonitorSubrack(Monitor):
         if ip is not None:
             self.ip = ip
         else:
-            self.ip = str(self.profile['SubRack']['ip'])
+            self.ip = str(self.profile['Subrack']['ip'])
         if port is not None:
             self.port = port
         else:
-            self.port = int(self.profile['SubRack']['port'])
+            self.port = int(self.profile['Subrack']['port'])
         self.wg.qline_ip.setText("%s (%d)" % (self.ip, self.port))
         if 'Query' in self.profile.keys():
             if 'once' in self.profile['Query'].keys():
@@ -438,15 +441,15 @@ class MonitorSubrack(Monitor):
                 if self.telemetry["tpm_on_off"][slot]:
                     self.client.execute_command(command="turn_off_tpm", parameters="%d" % (int(slot) + 1))
                     self.skipThreadPause = True
-                    #print("Turn OFF TPM-%02d" % (int(slot) + 1))
+                    monitor_logger.info("Turn OFF TPM-%02d" % (int(slot) + 1))
                 else:
                     self.client.execute_command(command="turn_on_tpm", parameters="%d" % (int(slot) + 1))
-                    #print("Turn ON TPM-%02d" % (int(slot) + 1)) 
+                    monitor_logger.info("Turn ON TPM-%02d" % (int(slot) + 1)) 
 
     def connect(self):
         if not self.wg.qline_ip.text() == "":
             if not self.connected:
-                print("Connecting to Subrack %s:%d..." % (self.ip, int(self.port)))
+                monitor_logger.info("Connecting to Subrack %s:%d..." % (self.ip, int(self.port)))
                 self.client = WebHardwareClient(self.ip, self.port)
                 if self.client.connect():
                     self.tlm_keys = self.client.execute_command("list_attributes")["retvalue"]
@@ -458,7 +461,7 @@ class MonitorSubrack(Monitor):
                             else:
                                 self.telemetry[tlmk] = data["info"]
                     if 'api_version' in self.telemetry.keys():
-                        self.wg.qlabel_message.setText("SubRack API version: " + self.telemetry['api_version'])
+                        self.wg.qlabel_message.setText("Subrack API version: " + self.telemetry['api_version'])
                     self.wg.subrack_button.setStyleSheet("background-color: rgb(78, 154, 6);")
                     self.wg.subrack_button.setText("ONLINE")
                     self.wg.subrack_button.setStyleSheet("background-color: rgb(78, 154, 6);")
@@ -471,7 +474,7 @@ class MonitorSubrack(Monitor):
                     self.updateTpm()
                     self.wait_check_subrack.set()
                 else:
-                    self.wg.qlabel_message.setText("The SubRack server does not respond!")
+                    self.wg.qlabel_message.setText("The Subrack server does not respond!")
                     self.wg.subrack_button.setStyleSheet("background-color: rgb(204, 0, 0);")
                     self.wg.subrack_button.setStyleSheet("background-color: rgb(204, 0, 0);")
                     self.wg.subrack_button.setText("OFFLINE")
@@ -517,7 +520,7 @@ class MonitorSubrack(Monitor):
                         else:
                             monitor_tlm[tlmk] = "NOT AVAILABLE"
         except:
-            print("Error reading Telemetry [attribute: %s], skipping..." % tkey)
+            monitor_logger.error("Error reading Telemetry [attribute: %s], skipping..." % tkey)
             monitor_tlm[tlmk] = f"ERROR{tkey}"
             self.from_subrack =  monitor_tlm 
             return
@@ -546,12 +549,12 @@ class MonitorSubrack(Monitor):
                         self.telemetry = dict(telemetry)
                         self.signal_to_monitor.emit()
                     except:
-                        print("Failed to get Subrack Telemetry!")
+                        monitor_logger.warning("Failed to get Subrack Telemetry!")
                         pass
                     sleep(0.1)
                     self.signalTlm.emit()
                     cycle = 0.0
-                    while cycle < (float(self.profile['SubRack']['query_interval'])) and not self.skipThreadPause:
+                    while cycle < (float(self.profile['Subrack']['query_interval'])) and not self.skipThreadPause:
                         sleep(0.1)
                         cycle = cycle + 0.1
                     self.skipThreadPause = False
@@ -595,7 +598,7 @@ class MonitorSubrack(Monitor):
         if result == QtWidgets.QMessageBox.Yes:
             event.accept()
             self.stopThreads = True
-            print("Stopping Threads")
+            monitor_logger.info("Stopping Threads")
             if type(self.tlm_hdf) is not None:
                 try:
                     self.tlm_hdf.close()
@@ -613,9 +616,9 @@ if __name__ == "__main__":
     parser.add_option("--profile", action="store", dest="profile",
                       type="str", default="Default", help="Monitor Profile to load")
     parser.add_option("--ip", action="store", dest="ip",
-                      type="str", default=None, help="SubRack IP address [default: None]")
+                      type="str", default=None, help="Subrack IP address [default: None]")
     parser.add_option("--port", action="store", dest="port",
-                      type="int", default=8081, help="SubRack WebServer Port [default: 8081]")
+                      type="int", default=8081, help="Subrack WebServer Port [default: 8081]")
     parser.add_option("--interval", action="store", dest="interval",
                       type="int", default=5, help="Time interval (sec) between telemetry requests [default: 1]")
     parser.add_option("--nogui", action="store_true", dest="nogui",
@@ -626,6 +629,7 @@ if __name__ == "__main__":
                       type="str", default="", help="Output Directory [Default: "", it means do not save data]")
     (opt, args) = parser.parse_args(argv[1:])
 
+    monitor_logger = logging.getLogger(__name__)
     if not opt.nogui:
         app = QtWidgets.QApplication(sys.argv)
         window = MonitorSubrack(uiFile="skalab_monitor.ui", size=[1190, 936],
@@ -642,9 +646,9 @@ if __name__ == "__main__":
         profile = []
         fullpath = default_app_dir + opt.profile + "/" + profile_filename
         if not os.path.exists(fullpath):
-            print("\nThe Monitor Profile does not exist.\n")
+            monitor_logger.error("\nThe Monitor Profile does not exist.\n")
         else:
-            print("Loading Monitor Profile: " + opt.profile + " (" + fullpath + ")")
+            monitor_logger.info("Loading Monitor Profile: " + opt.profile + " (" + fullpath + ")")
             profile = parse_profile(fullpath)
             profile_name = profile
             profile_file = fullpath
@@ -669,29 +673,29 @@ if __name__ == "__main__":
                     connected = True
                     tlm_keys = client.execute_command("list_attributes")["retvalue"]
                 else:
-                    print("Unable to connect to the Webserver on %s:%d" % (opt.ip, opt.port))
+                    monitor_logger.error("Unable to connect to the Webserver on %s:%d" % (opt.ip, opt.port))
             if connected:
                 if opt.single:
-                    print("SINGLE REQUEST")
+                    monitor_logger.info("SINGLE REQUEST")
                     tstamp = dt_to_timestamp(datetime.datetime.utcnow())
                     attributes = {}
-                    print("\nTstamp: %d\tDateTime: %s\n" % (tstamp, ts_to_datestring(tstamp)))
+                    monitor_logger.info("\nTstamp: %d\tDateTime: %s\n" % (tstamp, ts_to_datestring(tstamp)))
                     for att in tlm_keys:
                         attributes[att] = client.get_attribute(att)["value"]
-                        print(att, attributes[att])
+                        monitor_logger.info(att, attributes[att])
                 else:
                     try:
-                        print("CONTINUOUS REQUESTS")
+                        monitor_logger.info("CONTINUOUS REQUESTS")
                         while True:
                             tstamp = dt_to_timestamp(datetime.datetime.utcnow())
                             attributes = {}
-                            print("\nTstamp: %d\tDateTime: %s\n" % (tstamp, ts_to_datestring(tstamp)))
+                            monitor_logger.info("\nTstamp: %d\tDateTime: %s\n" % (tstamp, ts_to_datestring(tstamp)))
                             for att in subAttr:
                                 attributes[att] = client.get_attribute(att)["value"]
-                                print(att, attributes[att])
+                                monitor_logger.info(att, attributes[att])
                             sleep(opt.interval)
                     except KeyboardInterrupt:
-                        print("\nTerminated by the user.\n")
+                        monitor_logger.warning("\nTerminated by the user.\n")
                 client.disconnect()
                 del client
 
