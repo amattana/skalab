@@ -450,11 +450,51 @@
       <string>Save Data </string>
      </property>
     </widget>
+    <widget class="QLabel" name="qline_ip">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>20</y>
+       <width>151</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="text">
+      <string>ip:port</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
+    <widget class="QLabel" name="qlabel_tstamp">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>120</y>
+       <width>201</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
     <zorder>sub_frame</zorder>
     <zorder>frame_tpm</zorder>
     <zorder>frame_subrack</zorder>
     <zorder>subrack_button</zorder>
     <zorder>check_savedata</zorder>
+    <zorder>qline_ip</zorder>
+    <zorder>qlabel_tstamp</zorder>
    </widget>
    <widget class="QWidget" name="qtab_threshold">
     <attribute name="title">
@@ -802,8 +842,6 @@ p, li { white-space: pre-wrap; }
    </widget>
   </widget>
  </widget>
- <resources>
-  <include location="../../../../Pictures/helper.qrc"/>
- </resources>
+ <resources/>
  <connections/>
 </ui>

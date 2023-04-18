@@ -173,7 +173,7 @@ class SkaLab(QtWidgets.QMainWindow):
 
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabSubrackIndex, True)
         self.wgSubrackLayout = QtWidgets.QVBoxLayout()
-        self.wgSubrack = Subrack(self.wgMonitor, uiFile="skalab_subrack.ui", size=[1190, 936],
+        self.wgSubrack = Subrack(uiFile="skalab_subrack.ui", size=[1190, 936],
                                  profile=self.profile['Base']['subrack'],
                                  swpath=default_app_dir)
         self.wgSubrackLayout.addWidget(self.wgSubrack)

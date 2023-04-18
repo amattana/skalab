@@ -1,13 +1,12 @@
-from skalab_base import SkalabBase
 import os.path
 import sys
+import gc
 from pyaavs.tile_wrapper import Tile
 from PyQt5 import QtWidgets, uic, QtCore
 from hardware_client import WebHardwareClient
 from skalab_base import SkalabBase
-from skalab_utils import dt_to_timestamp, ts_to_datestring, parse_profile
+from skalab_utils import dt_to_timestamp, ts_to_datestring, parse_profile, COLORI, Led, getTextFromFile, colors
 from threading import Thread, Event, Lock
-from skalab_utils import COLORI, Led, getTextFromFile
 from time import sleep
 import datetime
 from pathlib import Path
@@ -18,6 +17,47 @@ import numpy as np
 default_app_dir = str(Path.home()) + "/.skalab/"
 default_profile = "Default"
 profile_filename = "monitor.ini"
+configuration = {'tiles': None,
+                 'time_delays': None,
+                 'station': {
+                     'id': 0,
+                     'name': "Unnamed",
+                     "number_of_antennas": 256,
+                     'program': False,
+                     'initialise': False,
+                     'program_cpld': False,
+                     'enable_test': False,
+                     'start_beamformer': False,
+                     'bitfile': None,
+                     'channel_truncation': 5,
+                     'channel_integration_time': -1,
+                     'beam_integration_time': -1,
+                     'equalize_preadu': 0,
+                     'default_preadu_attenuation': 0,
+                     'beamformer_scaling': 4,
+                     'pps_delays': 0},
+                 'observation': {
+                     'bandwidth': 8 * (400e6 / 512.0),
+                     'start_frequency_channel': 50e6},
+                 'network': {
+                     'lmc': {
+                         'tpm_cpld_port': 10000,
+                         'lmc_ip': "10.0.10.200",
+                         'use_teng': True,
+                         'lmc_port': 4660,
+                         'lmc_mac': 0x248A078F9D38,
+                         'integrated_data_ip': "10.0.0.2",
+                         'integrated_data_port': 5000,
+                         'use_teng_integrated': True},
+                     'csp_ingest': {
+                         'src_ip': "10.0.10.254",
+                         'dst_mac': 0x248A078F9D38,
+                         'src_port': None,
+                         'dst_port': 4660,
+                         'dst_ip': "10.0.10.200",
+                         'src_mac': None}
+                    }
+                 }
 
 subrack_attribute = {
                 "backplane_temperatures": [None]*4,
@@ -89,13 +129,14 @@ def add_led(frame):
     return qled_alert
 
 def populateSlots(frame):
-    qtpm = []
+    qbutton_tpm = []
     for i in range(8):
-        qtpm += [QtWidgets.QPushButton(frame)]
-        qtpm[i].setGeometry(QtCore.QRect(10, 80 + (66 * (i)), 80, 30))
-        qtpm[i].setObjectName("qtpm_%d" % i)
-        qtpm[i].setText("TPM #%d" % (i + 1))
-    return qtpm
+        qbutton_tpm += [QtWidgets.QPushButton(frame)]
+        qbutton_tpm[i].setGeometry(QtCore.QRect(10, 80 + (66 * (i)), 80, 30))
+        qbutton_tpm[i].setObjectName("qbutton_tpm_%d" % i)
+        qbutton_tpm[i].setText("TPM #%d" % (i + 1))
+        qbutton_tpm[i].setEnabled(False)
+    return qbutton_tpm
 
 
 class Monitor(SkalabBase):
@@ -111,7 +152,7 @@ class Monitor(SkalabBase):
         super(Monitor, self).__init__(App="monitor", Profile=profile, Path=swpath, parent=self.wgProBox)
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
-        self.load_events()
+        self.load_events_monitor()
         # Set variable
         self.from_subrack = {}
         self.interval_monitor = self.profile['Monitor']['query_interval']
@@ -123,7 +164,7 @@ class Monitor(SkalabBase):
         populate_subrack_ps(self.wg.sub_frame, subrack_attribute)
         self.populate_table_profile()
         self.qled_alert = add_led(self.wg.frame_subrack)
-        self.qtpm = populateSlots(self.wg.frame_subrack)
+        self.qbutton_tpm = populateSlots(self.wg.frame_subrack)
         self.populate_tile_instance()
         self.load_warning_alarm_values()
         populate_table(self.wg.qtable_tile, tile_table_attr)
@@ -138,7 +179,7 @@ class Monitor(SkalabBase):
         self.check_tpm_tm.start()
 
 
-    def load_events(self):
+    def load_events_monitor(self):
         self.wg.qbutton_clear_led.clicked.connect(lambda: self.clear_values())
         self.wgProfile.qbutton_load.clicked.connect(lambda: self.load_new_table())
         self.wg.check_savedata.toggled.connect(self.setup_hdf5) # TODO ADD toggled
@@ -199,9 +240,10 @@ class Monitor(SkalabBase):
                 elif not self.tpm_on_off[k] and self.tpm_active[k]:
                     self.tpm_active[k] = None
 
-            self.wait_check_tpm.set()
             if not(any(self.tpm_active)):
                 self.wait_check_tpm.clear()
+            else:
+                self.wait_check_tpm.set()
         sleep(0.1)
 
     def monitoring_tpm(self):
@@ -217,7 +259,7 @@ class Monitor(SkalabBase):
                         for d in L:
                             tpm_monitoring_points.update(d)
                     except:
-                        print("Failed to get TPM Telemetry.")
+                        print(f"Failed to get TPM Telemetry. Are you turning off TPM#{index+1}?")
                         tpm_monitoring_points = "ERROR"
                         continue
             #if self.wg.check_savedata.isChecked(): self.saveTlm(tpm_monitoring_points)
@@ -249,13 +291,12 @@ class Monitor(SkalabBase):
             sleep(float(self.interval_monitor))    
 
 
-    def read_subrack_attribute(self):
+    def read_subrack_attribute(self,):
         for attr in self.from_subrack:
             if attr in subrack_attribute:
                 self.write_subrack_attribute(attr,subrack_attribute,False)
 
     def write_subrack_attribute(self,attr,table,led_flag):
-       #print("write1",attr,table[attr],led_flag)
         for ind in range(0,len(table[attr]),2):
             value = self.from_subrack[attr][int(ind/2)]
             if (not(type(value) == bool) and not(type(value) == str)): value = round(value,1) 
@@ -263,7 +304,6 @@ class Monitor(SkalabBase):
             table[attr][ind].setText(str(value))
             table[attr][ind].setAlignment(QtCore.Qt.AlignCenter)
             with self._lock_tab2:
-                #print("write2")
                 if not(type(value)==str or type(value)==bool) and not(self.alarm_values[attr][0] <= value <= self.alarm_values[attr][1]):
                     table[attr][ind+1].setText(str(value))
                     table[attr][ind+1].setStyleSheet("color: white; background:red")
@@ -274,7 +314,6 @@ class Monitor(SkalabBase):
                             self.qled_alert[int(ind/2)].Colour = Led.Red
                             self.qled_alert[int(ind/2)].value = True
                 elif not(type(value)==str or type(value)==bool) and not(self.warning[attr][0] <= value <= self.warning[attr][1]):
-                    #print("write3")
                     if not self.alarm[attr][int(ind/2)]:
                         table[attr][ind+1].setText(str(value))
                         table[attr][ind+1].setStyleSheet("color: white; background:orange")
@@ -318,14 +357,6 @@ class Monitor(SkalabBase):
                                                 np.asarray([self.tlm_hdf_monitor[attr]]).shape[0]), axis=0)
                     self.tlm_hdf_monitor[attr][self.tlm_hdf_monitor[attr].shape[0]-1]=np.asarray([data_tile[attr]])                            
 
-
-    def populate_help(self, uifile="skalab_subrack.ui"):
-        with open(uifile) as f:
-            data = f.readlines()
-        helpkeys = [d[d.rfind('name="Help_'):].split('"')[1] for d in data if 'name="Help_' in d]
-        for k in helpkeys:
-            self.wg.findChild(QtWidgets.QTextEdit, k).setText(getTextFromFile(k.replace("_", "/")+".html"))
-
     def closeEvent(self, event):
         result = QtWidgets.QMessageBox.question(self,
                                                 "Confirm Exit...",
@@ -341,11 +372,242 @@ class Monitor(SkalabBase):
                     pass
             sleep(1)
 
+class MonitorSubrack(Monitor):
+    """ Main UI Window class """
+    # Signal for Slots
+    signalTlm = QtCore.pyqtSignal()
+    signal_to_monitor = QtCore.pyqtSignal()
+    signal_to_monitor_for_tpm = QtCore.pyqtSignal()
+
+    def __init__(self, ip=None, port=None, uiFile="", profile="", size=[1190, 936], swpath=""):
+        """ Initialise main window """
+
+        super(MonitorSubrack, self).__init__(uiFile="skalab_monitor.ui", size=[1190, 936], profile=opt.profile, swpath=default_app_dir)   
+        self.interval_monitor = self.profile['Monitor']['query_interval']
+
+        self.tlm_keys = []
+        self.telemetry = {} 
+        self.last_telemetry = {"tpm_supply_fault":[None] *8,"tpm_present":[None] *8,"tpm_on_off":[None] *8}
+        self.query_once = []
+        self.query_deny = []
+        self.query_tiles = []
+        self.connected = False
+        self.reload(ip=ip, port=port)
+        self.resize(size[0], size[1])
+
+        self.tlm_file = ""
+        self.tlm_hdf = None
+
+        self.client = None
+        self.data_charts = {}
+
+        self.load_events_subrack()
+        self.show()
+        self.skipThreadPause = False
+        self.processTlm = Thread(target=self.readTlm, daemon=True)
+        self.processTlm.start()
+        self._subrack_lock = Lock()
+        self.wait_check_subrack = Event()
+
+    def load_events_subrack(self):
+        self.wg.subrack_button.clicked.connect(lambda: self.connect())
+        for n, t in enumerate(self.qbutton_tpm):
+            t.clicked.connect(lambda state, g=n: self.cmdSwitchTpm(g))
+
+    def reload(self, ip=None, port=None):
+        if ip is not None:
+            self.ip = ip
+        else:
+            self.ip = str(self.profile['SubRack']['ip'])
+        if port is not None:
+            self.port = port
+        else:
+            self.port = int(self.profile['SubRack']['port'])
+        self.wg.qline_ip.setText("%s (%d)" % (self.ip, self.port))
+        if 'Query' in self.profile.keys():
+            if 'once' in self.profile['Query'].keys():
+                self.query_once = list(self.profile['Query']['once'].split(","))
+            if 'deny' in self.profile['Query'].keys():
+                self.query_deny = list(self.profile['Query']['deny'].split(","))
+            if 'deny' in self.profile['Query'].keys():
+                self.query_tiles = list(self.profile['Query']['tiles'].split(","))
+
+    def cmdSwitchTpm(self, slot):
+        with self._subrack_lock:
+            if self.connected:
+                if self.telemetry["tpm_on_off"][slot]:
+                    self.client.execute_command(command="turn_off_tpm", parameters="%d" % (int(slot) + 1))
+                    self.skipThreadPause = True
+                    #print("Turn OFF TPM-%02d" % (int(slot) + 1))
+                else:
+                    self.client.execute_command(command="turn_on_tpm", parameters="%d" % (int(slot) + 1))
+                    #print("Turn ON TPM-%02d" % (int(slot) + 1)) 
+
+    def connect(self):
+        if not self.wg.qline_ip.text() == "":
+            if not self.connected:
+                print("Connecting to Subrack %s:%d..." % (self.ip, int(self.port)))
+                self.client = WebHardwareClient(self.ip, self.port)
+                if self.client.connect():
+                    self.tlm_keys = self.client.execute_command("list_attributes")["retvalue"]
+                    for tlmk in self.tlm_keys:
+                        if tlmk in self.query_once:
+                            data = self.client.get_attribute(tlmk)
+                            if data["status"] == "OK":
+                                self.telemetry[tlmk] = data["value"]
+                            else:
+                                self.telemetry[tlmk] = data["info"]
+                    if 'api_version' in self.telemetry.keys():
+                        self.wg.qlabel_message.setText("SubRack API version: " + self.telemetry['api_version'])
+                    self.wg.subrack_button.setStyleSheet("background-color: rgb(78, 154, 6);")
+                    self.wg.subrack_button.setText("ONLINE")
+                    self.wg.subrack_button.setStyleSheet("background-color: rgb(78, 154, 6);")
+                    [item.setEnabled(True) for item in self.qbutton_tpm]
+                    self.connected = True
+
+                    self.tlm_hdf = self.setup_hdf5()
+                    self.getTelemetry()
+                    sleep(0.1)
+                    self.updateTpm()
+                    self.wait_check_subrack.set()
+                else:
+                    self.wg.qlabel_message.setText("The SubRack server does not respond!")
+                    self.wg.subrack_button.setStyleSheet("background-color: rgb(204, 0, 0);")
+                    self.wg.subrack_button.setStyleSheet("background-color: rgb(204, 0, 0);")
+                    self.wg.subrack_button.setText("OFFLINE")
+                    [item.setEnabled(False) for item in self.qbutton_tpm]
+                    self.client = None
+                    self.connected = False
+
+            else:
+                self.wait_check_tpm.clear()
+                self.wait_check_subrack.clear()
+                self.connected = False
+                self.wg.subrack_button.setStyleSheet("background-color: rgb(204, 0, 0);")
+                self.wg.subrack_button.setText("OFFLINE")
+                self.wg.subrack_button.setStyleSheet("background-color: rgb(204, 0, 0);")
+                [item.setEnabled(False) for item in self.qbutton_tpm]
+                self.client.disconnect()
+                del self.client
+                gc.collect()
+                if (type(self.tlm_hdf) is not None) or (type(self.tlm_hdf_monitor) is not None):
+                    try:
+                        self.tlm_hdf.close()
+                        self.tlm_hdf_monitor.close()
+                    except:
+                        pass
+        else:
+            self.wg.qlabel_connection.setText("Missing IP!")
+            self.wait_check_tpm.clear()
+            self.wait_check_subrack.clear()
+
+    def getTelemetry(self):
+        tkey = ""
+        telem = {}
+        monitor_tlm = {}
+        try:
+            for tlmk in self.tlm_keys:
+                tkey = tlmk
+                if not tlmk in self.query_deny:
+                    if self.connected:
+                        data = self.client.get_attribute(tlmk)
+                        if data["status"] == "OK":
+                            telem[tlmk] = data["value"]
+                            monitor_tlm[tlmk] = telem[tlmk]
+                        else:
+                            monitor_tlm[tlmk] = "NOT AVAILABLE"
+        except:
+            print("Error reading Telemetry [attribute: %s], skipping..." % tkey)
+            monitor_tlm[tlmk] = f"ERROR{tkey}"
+            self.from_subrack =  monitor_tlm 
+            return
+        self.from_subrack =  monitor_tlm  
+        return telem
+
+    def getTiles(self):
+        try:
+            for tlmk in self.query_tiles:
+                data = self.client.get_attribute(tlmk)
+                if data["status"] == "OK":
+                    self.telemetry[tlmk] = data["value"]
+                else:
+                    self.telemetry[tlmk] = []
+            return self.telemetry['tpm_ips']
+        except:
+            return []
+
+    def readTlm(self):
+        while True:
+            self.wait_check_subrack.wait()
+            with self._subrack_lock:
+                if self.connected:
+                    try:
+                        telemetry = self.getTelemetry()
+                        self.telemetry = dict(telemetry)
+                        self.signal_to_monitor.emit()
+                    except:
+                        print("Failed to get Subrack Telemetry!")
+                        pass
+                    sleep(0.1)
+                    self.signalTlm.emit()
+                    cycle = 0.0
+                    while cycle < (float(self.profile['SubRack']['query_interval'])) and not self.skipThreadPause:
+                        sleep(0.1)
+                        cycle = cycle + 0.1
+                    self.skipThreadPause = False
+                sleep(0.5)        
+
+    def updateTpm(self):
+        # TPM status on QButtons
+        if "tpm_supply_fault" in self.telemetry.keys():
+            for n, fault in enumerate(self.telemetry["tpm_supply_fault"]):
+                if fault:
+                    self.qbutton_tpm[n].setStyleSheet(colors("yellow_on_black"))
+                    self.tpm_on_off[n] = False
+                else:
+                    if "tpm_present" in self.telemetry.keys():
+                        if self.telemetry["tpm_present"][n]:
+                            self.qbutton_tpm[n].setStyleSheet(colors("black_on_red"))
+                            self.tpm_on_off[n] = False
+                        else:
+                            self.qbutton_tpm[n].setStyleSheet(colors("black_on_grey"))
+                            self.tpm_on_off[n] = False
+                    if "tpm_on_off" in self.telemetry.keys():
+                        if self.telemetry["tpm_on_off"][n]:
+                            self.qbutton_tpm[n].setStyleSheet(colors("black_on_green"))
+                            self.tpm_on_off[n] = True
+            try:
+                if (self.telemetry["tpm_supply_fault"]!= self.last_telemetry["tpm_supply_fault"]) | (self.telemetry["tpm_present"]!= self.last_telemetry["tpm_present"]) | (self.telemetry["tpm_on_off"]!= self.last_telemetry["tpm_on_off"]):
+                    self.signal_to_monitor_for_tpm.emit()
+                    self.last_telemetry["tpm_supply_fault"] = self.telemetry["tpm_supply_fault"]
+                    self.last_telemetry["tpm_present"] = self.telemetry["tpm_present"]
+                    self.last_telemetry["tpm_on_off"] = self.telemetry["tpm_on_off"]
+                    
+            except:
+                self.signal_to_monitor_for_tpm.emit()            
+
+    def closeEvent(self, event):
+        result = QtWidgets.QMessageBox.question(self,
+                                                "Confirm Exit...",
+                                                "Are you sure you want to exit ?",
+                                                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        event.ignore()
+        if result == QtWidgets.QMessageBox.Yes:
+            event.accept()
+            self.stopThreads = True
+            print("Stopping Threads")
+            if type(self.tlm_hdf) is not None:
+                try:
+                    self.tlm_hdf.close()
+                    self.tlm_hdf_monitor.close()
+                except:
+                    pass
+            sleep(1)
 
 
 if __name__ == "__main__":
     from optparse import OptionParser
-    from sys import argv, stdout
+    from sys import argv, stdout 
 
     parser = OptionParser(usage="usage: %station_subrack [options]")
     parser.add_option("--profile", action="store", dest="profile",
@@ -366,8 +628,15 @@ if __name__ == "__main__":
 
     if not opt.nogui:
         app = QtWidgets.QApplication(sys.argv)
-        window = Monitor( uiFile="skalab_monitor.ui", profile=opt.profile,swpath=default_app_dir)
-        # window.signalTlm.connect(window.updateTlm)
+        window = MonitorSubrack(uiFile="skalab_monitor.ui", size=[1190, 936],
+                                 profile=opt.profile,
+                                 swpath=default_app_dir)
+        window.dst_port = configuration['network']['lmc']['lmc_port']
+        window.lmc_ip = configuration['network']['lmc']['lmc_ip']
+        window.cpld_port = configuration['network']['lmc']['tpm_cpld_port']
+        window.signalTlm.connect(window.updateTpm)
+        window.signal_to_monitor.connect(window.read_subrack_attribute)
+        window.signal_to_monitor_for_tpm.connect(window.tpm_status_changed)
         sys.exit(app.exec_())
     else:
         profile = []
