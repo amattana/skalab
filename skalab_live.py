@@ -84,7 +84,7 @@ class Live(SkalabBase):
     signalRms = QtCore.pyqtSignal()
     signalTemp = QtCore.pyqtSignal()
 
-    def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936], swpath=""):
+    def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936], swpath=default_app_dir):
         """ Initialise main window """
         self.wg = uic.loadUi(uiFile)
 

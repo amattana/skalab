@@ -281,6 +281,7 @@ class Playback(SkalabBase):
                     self.wg.qline_sample_stop.setText("%d" % len(lista))
                     self.wg.qline_avg_sample_stop.setText("%d" % len(lista))
                     self.wg.qline_power_sample_stop.setText("%d" % len(lista))
+                    self.wg.qline_rms_sample_stop.setText("%d" % len(lista))
                     self.wg.qlabel_raw_filenum.setText("Select File Number (%d-%d)" % (1, self.nof_files))
                     self.wg.qline_raw_filenum.setText("1")
                 else:
@@ -337,7 +338,7 @@ class Playback(SkalabBase):
                 t_stop = int(self.wg.qline_sample_stop.text())
                 for k in range(t_start, t_stop):
                     for num, tpm_input in enumerate(self.input_list):
-                        spettro, rms = calcolaspettro(self.data[k]['data'][tpm_input - 1, pol, :], self.nsamples)
+                        spettro, rfpow, rms = calcolaspettro(self.data[k]['data'][tpm_input - 1, pol, :], self.nsamples)
                         allspgram[num] = np.concatenate((allspgram[num], [spettro[xmin:xmax + 1]]), axis=0)
                     self.wg.qprogress_plot.setValue(int((k - t_start + 1) * 100 / (t_stop - t_start)))
                 for num, tpm_input in enumerate(self.input_list):
@@ -365,12 +366,12 @@ class Playback(SkalabBase):
                                int(self.wg.qline_avg_sample_stop.text())-1):
                     for n, i in enumerate(self.input_list):
                         # Plot X Pol
-                        spettro, rfpow = calcolaspettro(self.data[k]['data'][i - 1, 0, :], self.nsamples)
+                        spettro, rfpow, rms = calcolaspettro(self.data[k]['data'][i - 1, 0, :], self.nsamples)
                         spettri_x[n] = np.add(spettri_x[n], dB2Linear(spettro))
                         rms_x[n] = np.add(rms_x[n], dB2Linear(rfpow))
 
                         # Plot Y Pol
-                        spettro, rfpow = calcolaspettro(self.data[k]['data'][i - 1, 1, :], self.nsamples)
+                        spettro, rfpow, rms = calcolaspettro(self.data[k]['data'][i - 1, 1, :], self.nsamples)
                         spettri_y[n] = np.add(spettri_y[n], dB2Linear(spettro))
                         rms_y[n] = np.add(rms_y[n], dB2Linear(rfpow))
                     self.wg.qprogress_plot.setValue(int((k + 1) * 100 / avgnum))
@@ -429,7 +430,7 @@ class Playback(SkalabBase):
                                 if 127 in self.data[k]['data'][i - 1, npol, :] or \
                                         -128 in self.data[k]['data'][i - 1, npol, :]:
                                     self.power["Input-%02d_%s_adc-clip" % (i, pol)] += [self.data[k]['timestamp']]
-                                spettro, rms = calcolaspettro(self.data[k]['data'][i - 1, npol, :], self.nsamples, log=False)
+                                spettro, rfpow, rms = calcolaspettro(self.data[k]['data'][i - 1, npol, :], self.nsamples, log=False)
                                 bandpower = np.sum(spettro[closest(self.asse_x, float(self.wg.qline_power_band_from.text())): closest(self.asse_x, float(self.wg.qline_power_band_to.text()))])
                                 if not len(self.power["Input-%02d_%s" % (i, pol)]):
                                     self.power["Input-%02d_%s" % (i, pol)] = [linear2dB(bandpower)]
@@ -497,7 +498,6 @@ class Playback(SkalabBase):
                                 if 127 in self.data[k]['data'][i - 1, npol, :] or \
                                         -128 in self.data[k]['data'][i - 1, npol, :]:
                                     self.raw["Input-%02d_%s_adc-clip" % (i, pol)] += [self.data[k]['timestamp']]
-                                #spettro, rms = calcolaspettro(self.data[k]['data'][i - 1, npol, :], self.nsamples, log=False)
                                 self.raw["Input-%02d_%s" % (i, pol)] = self.data[k]['data'][i - 1, npol, :]
                     for n, i in enumerate(self.input_list):
                         self.rawPlots.plotCurve(np.arange(len(self.raw["Input-%02d_Pol-X" % i])),
@@ -515,6 +515,8 @@ class Playback(SkalabBase):
                         self.wg.qprogress_plot.setValue(int((k + 1) * 100 / 1))
                     self.rawPlots.updatePlot()
                 self.wg.qbutton_export.setEnabled(True)
+                self.wg.qbutton_save.setEnabled(True)
+
             else:
                 msgBox = QtWidgets.QMessageBox()
                 msgBox.setText("Please select a file number within the range 1-%d." % self.nof_files)
@@ -543,7 +545,8 @@ class Playback(SkalabBase):
                     for n, i in enumerate(self.input_list):
                         for npol, pol in enumerate(["Pol-X", "Pol-Y"]):
                             spettro, rfpow, rms = calcolaspettro(self.data[k]['data'][i - 1, npol, :], self.nsamples,
-                                                                 log=False, adurms=True)
+                                                                 log=False)
+                            #print("FILE:", k, "INPUT:", i-1, "POL:", pol, "RMS:", rms)
                             if self.wg.qcheck_raw_dbm.isChecked():
                                 self.rms["Input-%02d_%s" % (i, pol)] = np.append(self.rms["Input-%02d_%s" % (i, pol)], rfpow)
                             else:
@@ -561,6 +564,7 @@ class Playback(SkalabBase):
                                             self.rms["Input-%02d_Pol-Y" % i], n, colore="g",
                                             show_line=self.wg.qcheck_ypol_rms.isChecked(), lw=lw)
                 self.rmsPlots.updatePlot()
+                self.wg.qbutton_save.setEnabled(True)
 
     def export_data(self):
         if self.wg.qradio_spectrogram.isChecked():
@@ -572,9 +576,10 @@ class Playback(SkalabBase):
         elif self.wg.qradio_avg.isChecked():
             pass
         elif self.wg.qradio_power.isChecked():
-            result = QtWidgets.QMessageBox.question(self, "Export Data...",
-                        "Are you sure you want to export %d files?\n(both x-y pols will be saved)" % (len(self.input_list)*2),
-                        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+            msg = "Are you sure you want to export %d files?\n(both x-y pols will be saved)" % (
+                        len(self.input_list) * 2)
+            result = QtWidgets.QMessageBox.question(self, "Export Data...", msg,
+                                                    QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
             if result == QtWidgets.QMessageBox.Yes:
                 fpath = str(QtWidgets.QFileDialog.getExistingDirectory(self, "Select a destination Directory"))
                 if os.path.exists(fpath) and fpath:
@@ -596,7 +601,7 @@ class Playback(SkalabBase):
 
     def savePicture(self):
         if self.wg.qradio_spectrogram.isChecked():
-            result = QtWidgets.QMessageBox.question(self, "Export Data...",
+            result = QtWidgets.QMessageBox.question(self, "Save Picture...",
                         "Are you sure you want to save this picture?",
                         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
             if result == QtWidgets.QMessageBox.Yes:
@@ -606,7 +611,7 @@ class Playback(SkalabBase):
                     self.log.info("Saving: " + fpath + "/" + tnow)
                     self.spectrogramPlots.savePicture(fpath + "/" + tnow)
         elif self.wg.qradio_avg.isChecked():
-            result = QtWidgets.QMessageBox.question(self, "Export Data...",
+            result = QtWidgets.QMessageBox.question(self, "Save Picture...",
                         "Are you sure you want to save this picture?",
                         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
             if result == QtWidgets.QMessageBox.Yes:
@@ -616,9 +621,27 @@ class Playback(SkalabBase):
                     self.log.info("Saving: " + fpath + "/" + tnow)
                     self.miniPlots.savePicture(fpath + "/" + tnow)
         elif self.wg.qradio_raw.isChecked():
-            pass
+            result = QtWidgets.QMessageBox.question(self, "Save Picture...",
+                        "Are you sure you want to save this picture?",
+                        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+            if result == QtWidgets.QMessageBox.Yes:
+                fpath = str(QtWidgets.QFileDialog.getExistingDirectory(self, "Select a destination Directory"))
+                if os.path.exists(fpath) and fpath:
+                    tnow = datetime.datetime.strftime(datetime.datetime.utcnow(), "TILE-%02d_ADC-RAW-DATA_SAVED_ON_%Y-%m-%d_%H%M%S.png")
+                    self.log.info("Saving: " + fpath + "/" + tnow)
+                    self.rawPlots.savePicture(fpath + "/" + tnow)
+        elif self.wg.qradio_rms.isChecked():
+            result = QtWidgets.QMessageBox.question(self, "Save Picture...",
+                        "Are you sure you want to save this picture?",
+                        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+            if result == QtWidgets.QMessageBox.Yes:
+                fpath = str(QtWidgets.QFileDialog.getExistingDirectory(self, "Select a destination Directory"))
+                if os.path.exists(fpath) and fpath:
+                    tnow = datetime.datetime.strftime(datetime.datetime.utcnow(), "TILE-%02d_RMS_SAVED_ON_%Y-%m-%d_%H%M%S.png")
+                    self.log.info("Saving: " + fpath + "/" + tnow)
+                    self.rmsPlots.savePicture(fpath + "/" + tnow)
         elif self.wg.qradio_power.isChecked():
-            result = QtWidgets.QMessageBox.question(self, "Export Data...",
+            result = QtWidgets.QMessageBox.question(self, "Save Picture...",
                         "Are you sure you want to save this picture?",
                         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
             if result == QtWidgets.QMessageBox.Yes:

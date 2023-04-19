@@ -344,7 +344,7 @@ def calcSpectra(vett):
     return np.real(spettro)
 
 
-def calcolaspettro(dati, nsamples=32768, log=True, adurms=False):
+def calcolaspettro(dati, nsamples=32768, log=True):
     n = int(nsamples)  # split and average number, from 128k to 16 of 8k # aavs1 federico
     sp = [dati[x:x + n] for x in range(0, len(dati), n)]
     mediato = np.zeros(len(calcSpectra(sp[0])))
@@ -354,19 +354,18 @@ def calcolaspettro(dati, nsamples=32768, log=True, adurms=False):
     mediato[:] /= (2 ** 15 / nsamples)  # federico
     with np.errstate(divide='ignore', invalid='ignore'):
         mediato[:] = 20 * np.log10(mediato / 127.0)
-    d = np.array(dati, dtype=np.int8)
+    d = np.array(dati, dtype=np.int64)
     with np.errstate(divide='ignore', invalid='ignore'):
         adu_rms = np.sqrt(np.mean(np.power(d, 2), 0))
+    if adu_rms == np.nan:
+        adu_rms = 0
     volt_rms = adu_rms * (1.7 / 256.)
     with np.errstate(divide='ignore', invalid='ignore'):
         power_adc = 10 * np.log10(np.power(volt_rms, 2) / 400.) + 30
     power_rf = power_adc + 12
     if not log:
         mediato = dB2Linear(mediato)
-    if not adurms:
-        return mediato, power_rf
-    else:
-        return mediato, power_rf, adu_rms
+    return mediato, power_rf, adu_rms
 
 
 def dircheck(directory="", tile=1):
