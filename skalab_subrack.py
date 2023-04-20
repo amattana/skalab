@@ -117,8 +117,6 @@ class Subrack(SkalabBase):
     """ Main UI Window class """
     # Signal for Slots
     signalTlm = QtCore.pyqtSignal()
-    signal_to_monitor = QtCore.pyqtSignal()
-    signal_to_monitor_for_tpm = QtCore.pyqtSignal()
 
     def __init__(self, ip=None, port=None, uiFile="", profile="", size=[1190, 936], swpath=""):
         """ Initialise main window """
@@ -589,10 +587,8 @@ class Subrack(SkalabBase):
                         self.wg.qlabel_message.setText("Subrack API version: " + self.telemetry['api_version'])
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")
                     self.wg.qbutton_connect.setText("ONLINE")
-                    self.monitor.wg.subrack_button.setStyleSheet("background-color: rgb(78, 154, 6);")
                     self.wg.frame_tpm.setEnabled(True)
                     self.wg.frame_fan.setEnabled(True)
-                    [item.setEnabled(True) for item in self.monitor.qtpm]
                     self.connected = True
 
                     self.tlm_hdf = self.setup_hdf5()
@@ -600,28 +596,23 @@ class Subrack(SkalabBase):
                 else:
                     self.wg.qlabel_message.setText("The Subrack server does not respond!")
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
-                    self.monitor.wg.subrack_button.setStyleSheet("background-color: rgb(204, 0, 0);")
                     self.wg.qbutton_connect.setText("OFFLINE")
                     self.wg.frame_tpm.setEnabled(False)
                     self.wg.frame_fan.setEnabled(False)
-                    [item.setEnabled(False) for item in self.monitor.qtpm]
                     self.client = None
                     self.connected = False
             else:
                 self.connected = False
                 self.wg.qbutton_connect.setStyleSheet("background-color: rgb(204, 0, 0);")
                 self.wg.qbutton_connect.setText("OFFLINE")
-                self.monitor.wg.subrack_button.setStyleSheet("background-color: rgb(204, 0, 0);")
                 self.wg.frame_tpm.setEnabled(False)
                 self.wg.frame_fan.setEnabled(False)
-                [item.setEnabled(False) for item in self.monitor.qtpm]
                 self.client.disconnect()
                 del self.client
                 gc.collect()
-                if (type(self.tlm_hdf) is not None) or (type(self.monitor.tlm_hdf_monitor) is not None):
+                if (type(self.tlm_hdf) is not None):
                     try:
                         self.tlm_hdf.close()
-                        self.monitor.tlm_hdf_monitor.close()
                     except:
                         pass
         else:
@@ -630,7 +621,6 @@ class Subrack(SkalabBase):
     def getTelemetry(self):
         tkey = ""
         telemetry = {}
-        monitor_tlm = {}
         try:
             for tlmk in self.tlm_keys:
                 tkey = tlmk
@@ -639,18 +629,9 @@ class Subrack(SkalabBase):
                         data = self.client.get_attribute(tlmk)
                         if data["status"] == "OK":
                             telemetry[tlmk] = data["value"]
-                            monitor_tlm[tlmk] = telemetry[tlmk]
-                        else:
-                            monitor_tlm[tlmk] = "NOT AVAILABLE"
-                else:
-                    monitor_tlm[tlmk] = "NOT MONITORED"
         except:
             print("Error reading Telemetry [attribute: %s], skipping..." % tkey)
-            monitor_tlm[tlmk] = f"ERROR{tkey}"
-            self.monitor.from_subrack =  monitor_tlm 
             return
-
-        self.monitor.from_subrack =  monitor_tlm  
         return telemetry
 
     def writeTlm(self):
@@ -716,24 +697,16 @@ class Subrack(SkalabBase):
             for n, fault in enumerate(self.telemetry["tpm_supply_fault"]):
                 if fault:
                     self.qbutton_tpm[n].setStyleSheet(colors("yellow_on_black"))
-                    self.monitor.qtpm[n].setStyleSheet(colors("yellow_on_black"))
-                    self.monitor.tpm_on_off[n] = False
                 else:
                     if "tpm_present" in self.telemetry.keys():
                         if self.telemetry["tpm_present"][n]:
                             self.qbutton_tpm[n].setStyleSheet(colors("black_on_red"))
-                            self.monitor.qtpm[n].setStyleSheet(colors("black_on_red"))
-                            self.monitor.tpm_on_off[n] = False
+
                         else:
                             self.qbutton_tpm[n].setStyleSheet(colors("black_on_grey"))
-                            self.monitor.qtpm[n].setStyleSheet(colors("black_on_grey"))
-                            self.monitor.tpm_on_off[n] = False
                     if "tpm_on_off" in self.telemetry.keys():
                         if self.telemetry["tpm_on_off"][n]:
                             self.qbutton_tpm[n].setStyleSheet(colors("black_on_green"))
-                            self.monitor.qtpm[n].setStyleSheet(colors("black_on_green"))
-                            self.monitor.tpm_on_off[n] = True
-            self.signal_to_monitor_for_tpm.emit()
 
         # Fan status on Sliders
         if ('subrack_fan_speeds' in self.telemetry.keys()) and ('subrack_fan_speeds_percent' in self.telemetry.keys()):
@@ -768,7 +741,6 @@ class Subrack(SkalabBase):
             if type(self.tlm_hdf) is not None:
                 try:
                     self.tlm_hdf.close()
-                    self.monitor.tlm_hdf_monitor.close()
                 except:
                     pass
             sleep(1)
