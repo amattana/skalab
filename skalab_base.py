@@ -75,7 +75,7 @@ class SkalabBase(QtWidgets.QMainWindow):
     def load_profile(self, App="", Profile="", Path=""):
         if not Profile == "":
             loadPath = Path + Profile + "/"
-            fullPath = loadPath + App + ".ini"
+            fullPath = loadPath + App.lower() + ".ini"
             if os.path.exists(fullPath):
                 print("Loading " + App + " Profile: " + Profile + " (" + fullPath + ")")
             else:
@@ -256,7 +256,7 @@ class SkalabBase(QtWidgets.QMainWindow):
     def updateProfileCombo(self, current):
         profiles = []
         for d in os.listdir(self.profile['Base']['path']):
-            if os.path.exists(self.profile['Base']['path'] + d + "/" + self.profile['Base']['app'] + ".ini"):
+            if os.path.exists(self.profile['Base']['path'] + d + "/" + self.profile['Base']['app'].lower() + ".ini"):
                 profiles += [d]
         if profiles:
             self.wgProfile.qcombo_profile.clear()
