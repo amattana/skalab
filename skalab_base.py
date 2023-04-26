@@ -128,7 +128,7 @@ class SkalabBase(QtWidgets.QMainWindow):
                 msgBox.setIcon(QtWidgets.QMessageBox.Critical)
                 msgBox.setText("The Template for the " +
                                App.upper() +
-                               "Profile file is not available.\n" +
+                               " Profile file is not available.\n" +
                                "Please, check it out from the repo.")
                 msgBox.setWindowTitle("Error!")
                 msgBox.exec_()
