@@ -44,6 +44,7 @@ class Station(SkalabBase):
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
         self.text_editor = ""
+        self.load_events()
 
     def load_events(self):
         self.wg.qbutton_browse.clicked.connect(lambda: self.browse_config())
