@@ -473,7 +473,7 @@ class Subrack(SkalabBase):
                         self.wg.qlabel_message.setText("SubRack API version: " + self.telemetry['api_version'])
                         self.logger.logger.info("Subrack API version: " + self.telemetry['api_version'])
                         if "tpm_ips" in self.tlm_keys:
-                            print("TPM IPs: ", self.tlm_keys["tpm_ips"])
+                            print("TPM IPs: ", self.telemetry["tpm_ips"])
                     else:
                         self.logger.logger.warning("The Subrack is running with a very old API version!")
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")
