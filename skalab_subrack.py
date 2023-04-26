@@ -121,6 +121,7 @@ class Subrack(SkalabBase):
     def __init__(self, ip=None, port=None, uiFile="", profile="", size=[1190, 936], swpath=default_app_dir):
         """ Initialise main window """
         self.tlm_keys = []
+        self.tpm_ips = []
         self.telemetry = {}
         self.query_once = []
         self.query_deny = []
@@ -137,6 +138,7 @@ class Subrack(SkalabBase):
         self.connected = False
         self.populate_table_profile()
         self.reload(ip=ip, port=port)
+        self.updateRequest = False
 
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
@@ -470,6 +472,8 @@ class Subrack(SkalabBase):
                     if 'api_version' in self.telemetry.keys():
                         self.wg.qlabel_message.setText("SubRack API version: " + self.telemetry['api_version'])
                         self.logger.logger.info("Subrack API version: " + self.telemetry['api_version'])
+                        if "tpm_ips" in self.tlm_keys:
+                            print("TPM IPs: ", self.tlm_keys["tpm_ips"])
                     else:
                         self.logger.logger.warning("The Subrack is running with a very old API version!")
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")

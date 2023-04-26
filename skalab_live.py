@@ -100,6 +100,7 @@ class Live(SkalabBase):
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
         self.populate_table_profile()
+        self.updateRequest = False
 
         self.preadu_version = self.profile['Live']['preadu_version']
 

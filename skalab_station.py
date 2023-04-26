@@ -40,6 +40,7 @@ class Station(SkalabBase):
         self.stopThreads = False
         self.processInit = Thread(target=self.do_station_init)
         self.processInit.start()
+        self.updateRequest = False
 
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
@@ -208,7 +209,7 @@ class Station(SkalabBase):
                             time.sleep(0.1)
                         time.sleep(1)
                         self.tpm_station.set_preadu_attenuation(0)
-                        print("TPM PreADUs Powered ON")
+                        self.logger.info("TPM PreADUs Powered ON")
                     else:
                         self.wg.qbutton_station_init.setStyleSheet("background-color: rgb(204, 0, 0);")
                     self.wg.qbutton_station_init.setEnabled(True)

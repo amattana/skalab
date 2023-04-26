@@ -24,6 +24,7 @@ import shutil
 import sys
 import os
 import time
+from threading import Thread
 
 import numpy as np
 import configparser
@@ -198,12 +199,29 @@ class SkaLab(QtWidgets.QMainWindow):
         # if self.config_file:
         #     self.setup_config()
         self.populate_help()
+        self.stopThreads = False
+        self.procUpdate = Thread(target=self.procUpdateChildren)
+        self.procUpdate.start()
 
     def load_events(self):
         self.wg.qbutton_profile_save.clicked.connect(lambda: self.save_profile(self.wg.qcombo_profiles.currentText()))
         self.wg.qbutton_profile_saveas.clicked.connect(lambda: self.save_as_profile())
         self.wg.qbutton_profile_load.clicked.connect(lambda: self.reload_profile(self.wg.qcombo_profiles.currentText()))
         self.wg.qbutton_profile_delete.clicked.connect(lambda: self.delete_profile(self.wg.qcombo_profiles.currentText()))
+
+    def procUpdateChildren(self):
+        while True:
+            # If a connection to the Subrack has been estabilished update the list of TPM IPs
+            if self.wgSubrack.updateRequest:
+                print("TPM IPs: ", self.wgSubrack.tlm_keys["tpm_ips"])
+                pass
+            if self.wgLive.updateRequest:
+                pass
+            if self.wgStation.updateRequest:
+                pass
+            if self.stopThreads:
+                break
+            time.sleep(1)
 
     def load_profile(self, profile):
         if not profile == "":
@@ -376,10 +394,10 @@ class SkaLab(QtWidgets.QMainWindow):
 
         if result == QtWidgets.QMessageBox.Yes:
             event.accept()
+            self.stopThreads = True
             self.wgLive.stopThreads = True
             self.wgStation.stopThreads = True
             self.wgSubrack.stopThreads = True
-            self.stopThreads = True
             time.sleep(1)
             if self.wg.qradio_autosave.isChecked():
                 self.save_profile(this_profile=self.profile_name, reload=False)
