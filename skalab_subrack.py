@@ -118,7 +118,7 @@ class Subrack(SkalabBase):
     # Signal for Slots
     signalTlm = QtCore.pyqtSignal()
 
-    def __init__(self, ip=None, port=None, uiFile="", profile="", size=[1190, 936], swpath=""):
+    def __init__(self, ip=None, port=None, uiFile="", profile="", size=[1190, 936], swpath=default_app_dir):
         """ Initialise main window """
         self.tlm_keys = []
         self.telemetry = {}
