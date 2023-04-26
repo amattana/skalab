@@ -472,6 +472,7 @@ class Subrack(SkalabBase):
                     if 'api_version' in self.telemetry.keys():
                         self.wg.qlabel_message.setText("SubRack API version: " + self.telemetry['api_version'])
                         self.logger.logger.info("Subrack API version: " + self.telemetry['api_version'])
+                        print(self.telemetry)
                         if "tpm_ips" in self.tlm_keys:
                             print("TPM IPs: ", self.telemetry["tpm_ips"])
                     else:
