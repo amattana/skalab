@@ -81,8 +81,8 @@ class Station(SkalabBase):
 
     def setup_config(self):
         if not self.config_file == "":
-            self.wgPlay.config_file = self.config_file
-            self.wgLive.config_file = self.config_file
+            # self.wgPlay.config_file = self.config_file
+            # self.wgLive.config_file = self.config_file
             station.load_configuration_file(self.config_file)
             self.station_name = station.configuration['station']['name']
             self.nof_tiles = len(station.configuration['tiles'])
@@ -94,16 +94,16 @@ class Station(SkalabBase):
             #     self.wg.qlabel_bitfile.setText(self.bitfile)
             self.truncation = int(station.configuration['station']['channel_truncation'])
             self.populate_table_station()
-            if not self.wgPlay == None:
-                self.wgPlay.wg.qcombo_tpm.clear()
-            if not self.wgLive == None:
-                self.wgLive.wg.qcombo_tpm.clear()
+            # if not self.wgPlay == None:
+            #     self.wgPlay.wg.qcombo_tpm.clear()
+            # if not self.wgLive == None:
+            #     self.wgLive.wg.qcombo_tpm.clear()
             self.tiles = []
             for n, i in enumerate(station.configuration['tiles']):
-                if not self.wgPlay == None:
-                    self.wgPlay.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (n + 1, i))
-                if not self.wgLive == None:
-                    self.wgLive.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (n + 1, i))
+                # if not self.wgPlay == None:
+                #     self.wgPlay.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (n + 1, i))
+                # if not self.wgLive == None:
+                #     self.wgLive.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (n + 1, i))
                 self.tiles += [i]
         else:
             msgBox = QtWidgets.QMessageBox()
