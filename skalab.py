@@ -102,19 +102,15 @@ class SkaLab(QtWidgets.QMainWindow):
         self.setCentralWidget(self.wg)
         self.resize(1210, 970)
         self.setWindowTitle("The SKA in LAB Project")
-        self.profile = {'App': {'subrack': "",
-                                'live': "",
-                                'playback': ""},
-                        'Init': {'station_setup': ""}}
+        # self.profile = {'App': {'subrack': "",
+        #                         'live': "",
+        #                         'playback': "",
+        #                         'station': ""},
+        #                 'Init': {'station_setup': ""}}
         self.profile_name = ""
         self.profile_file = ""
         self.load_profile(profile)
         self.updateProfileCombo(current=self.profile_name)
-
-        self.config_file = ""
-        if self.profile_name:
-            self.config_file = self.profile['Init']['station_file']
-            # self.wg.qline_configfile.setText(self.config_file)
 
         self.tabStationIndex = 1
         self.tabSubrackIndex = 2
@@ -123,7 +119,6 @@ class SkaLab(QtWidgets.QMainWindow):
 
         self.pic_ska = QtWidgets.QLabel(self.wg.qwpics)
         self.pic_ska.setGeometry(1, 1, 1111, 401)
-        #self.pic_ska.setPixmap(QtGui.QPixmap(os.getcwd() + "/Pictures/ska_inaf_logo.png"))
         self.pic_ska.setPixmap(QtGui.QPixmap(os.getcwd() + "/Pictures/bungarra.png"))
 
         self.pic_ska_help = QtWidgets.QLabel(self.wg.qwpics_help)
@@ -133,15 +128,15 @@ class SkaLab(QtWidgets.QMainWindow):
         self.wg.qlabel_sw_release.setText("Released on: " + __release__)
         self.wg.qlabel_sw_author.setText("Author: " + __author__)
 
+        # Instantiating Station Tab. This must be always done as first
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabStationIndex, True)
         self.wgStationLayout = QtWidgets.QVBoxLayout()
         self.wgStation = Station(uiFile="Gui/skalab_station.ui", size=[1190, 936],
                            profile=self.profile['Base']['station'],
                            swpath=default_app_dir)
-        # self.wgStation.signalTemp.connect(self.wgLive.updateTempPlot) # non so se servira' un signal
-
         self.wgStationLayout.addWidget(self.wgStation)
         self.wg.qwStation.setLayout(self.wgStationLayout)
+        self.config_file = self.wgStation.profile['Station']['station_file']
 
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabLiveIndex, True)
         self.wgLiveLayout = QtWidgets.QVBoxLayout()
@@ -196,8 +191,6 @@ class SkaLab(QtWidgets.QMainWindow):
         self.power = {}
         self.raw = {}
         self.rms = {}
-        # if self.config_file:
-        #     self.setup_config()
         self.populate_help()
         self.stopThreads = False
         self.procUpdate = Thread(target=self.procUpdateChildren)

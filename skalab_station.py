@@ -46,6 +46,8 @@ class Station(SkalabBase):
         self.resize(size[0], size[1])
         self.text_editor = ""
         self.load_events()
+        self.config_file = self.profile['Station']['station_file']
+        self.setup_config()
 
     def load_events(self):
         self.wg.qbutton_browse.clicked.connect(lambda: self.browse_config())
@@ -85,14 +87,12 @@ class Station(SkalabBase):
             # self.wgPlay.config_file = self.config_file
             # self.wgLive.config_file = self.config_file
             station.load_configuration_file(self.config_file)
+            self.wg.qline_configfile.setText(self.config_file)
             self.station_name = station.configuration['station']['name']
             self.nof_tiles = len(station.configuration['tiles'])
             self.nof_antennas = int(station.configuration['station']['number_of_antennas'])
             self.bitfile = station.configuration['station']['bitfile']
-            # if len(self.bitfile) > 52:
-            #     self.wg.qlabel_bitfile.setText("..." + self.bitfile[-52:])
-            # else:
-            #     self.wg.qlabel_bitfile.setText(self.bitfile)
+            self.wg.qlabel_bitfile.setText(self.bitfile)
             self.truncation = int(station.configuration['station']['channel_truncation'])
             self.populate_table_station()
             # if not self.wgPlay == None:
