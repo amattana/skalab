@@ -416,6 +416,8 @@ class Subrack(SkalabBase):
                 self.plotTpmPower.plotBar(data=self.telemetry["tpm_powers"][i], bar=i, color=COLORI[i])
             self.plotTpmPower.set_xticklabels(labels=["%3.1f" % x for x in self.telemetry["tpm_voltages"]])
         else:
+            self.logger.error("No data available")
+            self.logger.error(self.telemetry.keys())
             self.plotTpmPower.set_xlabel("No data available")
         self.plotTpmPower.updatePlot()
         if "power_supply_powers" in self.telemetry.keys():
