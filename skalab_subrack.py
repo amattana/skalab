@@ -467,7 +467,8 @@ class Subrack(SkalabBase):
                     for tlmk in self.tlm_keys:
                         if tlmk in self.query_once:
                             data = self.client.get_attribute(tlmk)
-                            self.logger.info(tlmk+": "+data["value"])
+                            self.logger.info("ATT: " + tlmk)
+                            self.logger.info(data["value"])
                             if data["status"] == "OK":
                                 self.telemetry[tlmk] = data["value"]
                             else:
