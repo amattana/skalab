@@ -122,10 +122,12 @@ class Subrack(SkalabBase):
         """ Initialise main window """
         self.tlm_keys = []
         self.tpm_ips = []
+        self.system = {}
         self.telemetry = {}
         self.query_once = []
+        self.query_once_armed = False
         self.query_deny = []
-        self.query_tiles = []
+        # self.query_tiles = []
         # Load window file
         self.wg = uic.loadUi(uiFile)
         self.wgProBox = QtWidgets.QWidget(self.wg.qtab_conf)
@@ -219,8 +221,8 @@ class Subrack(SkalabBase):
                 self.query_once = list(self.profile['Query']['once'].split(","))
             if 'deny' in self.profile['Query'].keys():
                 self.query_deny = list(self.profile['Query']['deny'].split(","))
-            if 'deny' in self.profile['Query'].keys():
-                self.query_tiles = list(self.profile['Query']['tiles'].split(","))
+            # if 'tiles' in self.profile['Query'].keys():
+            #     self.query_tiles = list(self.profile['Query']['tiles'].split(","))
 
     def populate_help(self, uifile="Gui/skalab_subrack.ui"):
         with open(uifile) as f:
@@ -461,25 +463,10 @@ class Subrack(SkalabBase):
                 self.client = WebHardwareClient(self.ip, self.port)
                 if self.client.connect():
                     self.logger.logger.info("Successfully connected")
-                    self.tlm_keys = self.client.execute_command("list_attributes")["retvalue"]
-                    self.logger.logger.info("Querying list of Subrack API attributes")
-                    self.logger.info(self.tlm_keys)
-                    for tlmk in self.tlm_keys:
-                        if tlmk in self.query_once:
-                            data = self.client.get_attribute(tlmk)
-                            self.logger.info("ATT: " + tlmk)
-                            self.logger.info(data["value"])
-                            if data["status"] == "OK":
-                                self.telemetry[tlmk] = data["value"]
-                            else:
-                                self.telemetry[tlmk] = data["info"]
                     self.connected = True
-                    if 'api_version' in self.telemetry.keys():
-                        self.wg.qlabel_message.setText("SubRack API version: " + self.telemetry['api_version'])
-                        self.logger.logger.info("Subrack API version: " + self.telemetry['api_version'])
-                        self.checkTpmIps()
-                    else:
-                        self.logger.logger.warning("The Subrack is running with a very old API version!")
+                    self.logger.logger.info("Querying list of Subrack API attributes")
+                    self.tlm_keys = self.client.execute_command("list_attributes")["retvalue"]
+                    self.checkTpmIps()
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")
                     self.wg.qbutton_connect.setText("ONLINE")
                     self.wg.frame_tpm.setEnabled(True)
@@ -522,20 +509,33 @@ class Subrack(SkalabBase):
     def checkTpmIps(self):
         if self.connected:
             self.logger.info("Checking available TPM IPs...")
-            if "assigned_tpm_ip_adds" in self.telemetry.keys():
-                if "tpm_present" in self.telemetry.keys():
-                    if "tpm_on_off" in self.telemetry.keys():
-                        for i in range(len(self.telemetry["tpm_present"])):
-                            msg = "SLOT %d: " % (i + 1)
-                            if self.telemetry["tpm_present"][i]:
-                                if self.telemetry["tpm_on_off"][i]:
-                                    msg += self.telemetry["assigned_tpm_ip_adds"][i]
-                                    self.tpm_ips += [self.telemetry["assigned_tpm_ip_adds"][i]]
+            for tlmk in self.tlm_keys:
+                if tlmk in self.query_once:
+                    data = self.client.get_attribute(tlmk)
+                    if data["status"] == "OK":
+                        self.system[tlmk] = data["value"]
+                    else:
+                        self.system[tlmk] = data["info"]
+            if 'api_version' in self.system.keys():
+                self.wg.qlabel_message.setText("SubRack API version: " + self.system['api_version'])
+                self.logger.logger.info("Subrack API version: " + self.system['api_version'])
+                if "assigned_tpm_ip_adds" in self.system.keys():
+                    if "tpm_present" in self.system.keys():
+                        if "tpm_on_off" in self.system.keys():
+                            for i in range(len(self.system["tpm_present"])):
+                                msg = "SLOT %d: " % (i + 1)
+                                if self.system["tpm_present"][i]:
+                                    if self.system["tpm_on_off"][i]:
+                                        msg += self.system["assigned_tpm_ip_adds"][i]
+                                        self.tpm_ips += [self.system["assigned_tpm_ip_adds"][i]]
+                                    else:
+                                        msg += "OFF"
                                 else:
-                                    msg += "OFF"
-                            else:
-                                msg += "np"
-                            self.logger.info(msg)
+                                    msg += "np"
+                                self.logger.info(msg)
+            else:
+                self.logger.logger.warning("The Subrack is running with a very old API version!")
+
 
     def getTelemetry(self):
         tkey = ""
@@ -548,6 +548,13 @@ class Subrack(SkalabBase):
                         data = self.client.get_attribute(tlmk)
                         if data["status"] == "OK":
                             telemetry[tlmk] = data["value"]
+                if self.query_once_armed and (tlmk in self.query_once):
+                    if self.connected:
+                        data = self.client.get_attribute(tlmk)
+                        if data["status"] == "OK":
+                            telemetry[tlmk] = data["value"]
+                        else:
+                            telemetry[tlmk] = data["info"]
         except:
             self.logger.logger.error("Error reading Telemetry [attribute: %s], skipping..." % tkey)
             return
@@ -605,17 +612,17 @@ class Subrack(SkalabBase):
                         self.tlm_hdf[tlmk].resize(self.tlm_hdf[tlmk].shape[0] + 1, axis=0)
                         self.tlm_hdf[tlmk][-1] = self.telemetry[tlmk]
 
-    def getTiles(self):
-        try:
-            for tlmk in self.query_tiles:
-                data = self.client.get_attribute(tlmk)
-                if data["status"] == "OK":
-                    self.telemetry[tlmk] = data["value"]
-                else:
-                    self.telemetry[tlmk] = []
-            return self.telemetry['tpm_ips']
-        except:
-            return []
+    # def getTiles(self):
+    #     try:
+    #         for tlmk in self.query_tiles:
+    #             data = self.client.get_attribute(tlmk)
+    #             if data["status"] == "OK":
+    #                 self.telemetry[tlmk] = data["value"]
+    #             else:
+    #                 self.telemetry[tlmk] = []
+    #         return self.telemetry['tpm_ips']
+    #     except:
+    #         return []
 
     def readTlm(self):
         while True:
