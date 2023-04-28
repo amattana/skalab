@@ -472,20 +472,7 @@ class Subrack(SkalabBase):
                     if 'api_version' in self.telemetry.keys():
                         self.wg.qlabel_message.setText("SubRack API version: " + self.telemetry['api_version'])
                         self.logger.logger.info("Subrack API version: " + self.telemetry['api_version'])
-                        if "assigned_tpm_ip_adds" in self.tlm_keys:
-                            if "tpm_present" in self.tlm_keys:
-                                if "tpm_on_off" in self.tlm_keys:
-                                    for i in range(len(self.telemetry["tpm_present"])):
-                                        msg = "SLOT %d: " % (i + 1)
-                                        if self.telemetry["tpm_present"][i]:
-                                            if self.telemetry["tpm_on_off"][i]:
-                                                msg += self.telemetry["assigned_tpm_ip_adds"][i]
-                                            else:
-                                                msg += "OFF"
-                                        else:
-                                            msg += "np"
-                                        self.logger.info(msg)
-                                        self.tpm_ips += [self.telemetry["assigned_tpm_ip_adds"][i]]
+                        self.checkTpmIps()
                     else:
                         self.logger.logger.warning("The Subrack is running with a very old API version!")
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")
@@ -521,6 +508,23 @@ class Subrack(SkalabBase):
                         pass
         else:
             self.wg.qlabel_connection.setText("Missing IP!")
+
+    def checkTpmIps(self):
+        self.logger.info("Checking available TPM IPs...")
+        if "assigned_tpm_ip_adds" in self.tlm_keys:
+            if "tpm_present" in self.tlm_keys:
+                if "tpm_on_off" in self.tlm_keys:
+                    for i in range(len(self.telemetry["tpm_present"])):
+                        msg = "SLOT %d: " % (i + 1)
+                        if self.telemetry["tpm_present"][i]:
+                            if self.telemetry["tpm_on_off"][i]:
+                                msg += self.telemetry["assigned_tpm_ip_adds"][i]
+                                self.tpm_ips += [self.telemetry["assigned_tpm_ip_adds"][i]]
+                            else:
+                                msg += "OFF"
+                        else:
+                            msg += "np"
+                        self.logger.info(msg)
 
     def getTelemetry(self):
         tkey = ""
