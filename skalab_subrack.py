@@ -235,40 +235,46 @@ class Subrack(SkalabBase):
         if self.connected:
             if self.telemetry["tpm_on_off"][slot]:
                 self.client.execute_command(command="turn_off_tpm", parameters="%d" % (int(slot) + 1))
-                #print("Turn OFF TPM-%02d" % (int(slot) + 1))
+                self.logger.info("Turn OFF TPM-%02d" % (int(slot) + 1))
             else:
                 self.client.execute_command(command="turn_on_tpm", parameters="%d" % (int(slot) + 1))
-                #print("Turn ON TPM-%02d" % (int(slot) + 1))
+                self.logger.info("Turn ON TPM-%02d" % (int(slot) + 1))
+            self.logger.info("Updating TPM IP List...")
+            self.checkTpmIps()
 
     def cmdSwitchTpmsOn(self):
         if self.connected:
             self.client.execute_command(command="turn_on_tpms")
-            #print("Turn ON ALL")
+            self.logger.info("Turn On ALL TPMs")
             self.skipThreadPause = True
+            self.logger.info("Updating TPM IP List...")
+            self.checkTpmIps()
 
     def cmdSwitchTpmsOff(self):
         if self.connected:
             self.client.execute_command(command="turn_off_tpms")
-            #print("Turn OFF ALL")
+            self.logger.info("Turn Off ALL TPMs")
             self.skipThreadPause = True
+            self.logger.info("Updating TPM IP List...")
+            self.checkTpmIps()
 
     def cmdSetFanManual(self, fan_id):
         if self.connected:
             self.client.execute_command(command="set_fan_mode", parameters="%d,0" % (fan_id + 1))
-            #print("Set FAN Mode MANUAL on FAN #%d" % (fan_id + 1))
+            self.logger.info("Set FAN Mode MANUAL on FAN #%d" % (fan_id + 1))
             self.skipThreadPause = True
 
     def cmdSetFanAuto(self, fan_id):
         if self.connected:
             self.client.execute_command(command="set_fan_mode", parameters="%d,1" % (fan_id + 1))
-            #print("Set FAN Mode AUTO on FAN #%d" % (fan_id + 1))
+            self.logger.info("Set FAN Mode AUTO on FAN #%d" % (fan_id + 1))
             self.skipThreadPause = True
 
     def cmdSetFanSpeed(self, fan_id):
         if self.connected:
             self.client.execute_command(command="set_subrack_fan_speed",
                                         parameters="%d,%d" % (fan_id + 1, int(self.fans[fan_id]['slider'].value())))
-            #print("Set FAN SPEED %d on FAN #%d" % (int(self.fans[fan_id]['slider'].value()), fan_id + 1))
+            self.logger.info("Set FAN SPEED %d on FAN #%d" % (int(self.fans[fan_id]['slider'].value()), fan_id + 1))
             self.fans[fan_id]['sliderPressed'] = False
             self.skipThreadPause = True
 
