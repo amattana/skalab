@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import time
+
 from skalab_base import SkalabBase
 from skalab_log import SkalabLog
 import gc
@@ -239,6 +241,9 @@ class Subrack(SkalabBase):
             else:
                 self.client.execute_command(command="turn_on_tpm", parameters="%d" % (int(slot) + 1))
                 self.logger.info("Turn ON TPM-%02d" % (int(slot) + 1))
+            # TODO gestire turn_on_tpm_still_running
+            self.logger.info("Waiting for 3 seconds...")
+            time.sleep(3)
             self.logger.info("Updating TPM IP List...")
             self.checkTpmIps()
 
@@ -247,6 +252,9 @@ class Subrack(SkalabBase):
             self.client.execute_command(command="turn_on_tpms")
             self.logger.info("Turn On ALL TPMs")
             self.skipThreadPause = True
+            # TODO gestire turn_on_tpm_still_running
+            self.logger.info("Waiting for 10 seconds...")
+            time.sleep(10)
             self.logger.info("Updating TPM IP List...")
             self.checkTpmIps()
 
@@ -255,6 +263,9 @@ class Subrack(SkalabBase):
             self.client.execute_command(command="turn_off_tpms")
             self.logger.info("Turn Off ALL TPMs")
             self.skipThreadPause = True
+            # TODO gestire turn_on_tpm_still_running
+            self.logger.info("Waiting for 10 seconds...")
+            time.sleep(10)
             self.logger.info("Updating TPM IP List...")
             self.checkTpmIps()
 
