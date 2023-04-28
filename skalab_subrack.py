@@ -522,17 +522,21 @@ class Subrack(SkalabBase):
                 if "assigned_tpm_ip_adds" in self.system.keys():
                     if "tpm_present" in self.system.keys():
                         if "tpm_on_off" in self.system.keys():
+                            tpm_ips = []
                             for i in range(len(self.system["tpm_present"])):
                                 msg = "SLOT %d: " % (i + 1)
                                 if self.system["tpm_present"][i]:
                                     if self.system["tpm_on_off"][i]:
                                         msg += self.system["assigned_tpm_ip_adds"][i]
-                                        self.tpm_ips += [self.system["assigned_tpm_ip_adds"][i]]
+                                        tpm_ips += [self.system["assigned_tpm_ip_adds"][i]]
                                     else:
                                         msg += "OFF"
                                 else:
                                     msg += "np"
                                 self.logger.info(msg)
+                if not tpm_ips ==  self.tpm_ips:
+                    self.tpm_ips = tpm_ips.copy()
+                    self.updateRequest = True
             else:
                 self.logger.logger.warning("The Subrack is running with a very old API version!")
 
