@@ -70,14 +70,14 @@ class SkalabLog(QtWidgets.QMainWindow):
         self.qtabLog.addTab(self.tabError, "")
         self.qtabLog.setTabText(self.qtabLog.indexOf(self.tabError), _translate("Form", "Errors   cnt: 0  "))
         self.qbutton_clear_log = QtWidgets.QPushButton(self.wg)
-        self.qbutton_clear_log.setGeometry(QtCore.QRect(self.size.width() - 81, 13, 71, 22))
+        self.qbutton_clear_log.setGeometry(QtCore.QRect(self.size.width() - 81, 11, 71, 24))
         self.qbutton_clear_log.setStatusTip("")
         self.qbutton_clear_log.setWhatsThis("")
         self.qbutton_clear_log.setToolTip(_translate("Form", "Clear Text on the Current Tab"))
         self.qbutton_clear_log.setText(_translate("Form", "Clear"))
         self.qbutton_clear_log.clicked.connect(self.clearLog)
         self.qbutton_reset_error_cnt = QtWidgets.QPushButton(self.wg)
-        self.qbutton_reset_error_cnt.setGeometry(QtCore.QRect(self.size.width() - 181, 13, 71, 22))
+        self.qbutton_reset_error_cnt.setGeometry(QtCore.QRect(self.size.width() - 181, 11, 71, 24))
         self.qbutton_reset_error_cnt.setToolTipDuration(-1)
         self.qbutton_reset_error_cnt.setStatusTip("")
         self.qbutton_reset_error_cnt.setObjectName("qbutton_reset_error_cnt")
@@ -171,7 +171,7 @@ class SkalabLog(QtWidgets.QMainWindow):
 
     def testFunc(self):
         self.qbutton_test = QtWidgets.QPushButton(self.wg)
-        self.qbutton_test.setGeometry(QtCore.QRect(300, 13, 71, 22))
+        self.qbutton_test.setGeometry(QtCore.QRect(300, 11, 71, 24))
         self.qbutton_test.clicked.connect(self.testLog)
         self.qbutton_test.setText("TEST")
 

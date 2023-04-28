@@ -190,6 +190,7 @@ class Subrack(SkalabBase):
 
     def load_events(self):
         self.wg.qbutton_connect.clicked.connect(lambda: self.connect())
+        self.wg.qbutton_check_ips.clicked.connect(lambda: self.checkTpmIps())
         for n, t in enumerate(self.qbutton_tpm):
             t.clicked.connect(lambda state, g=n: self.cmdSwitchTpm(g))
         self.wg.qbutton_tpm_on.clicked.connect(lambda: self.cmdSwitchTpmsOn())
@@ -510,21 +511,24 @@ class Subrack(SkalabBase):
             self.wg.qlabel_connection.setText("Missing IP!")
 
     def checkTpmIps(self):
-        self.logger.info("Checking available TPM IPs...")
-        if "assigned_tpm_ip_adds" in self.tlm_keys:
-            if "tpm_present" in self.tlm_keys:
-                if "tpm_on_off" in self.tlm_keys:
-                    for i in range(len(self.telemetry["tpm_present"])):
-                        msg = "SLOT %d: " % (i + 1)
-                        if self.telemetry["tpm_present"][i]:
-                            if self.telemetry["tpm_on_off"][i]:
-                                msg += self.telemetry["assigned_tpm_ip_adds"][i]
-                                self.tpm_ips += [self.telemetry["assigned_tpm_ip_adds"][i]]
+        if self.connected:
+            self.logger.info("Checking available TPM IPs...")
+            if "assigned_tpm_ip_adds" in self.tlm_keys:
+                if "tpm_present" in self.tlm_keys:
+                    if "tpm_on_off" in self.tlm_keys:
+                        for i in range(len(self.telemetry["tpm_present"])):
+                            msg = "SLOT %d: " % (i + 1)
+                            if self.telemetry["tpm_present"][i]:
+                                if self.telemetry["tpm_on_off"][i]:
+                                    msg += self.telemetry["assigned_tpm_ip_adds"][i]
+                                    self.tpm_ips += [self.telemetry["assigned_tpm_ip_adds"][i]]
+                                else:
+                                    msg += "OFF"
                             else:
-                                msg += "OFF"
-                        else:
-                            msg += "np"
-                        self.logger.info(msg)
+                                msg += "np"
+                            self.logger.info(msg)
+        else:
+            self.logger.warning("TPM IPs check can be done only when the Subrack connection is active.")
 
     def getTelemetry(self):
         tkey = ""
