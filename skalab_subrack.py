@@ -190,7 +190,7 @@ class Subrack(SkalabBase):
 
     def load_events(self):
         self.wg.qbutton_connect.clicked.connect(lambda: self.connect())
-        self.wg.qbutton_check_ips.clicked.connect(lambda: self.checkTpmIps())
+        self.wg.qbutton_check_ips.clicked.connect(lambda: self.checkIps())
         for n, t in enumerate(self.qbutton_tpm):
             t.clicked.connect(lambda state, g=n: self.cmdSwitchTpm(g))
         self.wg.qbutton_tpm_on.clicked.connect(lambda: self.cmdSwitchTpmsOn())
@@ -510,6 +510,12 @@ class Subrack(SkalabBase):
         else:
             self.wg.qlabel_connection.setText("Missing IP!")
 
+    def checkIps(self):
+        if self.connected:
+            self.checkTpmIps()
+        else:
+            self.logger.warning("TPM IPs check can be done only when the Subrack connection is active.")
+
     def checkTpmIps(self):
         if self.connected:
             self.logger.info("Checking available TPM IPs...")
@@ -527,8 +533,6 @@ class Subrack(SkalabBase):
                             else:
                                 msg += "np"
                             self.logger.info(msg)
-        else:
-            self.logger.warning("TPM IPs check can be done only when the Subrack connection is active.")
 
     def getTelemetry(self):
         tkey = ""
