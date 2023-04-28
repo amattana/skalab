@@ -463,6 +463,7 @@ class Subrack(SkalabBase):
                     self.logger.logger.info("Successfully connected")
                     self.tlm_keys = self.client.execute_command("list_attributes")["retvalue"]
                     self.logger.logger.info("Querying list of Subrack API attributes")
+                    self.logger.info(self.tlm_keys)
                     for tlmk in self.tlm_keys:
                         if tlmk in self.query_once:
                             data = self.client.get_attribute(tlmk)
