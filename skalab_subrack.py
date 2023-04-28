@@ -522,9 +522,9 @@ class Subrack(SkalabBase):
     def checkTpmIps(self):
         if self.connected:
             self.logger.info("Checking available TPM IPs...")
-            if "assigned_tpm_ip_adds" in self.tlm_keys:
-                if "tpm_present" in self.tlm_keys:
-                    if "tpm_on_off" in self.tlm_keys:
+            if "assigned_tpm_ip_adds" in self.telemetry.keys():
+                if "tpm_present" in self.telemetry.keys():
+                    if "tpm_on_off" in self.telemetry.keys():
                         for i in range(len(self.telemetry["tpm_present"])):
                             msg = "SLOT %d: " % (i + 1)
                             if self.telemetry["tpm_present"][i]:
