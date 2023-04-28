@@ -470,6 +470,9 @@ class Subrack(SkalabBase):
                                 self.telemetry[tlmk] = data["value"]
                             else:
                                 self.telemetry[tlmk] = data["info"]
+                    self.connected = True
+                    self.tlm_hdf = self.setup_hdf5()
+                    self.getTelemetry()
                     if 'api_version' in self.telemetry.keys():
                         self.wg.qlabel_message.setText("SubRack API version: " + self.telemetry['api_version'])
                         self.logger.logger.info("Subrack API version: " + self.telemetry['api_version'])
@@ -480,10 +483,7 @@ class Subrack(SkalabBase):
                     self.wg.qbutton_connect.setText("ONLINE")
                     self.wg.frame_tpm.setEnabled(True)
                     self.wg.frame_fan.setEnabled(True)
-                    self.connected = True
 
-                    self.tlm_hdf = self.setup_hdf5()
-                    self.getTelemetry()
                 else:
                     self.wg.qlabel_message.setText("The SubRack server does not respond!")
                     self.logger.logger.error("Unable to connect to the SubRack server %s:%d" % (self.ip, int(self.port)))
