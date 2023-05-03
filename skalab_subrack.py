@@ -241,12 +241,12 @@ class Subrack(SkalabBase):
             else:
                 self.client.execute_command(command="turn_on_tpm", parameters="%d" % (int(slot) + 1))
                 self.logger.info("Turn ON TPM-%02d" % (int(slot) + 1))
-            # TODO gestire turn_on_tpm_still_running
             if "tpm_on_off" in self.system.keys():
                 data = self.client.get_attribute("tpm_on_off")
-                if not data["status"] == "OK":
+                while not data["status"] == "OK":
                     self.logger.info("Waiting for operation complete: " + data["info"])
                     time.sleep(0.5)
+                    data = self.client.get_attribute("tpm_on_off")
             self.checkTpmIps()
 
     def cmdSwitchTpmsOn(self):
@@ -256,9 +256,10 @@ class Subrack(SkalabBase):
             self.skipThreadPause = True
             if "tpm_on_off" in self.system.keys():
                 data = self.client.get_attribute("tpm_on_off")
-                if not data["status"] == "OK":
+                while not data["status"] == "OK":
                     self.logger.info("Waiting for operation complete: " + data["info"])
                     time.sleep(0.5)
+                    data = self.client.get_attribute("tpm_on_off")
             self.checkTpmIps()
 
     def cmdSwitchTpmsOff(self):
@@ -268,9 +269,10 @@ class Subrack(SkalabBase):
             self.skipThreadPause = True
             if "tpm_on_off" in self.system.keys():
                 data = self.client.get_attribute("tpm_on_off")
-                if not data["status"] == "OK":
+                while not data["status"] == "OK":
                     self.logger.info("Waiting for operation complete: " + data["info"])
                     time.sleep(0.5)
+                    data = self.client.get_attribute("tpm_on_off")
             self.checkTpmIps()
 
     def cmdSetFanManual(self, fan_id):
