@@ -540,6 +540,7 @@ class Subrack(SkalabBase):
             for tlmk in self.tlm_keys:
                 if tlmk in self.query_once:
                     data = self.client.get_attribute(tlmk)
+                    print(data)
                     if data["status"] == "OK":
                         self.system[tlmk] = data["value"]
                     else:
@@ -547,6 +548,7 @@ class Subrack(SkalabBase):
                         time.sleep(0.1)
                         while (retry < 3) and (not data["status"] == "OK"):
                             data = self.client.get_attribute(tlmk)
+                            print(retry, data)
                             retry = retry + 1
                             time.sleep(0.1)
                             if data["status"] == "OK":
