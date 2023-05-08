@@ -45,6 +45,10 @@ class Station(SkalabBase):
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
         self.text_editor = ""
+        if 'Extras' in self.profile.keys():
+            if 'text_editor' in self.profile['Extras'].keys():
+                self.text_editor = self.profile['Extras']['text_editor']
+
         self.load_events()
         self.config_file = self.profile['Station']['station_file']
         self.setup_config()

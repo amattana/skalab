@@ -241,9 +241,9 @@ class SkaLab(QtWidgets.QMainWindow):
                 self.config_file = self.profile['Init']['station_file']
                 # self.wg.qline_configfile.setText(self.config_file)
                 self.populate_table_profile()
-                if 'Extras' in self.profile.keys():
-                    if 'text_editor' in self.profile['Extras'].keys():
-                        self.text_editor = self.profile['Extras']['text_editor']
+                # if 'Extras' in self.profile.keys():
+                #     if 'text_editor' in self.profile['Extras'].keys():
+                #         self.text_editor = self.profile['Extras']['text_editor']
 
     def reload_profile(self, profile):
         self.load_profile(profile=profile)
@@ -345,7 +345,7 @@ class SkaLab(QtWidgets.QMainWindow):
                         'playback': playback,
                         'station': station}
         conf['Init'] = {'station_file': config}
-        conf['Extras'] = {'text_editor': self.text_editor}
+        #conf['Extras'] = {'text_editor': self.text_editor}
         if not os.path.exists(default_app_dir):
             os.makedirs(default_app_dir)
         conf_path = default_app_dir + profile
