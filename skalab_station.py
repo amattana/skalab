@@ -8,6 +8,7 @@ from threading import Thread
 import time
 import gc
 import os
+import numpy as np
 from pathlib import Path
 from pyaavs import station
 from pyfabil import TPMGeneric
