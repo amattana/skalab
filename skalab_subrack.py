@@ -247,6 +247,7 @@ class Subrack(SkalabBase):
                     self.logger.info("Waiting for operation complete: " + data["info"])
                     time.sleep(0.5)
                     data = self.client.get_attribute("tpm_on_off")
+            time.sleep(0.5)
             self.checkTpmIps()
 
     def cmdSwitchTpmsOn(self):
@@ -260,6 +261,7 @@ class Subrack(SkalabBase):
                     self.logger.info("Waiting for operation complete: " + data["info"])
                     time.sleep(0.5)
                     data = self.client.get_attribute("tpm_on_off")
+            time.sleep(0.5)
             self.checkTpmIps()
 
     def cmdSwitchTpmsOff(self):
@@ -273,6 +275,7 @@ class Subrack(SkalabBase):
                     self.logger.info("Waiting for operation complete: " + data["info"])
                     time.sleep(0.5)
                     data = self.client.get_attribute("tpm_on_off")
+            time.sleep(0.5)
             self.checkTpmIps()
 
     def cmdSetFanManual(self, fan_id):
@@ -540,14 +543,24 @@ class Subrack(SkalabBase):
                     if data["status"] == "OK":
                         self.system[tlmk] = data["value"]
                     else:
-                        self.system[tlmk] = data["info"]
+                        retry = 0
+                        time.sleep(0.1)
+                        while (retry < 3) and (not data["status"] == "OK"):
+                            data = self.client.get_attribute(tlmk)
+                            retry = retry + 1
+                            time.sleep(0.1)
+                            if data["status"] == "OK":
+                                self.system[tlmk] = data["value"]
+                            else:
+                                self.system[tlmk] = data["info"]
+
             if 'api_version' in self.system.keys():
+                tpm_ips = []
                 self.wg.qlabel_message.setText("SubRack API version: " + self.system['api_version'])
                 self.logger.logger.info("Subrack API version: " + self.system['api_version'])
                 if "assigned_tpm_ip_adds" in self.system.keys():
                     if "tpm_present" in self.system.keys():
                         if "tpm_on_off" in self.system.keys():
-                            tpm_ips = []
                             for i in range(len(self.system["tpm_present"])):
                                 msg = "SLOT %d: " % (i + 1)
                                 if self.system["tpm_present"][i]:
@@ -559,7 +572,7 @@ class Subrack(SkalabBase):
                                 else:
                                     msg += "np"
                                 self.logger.info(msg)
-                if not tpm_ips ==  self.tpm_ips:
+                if not tpm_ips == self.tpm_ips:
                     self.tpm_ips = tpm_ips.copy()
                     self.updateRequest = True
             else:
