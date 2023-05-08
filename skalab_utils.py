@@ -728,6 +728,8 @@ class BarPlot(QtWidgets.QWidget):
         del self.markers
         self.markers = []
         if nbar > 1:
+            if nbar % 2:
+                nbar = nbar + 1
             for pol in range(2):
                 markers, = self.canvas.ax.plot(np.arange(0, nbar, 2) + 1 + pol, np.zeros(int(nbar/2)),
                                                linestyle='None', marker="s", markersize=self.markersize)
