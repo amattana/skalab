@@ -53,6 +53,7 @@ class Station(SkalabBase):
         self.load_events()
         self.config_file = self.profile['Station']['station_file']
         self.setup_config()
+        self.tpm_ips_from_subrack = []
 
     def load_events(self):
         self.wg.qbutton_browse.clicked.connect(lambda: self.browse_config())
@@ -127,73 +128,69 @@ class Station(SkalabBase):
                 station.load_configuration_file(self.config_file)
                 # Check wether the TPM are ON or OFF
                 station_on = True
-            #     tpm_ip_list = list(station.configuration['tiles'])
-            #     tpm_ip_from_subrack = self.wgSubrack.getTiles()
-            #     if tpm_ip_from_subrack:
-            #         tpm_ip_from_subrack_short = [x for x in tpm_ip_from_subrack if not x == '0']
-            #         if not len(tpm_ip_list) == len(tpm_ip_from_subrack_short):
-            #             msgBox = QtWidgets.QMessageBox()
-            #             message = "STATION\nOne or more TPMs forming the station are OFF\nPlease check the power!"
-            #             msgBox.setText(message)
-            #             msgBox.setWindowTitle("ERROR: TPM POWERED OFF")
-            #             msgBox.setIcon(QtWidgets.QMessageBox.Critical)
-            #             details = "STATION IP LIST FROM CONFIG FILE (%d): " % len(tpm_ip_list)
-            #             for i in tpm_ip_list:
-            #                 details += "\n%s" % i
-            #             details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(tpm_ip_from_subrack_short)
-            #             for i in tpm_ip_from_subrack_short:
-            #                 details += "\n%s" % i
-            #             msgBox.setDetailedText(details)
-            #             msgBox.exec_()
-            #             print(self.wgSubrack.telemetry)
-            #             return
-            #         else:
-            #             if not np.array_equal(tpm_ip_list, tpm_ip_from_subrack_short):
-            #                 msgBox = QtWidgets.QMessageBox()
-            #                 message = "STATION\nIPs provided by the SubRack are different from what defined in the " \
-            #                           "config file.\nINIT will use the new assigned IPs."
-            #                 msgBox.setText(message)
-            #                 msgBox.setWindowTitle("WARNING: IP mismatch")
-            #                 msgBox.setIcon(QtWidgets.QMessageBox.Warning)
-            #                 details = "STATION IP LIST FROM CONFIG FILE (%d): " % len(tpm_ip_list)
-            #                 for i in tpm_ip_list:
-            #                     details += "\n%s" % i
-            #                 details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(tpm_ip_from_subrack_short)
-            #                 for i in tpm_ip_from_subrack_short:
-            #                     details += "\n%s" % i
-            #                 msgBox.setDetailedText(details)
-            #                 msgBox.exec_()
-            #                 station.configuration['tiles'] = list(tpm_ip_from_subrack_short)
-            #                 self.wgLive.setupNewTilesIPs(list(tpm_ip_from_subrack))
-            #     for tpm_ip in station.configuration['tiles']:
-            #         try:
-            #             tpm = TPMGeneric()
-            #             tpm_version = tpm.get_tpm_version(socket.gethostbyname(tpm_ip), 10000)
-            #         except (BoardError, LibraryError):
-            #             station_on = False
-            #             break
-            #     if station_on:
-            #         self.doInit = True
-            #     else:
-            #         msgBox = QtWidgets.QMessageBox()
-            #         msgBox.setText("STATION\nOne or more TPMs forming the station is unreachable\n"
-            #                        "Please check the power or the connection!")
-            #         msgBox.setWindowTitle("ERROR: TPM UNREACHABLE")
-            #         msgBox.setIcon(QtWidgets.QMessageBox.Critical)
-            #         details = "STATION IP LIST FROM CONFIG FILE (%d): " % len(tpm_ip_list)
-            #         for i in tpm_ip_list:
-            #             details += "\n%s" % i
-            #         details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(tpm_ip_from_subrack)
-            #         for i in tpm_ip_from_subrack:
-            #             details += "\n%s" % i
-            #         msgBox.setDetailedText(details)
-            #         msgBox.exec_()
-            # else:
-            #     msgBox = QtWidgets.QMessageBox()
-            #     msgBox.setText("SKALAB: Please LOAD a configuration file first...")
-            #     msgBox.setWindowTitle("Error!")
-            #     msgBox.setIcon(QtWidgets.QMessageBox.Critical)
-            #     msgBox.exec_()
+                tpm_ip_list = list(station.configuration['tiles'])
+                if self.tpm_ips_from_subrack:
+                    if not len(tpm_ip_list) == len(self.tpm_ips_from_subrack):
+                        msgBox = QtWidgets.QMessageBox()
+                        message = "STATION\nOne or more TPMs forming the station are OFF\nPlease check the power!"
+                        msgBox.setText(message)
+                        msgBox.setWindowTitle("ERROR: TPM POWERED OFF")
+                        msgBox.setIcon(QtWidgets.QMessageBox.Critical)
+                        details = "STATION IP LIST FROM CONFIG FILE (%d): " % len(tpm_ip_list)
+                        for i in tpm_ip_list:
+                            details += "\n%s" % i
+                        details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(self.tpm_ips_from_subrack)
+                        for i in tpm_ip_from_subrack_short:
+                            details += "\n%s" % i
+                        msgBox.setDetailedText(details)
+                        msgBox.exec_()
+                    else:
+                        if not np.array_equal(tpm_ip_list, self.tpm_ips_from_subrack):
+                            msgBox = QtWidgets.QMessageBox()
+                            message = "STATION\nIPs provided by the SubRack are different from what defined in the " \
+                                      "config file.\nINIT will use the new assigned IPs."
+                            msgBox.setText(message)
+                            msgBox.setWindowTitle("WARNING: IP mismatch")
+                            msgBox.setIcon(QtWidgets.QMessageBox.Warning)
+                            details = "STATION IP LIST FROM CONFIG FILE (%d): " % len(tpm_ip_list)
+                            for i in tpm_ip_list:
+                                details += "\n%s" % i
+                            details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(self.tpm_ips_from_subrack)
+                            for i in self.tpm_ips_from_subrack:
+                                details += "\n%s" % i
+                            msgBox.setDetailedText(details)
+                            msgBox.exec_()
+                            station.configuration['tiles'] = list(self.tpm_ips_from_subrack)
+                            # self.wgLive.setupNewTilesIPs(list(self.tpm_ips_from_subrack))
+                for tpm_ip in station.configuration['tiles']:
+                    try:
+                        tpm = TPMGeneric()
+                        tpm_version = tpm.get_tpm_version(socket.gethostbyname(tpm_ip), 10000)
+                    except (BoardError, LibraryError):
+                        station_on = False
+                        break
+                if station_on:
+                    self.doInit = True
+                else:
+                    msgBox = QtWidgets.QMessageBox()
+                    msgBox.setText("STATION\nOne or more TPMs forming the station is unreachable\n"
+                                   "Please check the power or the connection!")
+                    msgBox.setWindowTitle("ERROR: TPM UNREACHABLE")
+                    msgBox.setIcon(QtWidgets.QMessageBox.Critical)
+                    details = "STATION IP LIST FROM CONFIG FILE (%d): " % len(tpm_ip_list)
+                    for i in tpm_ip_list:
+                        details += "\n%s" % i
+                    details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(self.tpm_ips_from_subrack)
+                    for i in tpm_ip_from_subrack:
+                        details += "\n%s" % i
+                    msgBox.setDetailedText(details)
+                    msgBox.exec_()
+            else:
+                msgBox = QtWidgets.QMessageBox()
+                msgBox.setText("SKALAB: Please LOAD a configuration file first...")
+                msgBox.setWindowTitle("Error!")
+                msgBox.setIcon(QtWidgets.QMessageBox.Critical)
+                msgBox.exec_()
 
     def do_station_init(self):
         while True:
@@ -201,7 +198,9 @@ class Station(SkalabBase):
                 station.configuration['station']['initialise'] = True
                 station.configuration['station']['program'] = True
                 try:
+                    self.logger.propagate = True
                     self.tpm_station = station.Station(station.configuration)
+                    self.logger.propagate = False
                     self.wg.qbutton_station_init.setEnabled(False)
                     self.tpm_station.connect()
                     station.configuration['station']['initialise'] = False
