@@ -7,6 +7,7 @@ import socket
 from threading import Thread
 import time
 import gc
+import os
 from pathlib import Path
 from pyaavs import station
 from pyfabil import TPMGeneric
