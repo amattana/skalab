@@ -740,6 +740,7 @@ class BarPlot(QtWidgets.QWidget):
                                            markersize=self.markersize)
             markers.set_visible(False)
             self.markers += [markers]
+        self.canvas.ax.set_xlim([0, nbar + 1])
         self.updatePlot()
 
     def showMarkers(self):
