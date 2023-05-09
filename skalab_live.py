@@ -957,7 +957,7 @@ class Live(SkalabBase):
         self.newTilesIPs = [x for x in newTiles if not x == '0']
         self.station_configuration['tiles'] = self.newTilesIPs
         self.updateComboIps(newTiles)
-        self.
+        #self.
 
     def runAcquisition(self):
         self.live_data = self.mydaq.execute()
