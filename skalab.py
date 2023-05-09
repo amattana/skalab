@@ -210,6 +210,7 @@ class SkaLab(QtWidgets.QMainWindow):
                 print("RECEIVED TPM IPs: ", self.wgSubrack.tpm_ips)
                 self.wgStation.tpm_ips_from_subrack = self.wgSubrack.tpm_ips.copy()
                 self.wgLive.setupNewTilesIPs(self.wgSubrack.tpm_ips)
+
             if self.wgLive.updateRequest:
                 pass
             if self.wgStation.updateRequest:

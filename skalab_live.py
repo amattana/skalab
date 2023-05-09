@@ -599,7 +599,7 @@ class Live(SkalabBase):
                 #except:
                 #    pass
 
-                try:
+                if True:
                     if not self.ThreadTempPause:
                         while self.commBusy:
                             time.sleep(0.2)
@@ -623,11 +623,11 @@ class Live(SkalabBase):
                         self.commBusy = False
                         self.signalTemp.emit()
                         self.signalRms.emit()
-                except:
-                    self.logger.logger.warning("Failed to get RMS and/or Temperature data!")
-                    self.commBusy = False
-                    # self.preadu.Busy = False
-                    pass
+                # except:
+                #     self.logger.logger.warning("Failed to get RMS and/or Temperature data!")
+                #     self.commBusy = False
+                #     # self.preadu.Busy = False
+                #     pass
                 cycle = 0.0
                 while cycle < float(self.profile['Live']['query_interval']) and not self.stopThreads:
                     sleep(0.1)
@@ -957,6 +957,7 @@ class Live(SkalabBase):
         self.newTilesIPs = [x for x in newTiles if not x == '0']
         self.station_configuration['tiles'] = self.newTilesIPs
         self.updateComboIps(newTiles)
+        self.
 
     def runAcquisition(self):
         self.live_data = self.mydaq.execute()
@@ -1193,6 +1194,8 @@ class Live(SkalabBase):
         for nn, i in enumerate(tpm_list):
             if not i == "0":
                 self.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (nn + 1, i))
+        if tpm_list:
+            self.wg.qcombo_tpm.setCurrentIndex(0)
 
     def export_data(self):
         if self.wg.play_qradio_spectrogram.isChecked():
