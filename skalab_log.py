@@ -29,21 +29,21 @@ class QTextEditLogger(logging.Handler):
 
     def emit(self, record):
         print(record.levelno, "\t", self.format(record))
-        if (record.levelno == self.level) or (self.level == logging.INFO):
-            msg = self.format(record)
-            if record.levelno == logging.INFO:
-                fancymsg = "\n<span style='font-weight:600; color:#22b80e;'>" + msg + "</span><br>"
-            elif record.levelno == logging.ERROR:
-                fancymsg = "\n<span style='font-weight:600; color:#ff0000;'>" + msg + "</span><br>"
-            else:
-                fancymsg = "\n<span style='font-weight:600; color:#ff7800;'>" + msg + "</span><br>"
+        # if (record.levelno == self.level) or (self.level == logging.INFO):
+        msg = self.format(record)
+        if record.levelno == logging.INFO:
+            fancymsg = "\n<span style='font-weight:600; color:#22b80e;'>" + msg + "</span><br>"
+        elif record.levelno == logging.ERROR:
+            fancymsg = "\n<span style='font-weight:600; color:#ff0000;'>" + msg + "</span><br>"
+        else:
+            fancymsg = "\n<span style='font-weight:600; color:#ff7800;'>" + msg + "</span><br>"
 
-            self.widget.insertHtml(fancymsg)
-            self.widget.moveCursor(QtGui.QTextCursor.End)
-            if self.caption is not None:
-                self.total = self.total + 1
-                self.caption.setTabText(2, record.levelname[0] + record.levelname[1:].lower() +
-                                        "s  cnt:%s" % str(self.total).rjust(3, " ") + " (*)")
+        self.widget.insertHtml(fancymsg)
+        self.widget.moveCursor(QtGui.QTextCursor.End)
+        if self.caption is not None:
+            self.total = self.total + 1
+            self.caption.setTabText(2, record.levelname[0] + record.levelname[1:].lower() +
+                                    "s  cnt:%s" % str(self.total).rjust(3, " ") + " (*)")
 
     def clear(self):
         self.widget.clear()
