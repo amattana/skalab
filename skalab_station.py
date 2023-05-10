@@ -219,7 +219,6 @@ class Station(SkalabBase):
                             tile["board.regfile.enable.fe"] = 1
                             time.sleep(0.1)
                         time.sleep(1)
-                        self.tpm_station.set_preadu_attenuation(0)
                         self.logger.info("TPM PreADUs Powered ON")
                     else:
                         self.wg.qbutton_station_init.setStyleSheet("background-color: rgb(204, 0, 0);")
