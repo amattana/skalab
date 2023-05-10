@@ -393,15 +393,14 @@ class SkaLab(QtWidgets.QMainWindow):
 
         if result == QtWidgets.QMessageBox.Yes:
             event.accept()
-            print("TOTAL THREADS: ", threading.activeCount())
+            print("Total Threads to close: ", threading.activeCount())
             self.stopThreads = True
             self.wgLive.cmdClose()
             self.wgStation.cmdClose()
             self.wgSubrack.cmdClose()
             self.wgPlay.cmdClose()
             time.sleep(1)
-            print("TOTAL THREADS: ", threading.activeCount())
-            print(threading.get_native_id())
+            print("Still active Threads: ", threading.activeCount())
             if self.wg.qradio_autosave.isChecked():
                 self.save_profile(this_profile=self.profile_name, reload=False)
 
