@@ -198,7 +198,7 @@ class Station(SkalabBase):
             if self.doInit:
                 station.configuration['station']['initialise'] = True
                 station.configuration['station']['program'] = True
-                try:
+                if True:
                     self.logger.propagate = True
                     self.tpm_station = station.Station(station.configuration)
                     pyaavs.logger.root_logger.handlers(self.logger.logInfo)
@@ -221,7 +221,7 @@ class Station(SkalabBase):
                     self.wg.qbutton_station_init.setEnabled(True)
                     del self.tpm_station
                     gc.collect()
-                except:
+                else:
                     self.wg.qbutton_station_init.setEnabled(True)
                 self.tpm_station = None
                 self.doInit = False
