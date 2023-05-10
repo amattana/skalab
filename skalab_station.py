@@ -56,11 +56,11 @@ class Station(SkalabBase):
         self.setup_config()
         self.tpm_ips_from_subrack = []
 
-        pyaavs.logger.root_logger.setLevel(logging.INFO)
-        pyaavs.logger.root_logger.handlers = []
-
-        pyaavs.logger.root_logger.addHandler(self.logger.logInfo)
-        pyaavs.logger.root_logger.addHandler(self.logger.file_handler)
+        # pyaavs.logger.root_logger.setLevel(logging.INFO)
+        # pyaavs.logger.root_logger.handlers = []
+        #
+        # pyaavs.logger.root_logger.addHandler(self.logger.logInfo)
+        # pyaavs.logger.root_logger.addHandler(self.logger.file_handler)
 
     def load_events(self):
         self.wg.qbutton_browse.clicked.connect(lambda: self.browse_config())
@@ -205,9 +205,9 @@ class Station(SkalabBase):
                 station.configuration['station']['initialise'] = True
                 station.configuration['station']['program'] = True
                 if True:
-                    self.logger.propagate = True
+                    #self.logger.propagate = True
                     self.tpm_station = station.Station(station.configuration)
-                    self.logger.propagate = False
+                    #self.logger.propagate = False
                     self.wg.qbutton_station_init.setEnabled(False)
                     self.tpm_station.connect()
                     station.configuration['station']['initialise'] = False
