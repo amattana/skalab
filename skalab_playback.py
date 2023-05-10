@@ -82,7 +82,7 @@ class Playback(SkalabBase):
         self.wgProBox.setVisible(True)
         self.wgProBox.show()
         super(Playback, self).__init__(App="playback", Profile=profile, Path=swpath, parent=self.wgProBox)
-        self.log = SkalabLog(parent=self.wg.qw_log, logname=__name__, profile=self.profile)
+        self.logger = SkalabLog(parent=self.wg.qw_log, logname=__name__, profile=self.profile)
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
 
@@ -863,6 +863,11 @@ class Playback(SkalabBase):
         self.miniPlots.set_y_limits(self.yAxisRange)
         self.wg.qbutton_apply.setEnabled(False)
 
+    def cmdClose(self):
+        self.stopThreads = True
+        self.logger.logger.info("Stopping Threads")
+        self.logger.stopLog()
+
     def closeEvent(self, event):
         result = QtWidgets.QMessageBox.question(self,
                                                 "Confirm Exit...",
@@ -872,6 +877,7 @@ class Playback(SkalabBase):
 
         if result == QtWidgets.QMessageBox.Yes:
             event.accept()
+            self.cmdClose()
 
 
 if __name__ == "__main__":
