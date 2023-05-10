@@ -33,6 +33,7 @@ class QTextEditLogger(logging.Handler):
 
         self.procWriteLog = Thread(target=self.writeLog)
         self.procWriteLog.start()
+        print("Start Log Thread: ", self.logname, ", Level:", self.level)
 
     def emit(self, record):
         self.msgQueue.append([record.levelno, record.levelname, self.format(record)])
