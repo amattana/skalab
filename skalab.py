@@ -391,9 +391,9 @@ class SkaLab(QtWidgets.QMainWindow):
         if result == QtWidgets.QMessageBox.Yes:
             event.accept()
             self.stopThreads = True
-            self.wgLive.stopThreads = True
-            self.wgStation.stopThreads = True
-            self.wgSubrack.stopThreads = True
+            self.wgLive.cmdClose()
+            self.wgStation.cmdClose()
+            self.wgSubrack.cmdClose()
             time.sleep(1)
             if self.wg.qradio_autosave.isChecked():
                 self.save_profile(this_profile=self.profile_name, reload=False)

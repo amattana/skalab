@@ -1250,6 +1250,11 @@ class Live(SkalabBase):
             self.show_spectra_grid = False
             self.livePlots.showGrid(show_grid=False)
 
+    def cmdClose(self):
+        self.stopThreads = True
+        self.logger.logger.info("Stopping Threads")
+        self.logger.stopLog()
+
     def closeEvent(self, event):
         result = QtWidgets.QMessageBox.question(self,
                                                 "Confirm Exit...",

@@ -728,6 +728,16 @@ class Subrack(SkalabBase):
         else:
             self.wg.qlabel_tstamp.setText("")
 
+    def cmdClose(self):
+        self.stopThreads = True
+        self.logger.logger.info("Stopping Threads")
+        self.logger.stopLog()
+        if type(self.tlm_hdf) is not None:
+            try:
+                self.tlm_hdf.close()
+            except:
+                pass
+
     def closeEvent(self, event):
         result = QtWidgets.QMessageBox.question(self,
                                                 "Confirm Exit...",
