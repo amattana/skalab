@@ -400,7 +400,7 @@ class SkaLab(QtWidgets.QMainWindow):
             self.wgSubrack.cmdClose()
             time.sleep(1)
             print("TOTAL THREADS: ", threading.activeCount())
-            print(threading.gettrace())
+            print(threading.get_native_id())
             if self.wg.qradio_autosave.isChecked():
                 self.save_profile(this_profile=self.profile_name, reload=False)
 
