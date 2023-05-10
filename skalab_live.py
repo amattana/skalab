@@ -1260,6 +1260,7 @@ class Live(SkalabBase):
         if result == QtWidgets.QMessageBox.Yes:
             event.accept()
             self.stopThreads = True
+            self.logger.stopLog()
             sleep(1)
             if self.monitor_daq is not None:
                 self.monitor_daq.stop_daq()

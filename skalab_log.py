@@ -187,6 +187,11 @@ class SkalabLog(QtWidgets.QMainWindow):
         self.logError.total = 0
         self.qtabLog.setTabText(2, "Errors  cnt:  0")
 
+    def stopLog(self):
+        self.logInfo.stopThread = True
+        self.logWarning.stopThread = True
+        self.logError.stopThread = True
+
     def testFunc(self):
         self.qbutton_test = QtWidgets.QPushButton(self.wg)
         self.qbutton_test.setGeometry(QtCore.QRect(300, 11, 71, 24))

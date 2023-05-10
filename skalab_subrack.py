@@ -744,6 +744,7 @@ class Subrack(SkalabBase):
                     self.tlm_hdf.close()
                 except:
                     pass
+            self.logger.stopLog()
             sleep(1)
 
 

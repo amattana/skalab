@@ -364,3 +364,16 @@ class Station(SkalabBase):
         self.wg.qtable_network.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.wg.qtable_network.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
 
+    def closeEvent(self, event):
+        result = QtWidgets.QMessageBox.question(self,
+                                                "Confirm Exit...",
+                                                "Are you sure you want to exit ?",
+                                                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        event.ignore()
+
+        if result == QtWidgets.QMessageBox.Yes:
+            event.accept()
+            self.stopThreads = True
+            self.logger.logger.info("Stopping Threads")
+            self.logger.stopLog()
+            time.sleep(1)
