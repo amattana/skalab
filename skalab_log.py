@@ -33,7 +33,7 @@ class QTextEditLogger(logging.Handler):
 
         self.procWriteLog = Thread(target=self.writeLog)
         self.procWriteLog.start()
-        print("Start Log Thread: ", self.logname, ", Level:", self.level)
+        print("Start Thread Log: ", self.logname, ", Level:", self.level)
 
     def emit(self, record):
         self.msgQueue.append([record.levelno, record.levelname, self.format(record)])
@@ -46,7 +46,7 @@ class QTextEditLogger(logging.Handler):
                     self.updateBox(l, n, m)
                 time.sleep(0.01)
             else:
-                print("Stopping Log Thread: ", self.logname, ", Level:", self.level)
+                print("Stopping Thread Log: ", self.logname, ", Level:", self.level)
                 break
 
     def updateBox(self, level, name, msg):
