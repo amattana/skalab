@@ -398,6 +398,7 @@ class SkaLab(QtWidgets.QMainWindow):
             self.wgLive.cmdClose()
             self.wgStation.cmdClose()
             self.wgSubrack.cmdClose()
+            self.wgPlay.cmdClose()
             time.sleep(1)
             print("TOTAL THREADS: ", threading.activeCount())
             print(threading.get_native_id())
