@@ -681,7 +681,7 @@ class Subrack(SkalabBase):
                     self.logger.logger.warning("Failed to get Subrack Telemetry!")
                     pass
                 cycle = 0.0
-                while cycle < (float(self.profile['Subrack']['query_interval'])) and not self.skipThreadPause:
+                while ((cycle < (float(self.profile['Subrack']['query_interval']))) and (not self.skipThreadPause) and (not self.stopThreads)):
                     sleep(0.1)
                     cycle = cycle + 0.1
                 self.skipThreadPause = False
