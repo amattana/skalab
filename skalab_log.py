@@ -7,6 +7,7 @@ import time
 import datetime
 from pathlib import Path
 default_app_dir = str(Path.home()) + "/.skalab/LOG"
+from threading import Thread
 
 
 class QTextEditLogger(logging.Handler):
@@ -19,6 +20,8 @@ class QTextEditLogger(logging.Handler):
         self.level = level
         self.caption = caption
         self.total = 0
+        self.stopThread = False
+        self.msgQueue = []
 
         html_header = "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" "
         html_header += "\"http://www.w3.org/TR/REC-html40/strict.dtd\"><html><head>"
@@ -27,25 +30,36 @@ class QTextEditLogger(logging.Handler):
         html_header += "font-size:11pt; font-weight:400; font-style:normal;\">"
         self.widget.insertHtml(html_header)
 
+        self.procWriteLog = Thread(target=self.writeLog)
+        self.procWriteLog.start()
+
     def emit(self, record):
-        print(record.levelno, "\t", self.format(record))
-        if (record.levelno == self.level) or (self.level == logging.INFO):
-            self.updateBox(record.levelno, record.levelname, self.format(record))
+        self.msgQueue.append([record.levelno, record.levelname, self.format(record)])
+
+    def writeLog(self):
+        while True:
+            if not self.stopThread:
+                if self.msgQueue:
+                    self.updateBox(self.msgQueue.pop())
+                time.sleep(0.01)
+            else:
+                break
 
     def updateBox(self, level, name, msg):
-        fancymsg = ""
-        if level == logging.INFO:
-            fancymsg += "\n<span style='font-weight:600; color:#22b80e;'>" + msg + "</span><br>"
-        elif level == logging.ERROR:
-            fancymsg += "\n<span style='font-weight:600; color:#ff0000;'>" + msg + "</span><br>"
-        else:
-            fancymsg += "\n<span style='font-weight:600; color:#ff7800;'>" + msg + "</span><br>"
+        if (level == self.level) or (self.level == logging.INFO):
+            fancymsg = ""
+            if level == logging.INFO:
+                fancymsg += "\n<span style='font-weight:600; color:#22b80e;'>" + msg + "</span><br>"
+            elif level == logging.ERROR:
+                fancymsg += "\n<span style='font-weight:600; color:#ff0000;'>" + msg + "</span><br>"
+            else:
+                fancymsg += "\n<span style='font-weight:600; color:#ff7800;'>" + msg + "</span><br>"
 
-        self.widget.insertHtml(fancymsg)
-        self.widget.moveCursor(QtGui.QTextCursor.End)
-        if self.caption is not None:
-            self.total = self.total + 1
-            self.caption.setTabText(2, name[0] + name[1:].lower() + "s  cnt:%s" % str(self.total).rjust(3, " ") + " (*)")
+            self.widget.insertHtml(fancymsg)
+            self.widget.moveCursor(QtGui.QTextCursor.End)
+            if self.caption is not None:
+                self.total = self.total + 1
+                self.caption.setTabText(2, name[0] + name[1:].lower() + "s  cnt:%s" % str(self.total).rjust(3, " ") + " (*)")
 
     def clear(self):
         self.widget.clear()
