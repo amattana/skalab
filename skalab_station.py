@@ -201,6 +201,7 @@ class Station(SkalabBase):
                 try:
                     self.logger.propagate = True
                     self.tpm_station = station.Station(station.configuration)
+                    self.tpm_station.logging.addHandler(self.logger.logInfo)
                     self.logger.propagate = False
                     self.wg.qbutton_station_init.setEnabled(False)
                     self.tpm_station.connect()
