@@ -23,6 +23,7 @@ __maintainer__ = "Andrea Mattana"
 import shutil
 import sys
 import os
+import threading
 import time
 from threading import Thread
 
@@ -391,11 +392,13 @@ class SkaLab(QtWidgets.QMainWindow):
 
         if result == QtWidgets.QMessageBox.Yes:
             event.accept()
+            print("TOTAL THREADS: ", threading.activeCount())
             self.stopThreads = True
             self.wgLive.cmdClose()
             self.wgStation.cmdClose()
             self.wgSubrack.cmdClose()
             time.sleep(1)
+            print("TOTAL THREADS: ", threading.activeCount())
             if self.wg.qradio_autosave.isChecked():
                 self.save_profile(this_profile=self.profile_name, reload=False)
 
