@@ -18,6 +18,7 @@ class QTextEditLogger(logging.Handler):
         self.widget.setStyleSheet("background-color: rgb(255, 255, 255);")
         self.widget.setReadOnly(True)
         self.level = level
+        self.logname = ""
         self.caption = caption
         self.total = 0
         self.stopThread = False
@@ -44,6 +45,7 @@ class QTextEditLogger(logging.Handler):
                     self.updateBox(l, n, m)
                 time.sleep(0.01)
             else:
+                print("Stopping Log Thread: ", self.logname, ", Level:", self.level)
                 break
 
     def updateBox(self, level, name, msg):
@@ -131,6 +133,7 @@ class SkalabLog(QtWidgets.QMainWindow):
         self.logger.addHandler(self.file_handler)
 
         self.logInfo = QTextEditLogger(self, level=logging.INFO)
+        self.logInfo.logname = profile['Base']['app']
         self.logInfo.setFormatter(formatter)
         self.logger.addHandler(self.logInfo)
         layoutInfo = QtWidgets.QVBoxLayout()
@@ -138,6 +141,7 @@ class SkalabLog(QtWidgets.QMainWindow):
         self.tabLog.setLayout(layoutInfo)
 
         self.logWarning = QTextEditLogger(self, level=logging.WARNING)
+        self.logWarning.logname = profile['Base']['app']
         self.logWarning.setFormatter(formatter)
         self.logger.addHandler(self.logWarning)
         layoutWarning = QtWidgets.QVBoxLayout()
@@ -145,6 +149,7 @@ class SkalabLog(QtWidgets.QMainWindow):
         self.tabWarning.setLayout(layoutWarning)
 
         self.logError = QTextEditLogger(self, level=logging.ERROR, caption=self.qtabLog)
+        self.logError.logname = profile['Base']['app']
         self.logError.setFormatter(formatter)
         self.logger.addHandler(self.logError)
         layoutError = QtWidgets.QVBoxLayout()
