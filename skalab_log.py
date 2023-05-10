@@ -40,7 +40,8 @@ class QTextEditLogger(logging.Handler):
         while True:
             if not self.stopThread:
                 if self.msgQueue:
-                    self.updateBox(self.msgQueue.pop())
+                    l, n, m = self.msgQueue.pop()
+                    self.updateBox(l, n, m)
                 time.sleep(0.01)
             else:
                 break
