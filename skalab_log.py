@@ -28,6 +28,7 @@ class QTextEditLogger(logging.Handler):
         self.widget.insertHtml(html_header)
 
     def emit(self, record):
+        print(record.levelno, "\t", self.format(record))
         if (record.levelno == self.level) or (self.level == logging.INFO):
             msg = self.format(record)
             if record.levelno == logging.INFO:

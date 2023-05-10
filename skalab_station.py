@@ -212,9 +212,9 @@ class Station(SkalabBase):
                     for tile in self.tpm_station.tiles:
                         tile.logger.handlers.clear()
                         tile.logger.addHandler(self.logger.logInfo)
-                        tile.logger.addHandler(self.logger.logWarning)
-                        tile.logger.addHandler(self.logger.logError)
-                        tile.logger.addHandler(self.logger.file_handler)
+                        # tile.logger.addHandler(self.logger.logWarning)
+                        # tile.logger.addHandler(self.logger.logError)
+                        # tile.logger.addHandler(self.logger.file_handler)
                         tile.logger.setLevel(logging.INFO)
                         # tile.logger.propagate = True
                     #self.logger.propagate = False
