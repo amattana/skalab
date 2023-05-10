@@ -686,6 +686,7 @@ class Subrack(SkalabBase):
                     cycle = cycle + 0.1
                 self.skipThreadPause = False
             if self.stopThreads:
+                print("Stopping Thread Subrack ReadTlm")
                 break
             sleep(0.5)
 
