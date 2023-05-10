@@ -57,6 +57,7 @@ class Station(SkalabBase):
         self.tpm_ips_from_subrack = []
 
         pyaavs.logger.root_logger.addHandler(self.logger.logInfo)
+        pyaavs.logger.root_logger.addHandler(self.logger.file_handler)
 
     def load_events(self):
         self.wg.qbutton_browse.clicked.connect(lambda: self.browse_config())
