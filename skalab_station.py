@@ -56,6 +56,9 @@ class Station(SkalabBase):
         self.setup_config()
         self.tpm_ips_from_subrack = []
 
+        pyaavs.logger.root_logger.setLevel(logging.INFO)
+        pyaavs.logger.root_logger.handlers = []
+
         pyaavs.logger.root_logger.addHandler(self.logger.logInfo)
         pyaavs.logger.root_logger.addHandler(self.logger.file_handler)
 
