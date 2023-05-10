@@ -216,6 +216,7 @@ class SkaLab(QtWidgets.QMainWindow):
             if self.wgStation.updateRequest:
                 pass
             if self.stopThreads:
+                print("Stopping Thread SKALAB Update children")
                 break
             time.sleep(1)
 
