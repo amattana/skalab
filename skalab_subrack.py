@@ -238,11 +238,11 @@ class Subrack(SkalabBase):
             if self.telemetry["tpm_on_off"][slot]:
                 self.client.execute_command(command="turn_off_tpm", parameters="%d" % (int(slot) + 1))
                 self.logger.info("Turn OFF TPM-%02d" % (int(slot) + 1))
-                print("Turn OFF TPM-%02d" % (int(slot) + 1))
+                #print("Turn OFF TPM-%02d" % (int(slot) + 1))
             else:
                 self.client.execute_command(command="turn_on_tpm", parameters="%d" % (int(slot) + 1))
                 self.logger.info("Turn ON TPM-%02d" % (int(slot) + 1))
-                print("Turn ON TPM-%02d" % (int(slot) + 1))
+                #print("Turn ON TPM-%02d" % (int(slot) + 1))
             if "tpm_on_off" in self.system.keys():
                 data = self.client.get_attribute("tpm_on_off")
                 while not data["status"] == "OK":
@@ -542,15 +542,15 @@ class Subrack(SkalabBase):
             for tlmk in self.tlm_keys:
                 if tlmk in self.query_once:
                     data = self.client.get_attribute(tlmk)
-                    print("GET_ATT: ", tlmk, data)
+                    self.logger.logger.debug("GET_ATT: ", tlmk, data)
                     if data["status"] == "OK":
                         self.system[tlmk] = data["value"]
                     else:
                         retry = 0
                         time.sleep(0.1)
-                        while (retry < 3) and (not data["status"] == "OK"):
+                        while (retry < 10) and (not data["status"] == "OK"):
                             data = self.client.get_attribute(tlmk)
-                            print("RETRY: ", retry, data)
+                            self.logger.logger.info("RETRY: ", retry, data)
                             retry = retry + 1
                             time.sleep(0.1)
                             if data["status"] == "OK":

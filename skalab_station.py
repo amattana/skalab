@@ -13,7 +13,7 @@ from pathlib import Path
 from pyaavs import station
 from pyfabil import TPMGeneric
 from pyfabil.base.definitions import LibraryError, BoardError, PluginError, InstrumentError
-
+import pyaavs.logger
 
 default_app_dir = str(Path.home()) + "/.skalab/"
 default_profile = "Default"
@@ -201,7 +201,7 @@ class Station(SkalabBase):
                 try:
                     self.logger.propagate = True
                     self.tpm_station = station.Station(station.configuration)
-                    self.tpm_station.logging.addHandler(self.logger.logInfo)
+                    pyaavs.logger.root_logger.handlers(self.logger.logInfo)
                     self.logger.propagate = False
                     self.wg.qbutton_station_init.setEnabled(False)
                     self.tpm_station.connect()

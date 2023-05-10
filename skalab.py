@@ -207,7 +207,7 @@ class SkaLab(QtWidgets.QMainWindow):
             # If a connection to the Subrack has been estabilished update the list of TPM IPs
             if self.wgSubrack.updateRequest:
                 self.wgSubrack.updateRequest = False
-                print("RECEIVED TPM IPs: ", self.wgSubrack.tpm_ips)
+                #print("RECEIVED TPM IPs: ", self.wgSubrack.tpm_ips)
                 self.wgStation.tpm_ips_from_subrack = self.wgSubrack.tpm_ips.copy()
                 self.wgLive.setupNewTilesIPs(self.wgSubrack.tpm_ips)
 
