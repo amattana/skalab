@@ -201,7 +201,7 @@ class Station(SkalabBase):
                 if True:
                     self.logger.propagate = True
                     self.tpm_station = station.Station(station.configuration)
-                    pyaavs.logger.root_logger.handlers(self.logger.logInfo)
+                    pyaavs.logger.root_logger.addHandler(self.logger.logInfo)
                     self.logger.propagate = False
                     self.wg.qbutton_station_init.setEnabled(False)
                     self.tpm_station.connect()
