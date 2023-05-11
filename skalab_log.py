@@ -227,17 +227,20 @@ class SkalabLog(QtWidgets.QMainWindow):
 
     def writeLogInfo(self):
         if self.logInfo.msgQueue:
-            l, n, m = self.logInfo.msgQueue.pop()
+            l, n, m = self.logInfo.msgQueue[0]
+            self.logInfo.msgQueue = self.logInfo.msgQueue[1:]
             self.logInfo.updateBox(l, n, m)
 
     def writeLogWarning(self):
         if self.logInfo.msgQueue:
-            l, n, m = self.logWarning.msgQueue.pop()
+            l, n, m = self.logWarning.msgQueue[0]
+            self.logWarning.msgQueue = self.logWarning.msgQueue[1:]
             self.logWarning.updateBox(l, n, m)
 
     def writeLogError(self):
         if self.logInfo.msgQueue:
-            l, n, m = self.logError.msgQueue.pop()
+            l, n, m = self.logError.msgQueue[0]
+            self.logError.msgQueue = self.logError.msgQueue[1:]
             self.logError.updateBox(l, n, m)
 
 
