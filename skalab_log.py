@@ -202,6 +202,12 @@ class SkalabLog(QtWidgets.QMainWindow):
         self.logger.warning("TESTING WARNING")
         self.logger.error("TESTING ERROR")
 
+    def testClose(self):
+        self.qbutton_close = QtWidgets.QPushButton(self.wg)
+        self.qbutton_close.setGeometry(QtCore.QRect(400, 11, 131, 24))
+        self.qbutton_close.clicked.connect(self.stopLog)
+        self.qbutton_close.setText("TERMINATE")
+
     def procLog(self):
         while True:
             if not self.stopThread:
@@ -228,18 +234,6 @@ class SkalabLog(QtWidgets.QMainWindow):
         l, n, m = self.logError.msgQueue.pop()
         self.logError.updateBox(l, n, m)
 
-    def closeEvent(self, event):
-        print("CLOSING...")
-        result = QtWidgets.QMessageBox.question(self,
-                                                "Confirm Exit...",
-                                                "Are you sure you want to exit ?",
-                                                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-        event.ignore()
-        if result == QtWidgets.QMessageBox.Yes:
-            event.accept()
-            self.stopThread = True
-            time.sleep(1)
-
 
 if __name__ == "__main__":
     from optparse import OptionParser
@@ -263,6 +257,7 @@ if __name__ == "__main__":
     slog.signalLogWarning.connect(slog.writeLogWarning)
     slog.signalLogError.connect(slog.writeLogError)
     slog.testFunc()
+    slog.testClose()
     wg.show()
     wg.raise_()
     sys.exit(app.exec_())
