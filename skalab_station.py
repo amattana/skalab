@@ -42,7 +42,7 @@ class Station(SkalabBase):
         self.stopThreads = False
         self.processInit = Thread(target=self.do_station_init)
         self.processInit.start()
-        print("Start Thread Station do_station_init")
+        # print("Start Thread Station do_station_init")
 
         self.updateRequest = False
 

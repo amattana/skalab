@@ -172,10 +172,10 @@ class Live(SkalabBase):
         self.live_data = []
         self.procRun = Thread(target=self.procRunDaq)
         self.procRun.start()
-        print("Start Thread Live RunDAQ")
+        # print("Start Thread Live RunDAQ")
         self.procRms = Thread(target=self.procReadRms)
         self.procRms.start()
-        print("Start Thread Live ReadRms")
+        # print("Start Thread Live ReadRms")
         self.monitor_daq = None
         self.initMonitor = True
         self.monitor_tstart = 0

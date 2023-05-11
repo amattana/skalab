@@ -187,7 +187,7 @@ class Subrack(SkalabBase):
         self.skipThreadPause = False
         self.processTlm = Thread(target=self.readTlm)
         self.processTlm.start()
-        print("Start Thread Subrack readTlm")
+        # print("Start Thread Subrack readTlm")
 
 
         self.wg.qplot_chart_tpm.setVisible(False)
