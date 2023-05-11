@@ -162,6 +162,9 @@ class SkalabLog(QtWidgets.QMainWindow):
         self.stopThread = False
         self.procWriteLog = Thread(target=self.procLog)
         self.procWriteLog.start()
+        self.signalLogInfo.connect(self.writeLogInfo)
+        self.signalLogWarning.connect(self.writeLogWarning)
+        self.signalLogError.connect(self.writeLogError)
 
     def info(self, msg):
         self.logger.info(msg)
@@ -223,16 +226,19 @@ class SkalabLog(QtWidgets.QMainWindow):
                 break
 
     def writeLogInfo(self):
-        l, n, m = self.logInfo.msgQueue.pop()
-        self.logInfo.updateBox(l, n, m)
+        if self.logInfo.msgQueue:
+            l, n, m = self.logInfo.msgQueue.pop()
+            self.logInfo.updateBox(l, n, m)
 
     def writeLogWarning(self):
-        l, n, m = self.logWarning.msgQueue.pop()
-        self.logWarning.updateBox(l, n, m)
+        if self.logInfo.msgQueue:
+            l, n, m = self.logWarning.msgQueue.pop()
+            self.logWarning.updateBox(l, n, m)
 
     def writeLogError(self):
-        l, n, m = self.logError.msgQueue.pop()
-        self.logError.updateBox(l, n, m)
+        if self.logInfo.msgQueue:
+            l, n, m = self.logError.msgQueue.pop()
+            self.logError.updateBox(l, n, m)
 
 
 if __name__ == "__main__":
@@ -253,9 +259,9 @@ if __name__ == "__main__":
     fname = default_app_dir + "/testlog"
 
     slog = SkalabLog(parent=wg, logname=__name__)
-    slog.signalLogInfo.connect(slog.writeLogInfo)
-    slog.signalLogWarning.connect(slog.writeLogWarning)
-    slog.signalLogError.connect(slog.writeLogError)
+    # slog.signalLogInfo.connect(slog.writeLogInfo)
+    # slog.signalLogWarning.connect(slog.writeLogWarning)
+    # slog.signalLogError.connect(slog.writeLogError)
     slog.testFunc()
     slog.testClose()
     wg.show()
