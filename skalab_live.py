@@ -468,7 +468,7 @@ class Live(SkalabBase):
                     #self.wg.qlabel_connection.setText("Connected")
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")
                     self.wg.qbutton_connect.setText("ONLINE")
-                    print("REINIT LIVE BARs: ", len(self.tpm_station.tiles))
+                    # print("REINIT LIVE BARs: ", len(self.tpm_station.tiles))
                     self.tempBoardPlots.reinit(len(self.tpm_station.tiles))
                     self.tempFpga1Plots.reinit(len(self.tpm_station.tiles))
                     self.tempFpga2Plots.reinit(len(self.tpm_station.tiles))
