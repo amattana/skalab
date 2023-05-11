@@ -95,7 +95,7 @@
        <number>8</number>
       </property>
       <property name="columnCount">
-       <number>5</number>
+       <number>0</number>
       </property>
       <attribute name="horizontalHeaderMinimumSectionSize">
        <number>54</number>
@@ -129,31 +129,6 @@
       <row/>
       <row/>
       <row/>
-      <column>
-       <property name="text">
-        <string>FPGA0 Temp</string>
-       </property>
-      </column>
-      <column>
-       <property name="text">
-        <string>FPGA1 Temp</string>
-       </property>
-      </column>
-      <column>
-       <property name="text">
-        <string>Volatage</string>
-       </property>
-      </column>
-      <column>
-       <property name="text">
-        <string>Temperature</string>
-       </property>
-      </column>
-      <column>
-       <property name="text">
-        <string>Current</string>
-       </property>
-      </column>
      </widget>
     </widget>
     <widget class="QFrame" name="sub_frame">

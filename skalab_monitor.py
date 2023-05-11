@@ -1,6 +1,7 @@
 import os.path
 import sys
 import gc
+import copy
 from pyaavs.tile_wrapper import Tile
 from PyQt5 import QtWidgets, uic, QtCore
 from hardware_client import WebHardwareClient
@@ -70,17 +71,17 @@ subrack_attribute = {
                 "subrack_fan_speeds_percent": [None]*8,
                 }
 
-tile_table_attr =  {"FPGA0": [None]*16,
-                    "FPGA1": [None]*16,
-                    "board":[None]*16,
-                    "DDR0_VREF":[None]*16,
-                    "VIN":[None]*16,
-                    "MON_5V0":[None]*16,
-                    "FE0_mVA":[None]*16,
-                    "FE1_mVA":[None]*16,
-                    }
 
-def populate_table(qtable, attribute):
+def populateTable(qtable, attribute):
+    "Create table"
+    horHeaders = []
+    qtable.setRowCount(8)
+    qtable.setColumnCount(len(attribute))
+    for key in attribute.keys():
+            horHeaders.append(key)
+    qtable.setHorizontalHeaderLabels(horHeaders)
+    qtable.horizontalHeader().setDefaultSectionSize(100)
+    "Fill table"
     j = 0
     for k in attribute:
         for v in range(0,16,2):
@@ -95,7 +96,7 @@ def populate_table(qtable, attribute):
             qtable.setCellWidget(int(v/2),j,cellWidget)
         j+=1
 
-def populate_subrack_ps(frame, attribute):
+def populateSubrackPs(frame, attribute):
     j=0
     for k in attribute:
         for v in range(0,len(attribute[k]),2):
@@ -110,19 +111,24 @@ def populate_subrack_ps(frame, attribute):
             subrack_attribute[k][v+1].setGeometry(QtCore.QRect(size_x+45*v, 30 +  (size_y*(j)),  70,19))
         j+=1
 
-def populate_warning_alarm_table(true_table, warning, alarm):
+def populateWarningAlarmTable(true_table, warning, alarm):
+    true_table.setEditTriggers(QtWidgets.QTableWidget.AllEditTriggers)
     row = len(alarm.keys())
+    item = QtWidgets.QTableWidgetItem()
+    item.setFlags(item.flags() ^ QtCore.Qt.ItemIsEditable)
     for i in range(row):
         attr = list(alarm)[i]
         true_table.setRowCount(row)
         row_name = QtWidgets.QTableWidgetItem(list(warning.keys())[i])
         true_table.setVerticalHeaderItem(i, row_name)
-        true_table.setItem(i , 0, QtWidgets.QTableWidgetItem(str(warning[attr][0])) )
-        true_table.setItem(i , 1, QtWidgets.QTableWidgetItem(str(warning[attr][1])) )
-        true_table.setItem(i , 2, QtWidgets.QTableWidgetItem(str(alarm[attr][0])))
-        true_table.setItem(i , 3, QtWidgets.QTableWidgetItem(str(alarm[attr][1])))
+        true_table.setItem(i , 0, QtWidgets.QTableWidgetItem(str(warning[attr][0])))
+        true_table.setItem(i , 1, QtWidgets.QTableWidgetItem(str(warning[attr][1])))
+        true_table.setItem(i , 2, QtWidgets.QTableWidgetItem(str(alarm[attr][0]))  )
+        true_table.setItem(i , 3, QtWidgets.QTableWidgetItem(str(alarm[attr][1])) )
+    true_table.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
+    
                
-def add_led(frame):
+def addLed(frame):
     qled_alert = []
     for i in range(8):
         qled_alert += [Led(frame)]
@@ -158,29 +164,32 @@ class Monitor(SkalabBase):
         self.logger = SkalabLog(parent=self.wg.qt_log, logname=__name__, profile=self.profile)
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
-        self.load_events_monitor()
+        self.loadEventsMonitor()
         # Set variable
         self.from_subrack = {}
         self.interval_monitor = self.profile['Monitor']['query_interval']
-        self.alarm = dict(tile_table_attr, **subrack_attribute)
-        for k in self.alarm.keys():
-            self.alarm[k] = [False]*8
         self.tlm_hdf_monitor = None
         # Populate table
-        populate_subrack_ps(self.wg.sub_frame, subrack_attribute)
+        populateSubrackPs(self.wg.sub_frame, subrack_attribute)
         self.populate_table_profile()
-        self.qled_alert = add_led(self.wg.frame_subrack)
+        self.qled_alert = addLed(self.wg.frame_subrack)
         self.qbutton_tpm = populateSlots(self.wg.frame_subrack)
-        self.populate_tile_instance()
-        self.load_warning_alarm_values()
-        populate_table(self.wg.qtable_tile, tile_table_attr)
+        self.populateTileInstance()
+        self.loadWarningAlarmValues()
+        self.tile_table_attr = copy.deepcopy(self.tpm_alarm)
+        for i in self.tile_table_attr.keys():
+            self.tile_table_attr[i] = [None] * 16            
+        self.alarm = dict(self.tile_table_attr, **subrack_attribute)
+        for k in self.alarm.keys():
+            self.alarm[k] = [False]*8
+        populateTable(self.wg.qtable_tile, self.tile_table_attr)
         
         # Start thread
         self.show()
         self._lock_led = Lock()
         self._lock_tab1 = Lock()
         self._lock_tab2 = Lock()
-        self.check_tpm_tm = Thread(name= "TPM telemetry", target=self.monitoring_tpm, daemon=True)
+        self.check_tpm_tm = Thread(name= "TPM telemetry", target=self.monitoringTpm, daemon=True)
         self._tpm_lock = Lock()
         self.wait_check_tpm = Event()
         self.check_tpm_tm.start()
@@ -194,41 +203,38 @@ class Monitor(SkalabBase):
         else:
             self.logger.error(message)
     
-    
-    def load_events_monitor(self):
-        self.wg.qbutton_clear_led.clicked.connect(lambda: self.clear_values())
-        self.wgProfile.qbutton_load.clicked.connect(lambda: self.load_new_table())
-        self.wg.check_savedata.toggled.connect(self.setup_hdf5) # TODO ADD toggled
+    def loadEventsMonitor(self):
+        self.wg.qbutton_clear_led.clicked.connect(lambda: self.clearValues())
+        self.wgProfile.qbutton_load.clicked.connect(lambda: self.loadNewTable())
+        self.wg.check_savedata.toggled.connect(self.setupHdf5) # TODO ADD toggled
 
-
-    def load_new_table(self):
-        self.load_warning_alarm_values()
+    def loadNewTable(self):
+        self.loadWarningAlarmValues()
     
-    def clear_values(self):
+    def clearValues(self):
         with (self._lock_led and self._lock_tab1 and self._lock_tab2):
             for i in range(16):
                 self.qled_alert[int(i/2)].Colour = Led.Grey
                 self.qled_alert[int(i/2)].value = False  
                 for attr in self.alarm:
                     self.alarm[attr][int(i/2)] = False
-                    if attr in tile_table_attr:
-                        tile_table_attr[attr][i].setText(str(""))
-                        tile_table_attr[attr][i].setStyleSheet("color: black; background:white")  
+                    if attr in self.tile_table_attr:
+                        self.tile_table_attr[attr][i].setText(str(""))
+                        self.tile_table_attr[attr][i].setStyleSheet("color: black; background:white")  
                     elif attr in subrack_attribute:
                         try:
                             subrack_attribute[attr][int(i/2)].setText(str(""))
                             subrack_attribute[attr][int(i/2)].setStyleSheet("color: black; background:white")
                         except:
                             pass
-                    
-                
-    def populate_tile_instance(self):
+                         
+    def populateTileInstance(self):
         self.tpm_on_off = [False] * 8
         self.tpm_active = [None] * 8
         self.tpm_slot_ip = eval(self.profile['Monitor']['tiles_slot_ip'])
         self.bitfile = self.profile['Monitor']['bitfile']
 
-    def load_warning_alarm_values(self):
+    def loadWarningAlarmValues(self):
         self.subrack_warning = self.profile['Subrack Warning']
         self.tpm_warning = self.profile['TPM Warning']
         self.warning = dict(self.tpm_warning, **self.subrack_warning)
@@ -242,7 +248,7 @@ class Monitor(SkalabBase):
             if self.alarm_values[attr][0]   == None: self.alarm_values[attr][0]   = -float('inf')
             if self.warning[attr][1] == None: self.warning[attr][1] =  float('inf')
             if self.alarm_values[attr][1]   == None: self.alarm_values[attr][1]   =  float('inf')   
-        populate_warning_alarm_table(self.wg.true_table, self.warning, self.alarm_values)
+        populateWarningAlarmTable(self.wg.true_table, self.warning, self.alarm_values)
 
     def tpmStatusChanged(self):
         if self.check_tpm_tm.is_alive():
@@ -260,7 +266,7 @@ class Monitor(SkalabBase):
             else:
                 self.wait_check_tpm.set()
 
-    def monitoring_tpm(self):
+    def monitoringTpm(self):
         while True:
             self.wait_check_tpm.wait()
             # Get tm from tpm
@@ -283,18 +289,18 @@ class Monitor(SkalabBase):
             sleep(float(self.interval_monitor))    
 
     def writeTpmAttribute(self,tpm_tmp,i):
-        for attr in tile_table_attr:
+        for attr in self.tile_table_attr:
             value = tpm_tmp[attr]
-            tile_table_attr[attr][i].setStyleSheet("color: black; background:white")
-            tile_table_attr[attr][i].setText(str(value))
-            tile_table_attr[attr][i].setAlignment(QtCore.Qt.AlignCenter)
+            self.tile_table_attr[attr][i].setStyleSheet("color: black; background:white")
+            self.tile_table_attr[attr][i].setText(str(value))
+            self.tile_table_attr[attr][i].setAlignment(QtCore.Qt.AlignCenter)
             with self._lock_tab1:
                 if not(type(value)==str or type(value)==str) and not(self.alarm_values[attr][0] <= value <= self.alarm_values[attr][1]):
                     # # tile_table_attr[attr][i].setStyleSheet("color: white; background:red")  
                     # segmentation error or free() pointer error
-                    tile_table_attr[attr][i+1].setText(str(value))
-                    tile_table_attr[attr][i+1].setStyleSheet("color: white; background:red")
-                    tile_table_attr[attr][i+1].setAlignment(QtCore.Qt.AlignCenter)
+                    self.tile_table_attr[attr][i+1].setText(str(value))
+                    self.tile_table_attr[attr][i+1].setStyleSheet("color: white; background:red")
+                    self.tile_table_attr[attr][i+1].setAlignment(QtCore.Qt.AlignCenter)
                     self.alarm[attr][int(i/2)] = True
                     self.logger.error(f"ERROR: {attr} parameter is out of range!")
                     with self._lock_led:
@@ -302,9 +308,9 @@ class Monitor(SkalabBase):
                         self.qled_alert[int(i/2)].value = True
                 elif not(type(value)==str or type(value)==str) and not(self.warning[attr][0] <= value <= self.warning[attr][1]):
                     if not self.alarm[attr][int(i/2)]:
-                        tile_table_attr[attr][i+1].setText(str(value))
-                        tile_table_attr[attr][i+1].setStyleSheet("color: white; background:orange")
-                        tile_table_attr[attr][i+1].setAlignment(QtCore.Qt.AlignCenter)
+                        self.tile_table_attr[attr][i+1].setText(str(value))
+                        self.tile_table_attr[attr][i+1].setStyleSheet("color: white; background:orange")
+                        self.tile_table_attr[attr][i+1].setAlignment(QtCore.Qt.AlignCenter)
                         self.logger.warning(f"WARNING: {attr} parameter is near the out of range threshold!")
                         if self.qled_alert[int(i/2)].Colour==4:
                             with self._lock_led:
@@ -314,9 +320,9 @@ class Monitor(SkalabBase):
     def readSubrackAttribute(self):
         for attr in self.from_subrack:
             if attr in subrack_attribute:
-                self.write_subrack_attribute(attr,subrack_attribute,False)
+                self.writeSubrackAttribute(attr,subrack_attribute,False)
 
-    def write_subrack_attribute(self,attr,table,led_flag):
+    def writeSubrackAttribute(self,attr,table,led_flag):
         for ind in range(0,len(table[attr]),2):
             value = self.from_subrack[attr][int(ind/2)]
             if (not(type(value) == bool) and not(type(value) == str)): value = round(value,1) 
@@ -346,7 +352,7 @@ class Monitor(SkalabBase):
                                 self.qled_alert[int(ind/2)].value = True
 
 
-    def setup_hdf5(self):
+    def setupHdf5(self):
         if not(self.tlm_hdf_monitor):
             if not self.profile['Monitor']['data_path'] == "":
                 fname = self.profile['Monitor']['data_path']
@@ -367,7 +373,7 @@ class Monitor(SkalabBase):
 
     def saveTlm(self,data_tile):
         if self.tlm_hdf_monitor:
-            for attr in tile_table_attr:
+            for attr in self.tile_table_attr:
                 data_tile[attr][:] = [0.0 if type(x) is str else x for x in data_tile[attr]]
                 if attr not in self.tlm_hdf_monitor:
                     try:
@@ -404,7 +410,7 @@ class MonitorSubrack(Monitor):
     def __init__(self, ip=None, port=None, uiFile="", profile="", size=[1190, 936], swpath=""):
         """ Initialise main window """
 
-        super(MonitorSubrack, self).__init__(uiFile="skalab_monitor.ui", size=[1190, 936], profile=opt.profile, swpath=default_app_dir)   
+        super(MonitorSubrack, self).__init__(uiFile="Gui/skalab_monitor.ui", size=[1190, 936], profile=opt.profile, swpath=default_app_dir)   
         self.interval_monitor = self.profile['Monitor']['query_interval']
 
         self.tlm_keys = []
@@ -496,7 +502,7 @@ class MonitorSubrack(Monitor):
                     [item.setEnabled(True) for item in self.qbutton_tpm]
                     self.connected = True
 
-                    self.tlm_hdf = self.setup_hdf5()
+                    self.tlm_hdf = self.setupHdf5()
                     with self._subrack_lock:
                         telemetry = self.getTelemetry()
                         self.telemetry = dict(telemetry)
@@ -664,7 +670,7 @@ if __name__ == "__main__":
     monitor_logger = logging.getLogger(__name__)
     if not opt.nogui:
         app = QtWidgets.QApplication(sys.argv)
-        window = MonitorSubrack(uiFile="skalab_monitor.ui", size=[1190, 936],
+        window = MonitorSubrack(uiFile="Gui/skalab_monitor.ui", size=[1190, 936],
                                  profile=opt.profile,
                                  swpath=default_app_dir)
         window.dst_port = configuration['network']['lmc']['lmc_port']

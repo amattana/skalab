@@ -60,6 +60,8 @@ class SkalabBase(QtWidgets.QMainWindow):
 
     def writeConfig(self, profileConfig, fname):
         conf = configparser.ConfigParser()
+        conf.optionxform = str
+
         for s in profileConfig.keys():
             # print(s, ": ", self.profile[s], type(self.profile[s]))
             if type(profileConfig[s]) == dict:
@@ -231,10 +233,8 @@ class SkalabBase(QtWidgets.QMainWindow):
                     self.wgProfile.qline_row.setText(str(row))
                     self.wgProfile.qline_col.setText(str(col))
                     self.wgProfile.qline_edit_key.setText(key.text())
-                    for s in self.profile.keys():
-                        for k in self.profile[s].keys():
-                            if k == key.text():
-                                self.wgProfile.qline_edit_value.setText(self.profile[s][k])
+                    NewIndex = self.wgProfile.qtable_conf.currentIndex().siblingAtColumn(0)
+                    self.wgProfile.qline_edit_value.setText(NewIndex.data())
                     item = self.wgProfile.qtable_conf.item(row, col)
                     if item:
                         self.wgProfile.qline_edit_newvalue.setText(item.text())
