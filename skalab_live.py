@@ -559,7 +559,7 @@ class Live(SkalabBase):
                     cycle = cycle + 0.1
                 self.skipThreadPause = False
             if self.stopThreads:
-                print("Stopping Thread Live: RunDAQ")
+                # print("Stopping Thread Live: RunDAQ")
                 break
             sleep(0.5)
 
@@ -672,7 +672,7 @@ class Live(SkalabBase):
                             self.writing_preadu = False
 
             if self.stopThreads:
-                print("Stopping Thread Live ReadRMS")
+                #print("Stopping Thread Live ReadRMS")
                 break
             sleep(1)
 

@@ -242,7 +242,7 @@ class Station(SkalabBase):
                 self.tpm_station = None
                 self.doInit = False
             if self.stopThreads:
-                print("Stopping Thread Station do_station_init")
+                #print("Stopping Thread Station do_station_init")
                 break
             time.sleep(0.3)
 

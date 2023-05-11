@@ -196,7 +196,7 @@ class SkaLab(QtWidgets.QMainWindow):
         self.stopThreads = False
         self.procUpdate = Thread(target=self.procUpdateChildren)
         self.procUpdate.start()
-        print("Start Thread Skalab procUpdateChildren")
+        # print("Start Thread Skalab procUpdateChildren")
 
     def load_events(self):
         self.wg.qbutton_profile_save.clicked.connect(lambda: self.save_profile(self.wg.qcombo_profiles.currentText()))
@@ -218,7 +218,7 @@ class SkaLab(QtWidgets.QMainWindow):
             if self.wgStation.updateRequest:
                 pass
             if self.stopThreads:
-                print("Stopping Thread SKALAB Update children")
+                #print("Stopping Thread SKALAB Update children")
                 break
             time.sleep(1)
 

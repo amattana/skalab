@@ -11,7 +11,6 @@ from threading import Thread
 
 
 class QTextEditLogger(logging.Handler):
-    signalLog = QtCore.pyqtSignal()
     def __init__(self, parent, level=logging.INFO, caption=None):
         super().__init__()
         self.widget = QtWidgets.QTextEdit(parent)
@@ -22,7 +21,6 @@ class QTextEditLogger(logging.Handler):
         self.logname = ""
         self.caption = caption
         self.total = 0
-        self.stopThread = False
         self.msgQueue = []
 
         html_header = "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" "
@@ -32,26 +30,13 @@ class QTextEditLogger(logging.Handler):
         html_header += "font-size:11pt; font-weight:400; font-style:normal;\">"
         self.widget.insertHtml(html_header)
 
-        self.procWriteLog = Thread(target=self.procLog)
-        self.procWriteLog.start()
         # print("Start Thread Log: ", self.logname, ", Level:", self.level)
 
     def emit(self, record):
         self.msgQueue.append([record.levelno, record.levelname, self.format(record)])
 
-    def procLog(self):
-        while True:
-            if not self.stopThread:
-                if self.msgQueue:
-                    self.signalLog.emit()
-                time.sleep(0.01)
-            else:
-                # print("Stopping Thread Log: ", self.logname, ", Level:", self.level)
-                break
-
-    def writeLog(self):
-        l, n, m = self.msgQueue.pop()
-        self.updateBox(l, n, m)
+    def clear(self):
+        self.widget.clear()
 
     def updateBox(self, level, name, msg):
         if (level == self.level) or (self.level == logging.INFO):
@@ -69,12 +54,13 @@ class QTextEditLogger(logging.Handler):
                 self.total = self.total + 1
                 self.caption.setTabText(2, name[0] + name[1:].lower() + "s  cnt:%s" % str(self.total).rjust(3, " ") + " (*)")
 
-    def clear(self):
-        self.widget.clear()
-
 
 class SkalabLog(QtWidgets.QMainWindow):
     """ SkaLab Log class """
+    signalLogInfo = QtCore.pyqtSignal()
+    signalLogWarning = QtCore.pyqtSignal()
+    signalLogError = QtCore.pyqtSignal()
+
     def __init__(self, parent, logname=None, profile=None):
         super().__init__(parent=None)
         self.wg = parent
@@ -110,7 +96,6 @@ class SkalabLog(QtWidgets.QMainWindow):
         self.qbutton_reset_error_cnt.setText(_translate("Form", "Reset"))
         self.qbutton_reset_error_cnt.clicked.connect(self.resetCnt)
         self.qtabLog.currentChanged.connect(self.logChanged)
-        #self.qtabLog.show()
 
         if logname is not None:
             self.logger = logging.getLogger(logname)
@@ -128,6 +113,9 @@ class SkalabLog(QtWidgets.QMainWindow):
                 if not logname[-1] == "/":
                     logname = logname + "/"
                 logname = logname + profile['Base']['app']
+        else:
+            profile = {'Base': {'app': "TEST"}}
+            logname = "TEST"
         pname = Path(logname)
         pname.mkdir(parents=True, exist_ok=True)
         fname = logname + "/" + logname[logname.rfind("/") + 1:].lower() + \
@@ -139,7 +127,6 @@ class SkalabLog(QtWidgets.QMainWindow):
 
         self.logInfo = QTextEditLogger(self, level=logging.INFO)
         self.logInfo.logname = profile['Base']['app']
-        self.logInfo.signalLog.connect(self.logInfo.writeLog)
         self.logInfo.setFormatter(formatter)
         self.logger.addHandler(self.logInfo)
         layoutInfo = QtWidgets.QVBoxLayout()
@@ -148,7 +135,6 @@ class SkalabLog(QtWidgets.QMainWindow):
 
         self.logWarning = QTextEditLogger(self, level=logging.WARNING)
         self.logWarning.logname = profile['Base']['app']
-        self.logWarning.signalLog.connect(self.logWarning.writeLog)
         self.logWarning.setFormatter(formatter)
         self.logger.addHandler(self.logWarning)
         layoutWarning = QtWidgets.QVBoxLayout()
@@ -157,7 +143,6 @@ class SkalabLog(QtWidgets.QMainWindow):
 
         self.logError = QTextEditLogger(self, level=logging.ERROR, caption=self.qtabLog)
         self.logError.logname = profile['Base']['app']
-        self.logError.signalLog.connect(self.logError.writeLog)
         self.logError.setFormatter(formatter)
         self.logger.addHandler(self.logError)
         layoutError = QtWidgets.QVBoxLayout()
@@ -173,6 +158,10 @@ class SkalabLog(QtWidgets.QMainWindow):
         self.logger.propagate = False
         self.logger.info("Log File: " + fname)
         self.logger.info("Logging Time is set to UTC")
+
+        self.stopThread = False
+        self.procWriteLog = Thread(target=self.procLog)
+        self.procWriteLog.start()
 
     def info(self, msg):
         self.logger.info(msg)
@@ -200,9 +189,7 @@ class SkalabLog(QtWidgets.QMainWindow):
         self.qtabLog.setTabText(2, "Errors  cnt:  0")
 
     def stopLog(self):
-        self.logInfo.stopThread = True
-        self.logWarning.stopThread = True
-        self.logError.stopThread = True
+        self.stopThread = True
 
     def testFunc(self):
         self.qbutton_test = QtWidgets.QPushButton(self.wg)
@@ -214,6 +201,44 @@ class SkalabLog(QtWidgets.QMainWindow):
         self.logger.info("TESTING INFO")
         self.logger.warning("TESTING WARNING")
         self.logger.error("TESTING ERROR")
+
+    def procLog(self):
+        while True:
+            if not self.stopThread:
+                if self.logInfo.msgQueue:
+                    self.signalLogInfo.emit()
+                if self.logWarning.msgQueue:
+                    self.signalLogWarning.emit()
+                if self.logError.msgQueue:
+                    self.signalLogError.emit()
+                time.sleep(0.01)
+            else:
+                #print("Stopping Thread Log: ", self.logname, ", Level:", self.level)
+                break
+
+    def writeLogInfo(self):
+        l, n, m = self.logInfo.msgQueue.pop()
+        self.logInfo.updateBox(l, n, m)
+
+    def writeLogWarning(self):
+        l, n, m = self.logWarning.msgQueue.pop()
+        self.logWarning.updateBox(l, n, m)
+
+    def writeLogError(self):
+        l, n, m = self.logError.msgQueue.pop()
+        self.logError.updateBox(l, n, m)
+
+    def closeEvent(self, event):
+        print("CLOSING...")
+        result = QtWidgets.QMessageBox.question(self,
+                                                "Confirm Exit...",
+                                                "Are you sure you want to exit ?",
+                                                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        event.ignore()
+        if result == QtWidgets.QMessageBox.Yes:
+            event.accept()
+            self.stopThread = True
+            time.sleep(1)
 
 
 if __name__ == "__main__":
@@ -234,6 +259,9 @@ if __name__ == "__main__":
     fname = default_app_dir + "/testlog"
 
     slog = SkalabLog(parent=wg, logname=__name__)
+    slog.signalLogInfo.connect(slog.writeLogInfo)
+    slog.signalLogWarning.connect(slog.writeLogWarning)
+    slog.signalLogError.connect(slog.writeLogError)
     slog.testFunc()
     wg.show()
     wg.raise_()
