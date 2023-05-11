@@ -60,6 +60,7 @@ class SkalabBase(QtWidgets.QMainWindow):
 
     def writeConfig(self, profileConfig, fname):
         conf = configparser.ConfigParser()
+        conf.optionxform = str
         for s in profileConfig.keys():
             # print(s, ": ", self.profile[s], type(self.profile[s]))
             if type(profileConfig[s]) == dict:
