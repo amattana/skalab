@@ -26,29 +26,8 @@ class MyStation(Station):
     """ Customized Class representing an AAVS station using parent Logger """
 
     def __init__(self, config, logger):
-        super(MyStation).__init__(config)
-        # Save configuration locally
-        self.configuration = config
+        super(Station).__init__(config)
         self.log = logger
-        self._station_id = config['station']['id']
-
-        # Check if station name is specified
-        self._slack = None
-        if config['station']['name'] == "":
-            self.logger.warning("Station name not defined, will be able to push notifications to Slack")
-        else:
-            self._slack = get_slack_instance(config['station']['name'])
-
-        # Add tiles to station
-        self.tiles = []
-        for tile in config['tiles']:
-            self.add_tile(tile)
-
-        # Default duration of sleeps
-        self._seconds = 1.0
-
-        # Set if the station is properly configured
-        self.properly_formed_station = None
         print("LOGGO IO: ", self.log)
 
     def add_tile(self, tile_ip):
