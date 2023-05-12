@@ -26,7 +26,7 @@ class MyStation(Station):
     """ Customized Class representing an AAVS station using parent Logger """
 
     def __init__(self, config, logger):
-        super(Station).__init__(config)
+        super().__init__(config)
         self.log = logger
         print("LOGGO IO: ", self.log)
 
