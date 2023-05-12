@@ -28,7 +28,6 @@ class MyStation(Station):
     def __init__(self, config, logger):
         self.log = logger
         super().__init__(config)
-        print("LOGGO IO: ", self.log)
 
     def add_tile(self, tile_ip):
         """ override add_tile only to provide the Tile Logger """
