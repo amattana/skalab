@@ -26,7 +26,7 @@ class MyStation(Station):
     """ Customized Class representing an AAVS station using parent Logger """
 
     def __init__(self, config, logger):
-        super(MyStation, self).__init__(config)
+        super(MyStation).__init__(config)
         # Save configuration locally
         self.configuration = config
         self.log = logger
