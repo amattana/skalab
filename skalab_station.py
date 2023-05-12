@@ -29,7 +29,7 @@ class MyStation(Station):
         super(MyStation, self).__init__(config)
         # Save configuration locally
         self.configuration = config
-        self.logger = logger
+        self.log = logger
         self._station_id = config['station']['id']
 
         # Check if station name is specified
@@ -49,6 +49,7 @@ class MyStation(Station):
 
         # Set if the station is properly configured
         self.properly_formed_station = None
+        print("LOGGO IO: ", self.log)
 
     def add_tile(self, tile_ip):
         """ override add_tile only to provide the Tile Logger """
@@ -65,7 +66,7 @@ class MyStation(Station):
             lmc_ip = self.configuration['network']['lmc']['integrated_data_ip']
 
         self.tiles.append(
-            Tile(tile_ip, self.configuration['network']['lmc']['tpm_cpld_port'], lmc_ip, dst_port, logger=self.logger))
+            Tile(tile_ip, self.configuration['network']['lmc']['tpm_cpld_port'], lmc_ip, dst_port, logger=self.log))
 
 
 class SkalabStation(SkalabBase):
