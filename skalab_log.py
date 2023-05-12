@@ -232,7 +232,7 @@ class SkalabLog(QtWidgets.QMainWindow):
             self.logInfo.updateBox(l, n, m)
 
     def writeLogWarning(self):
-        if self.logInfo.msgQueue:
+        if self.logWarning.msgQueue:
             try:
                 l, n, m = self.logWarning.msgQueue[0]
                 self.logWarning.msgQueue = self.logWarning.msgQueue[1:]
@@ -241,7 +241,7 @@ class SkalabLog(QtWidgets.QMainWindow):
                 print("Raised Exception: ", self.logWarning.msgQueue)
 
     def writeLogError(self):
-        if self.logInfo.msgQueue:
+        if self.logError.msgQueue:
             l, n, m = self.logError.msgQueue[0]
             self.logError.msgQueue = self.logError.msgQueue[1:]
             self.logError.updateBox(l, n, m)
