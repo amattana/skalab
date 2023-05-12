@@ -27,7 +27,7 @@ class MyStation(Station):
 
     def __init__(self, config, logger):
         self.log = logger
-        super(Station, self).__init__(config)
+        super().__init__(config)
         print("LOGGO IO: ", self.log)
 
     def add_tile(self, tile_ip):
