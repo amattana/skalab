@@ -26,8 +26,8 @@ class MyStation(Station):
     """ Customized Class representing an AAVS station using parent Logger """
 
     def __init__(self, config, logger):
-        super().__init__(config)
         self.log = logger
+        super(Station, self).__init__(config)
         print("LOGGO IO: ", self.log)
 
     def add_tile(self, tile_ip):
