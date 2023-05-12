@@ -34,7 +34,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets, uic
 from skalab_live import Live
 from skalab_playback import Playback
 from skalab_subrack import Subrack
-from skalab_station import Station
+from skalab_station import SkalabStation
 from skalab_utils import parse_profile, getTextFromFile
 from pathlib import Path
 import logging
@@ -132,7 +132,7 @@ class SkaLab(QtWidgets.QMainWindow):
         # Instantiating Station Tab. This must be always done as first
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabStationIndex, True)
         self.wgStationLayout = QtWidgets.QVBoxLayout()
-        self.wgStation = Station(uiFile="Gui/skalab_station.ui", size=[1190, 936],
+        self.wgStation = SkalabStation(uiFile="Gui/skalab_station.ui", size=[1190, 936],
                            profile=self.profile['Base']['station'],
                            swpath=default_app_dir)
         self.wgStationLayout.addWidget(self.wgStation)

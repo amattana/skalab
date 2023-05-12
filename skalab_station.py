@@ -11,6 +11,8 @@ import os
 import numpy as np
 from pathlib import Path
 from pyaavs import station
+from pyaavs.station import Station, get_slack_instance
+from pyaavs.tile_wrapper import Tile
 from pyfabil import TPMGeneric
 from pyfabil.base.definitions import LibraryError, BoardError, PluginError, InstrumentError
 import pyaavs.logger
@@ -20,7 +22,53 @@ default_profile = "Default"
 profile_filename = "station.ini"
 
 
-class Station(SkalabBase):
+class MyStation(Station):
+    """ Customized Class representing an AAVS station using parent Logger """
+
+    def __init__(self, config, logger):
+        super(MyStation, self).__init__(config)
+        # Save configuration locally
+        self.configuration = config
+        self.logger = logger
+        self._station_id = config['station']['id']
+
+        # Check if station name is specified
+        self._slack = None
+        if config['station']['name'] == "":
+            self.logger.warning("Station name not defined, will be able to push notifications to Slack")
+        else:
+            self._slack = get_slack_instance(config['station']['name'])
+
+        # Add tiles to station
+        self.tiles = []
+        for tile in config['tiles']:
+            self.add_tile(tile)
+
+        # Default duration of sleeps
+        self._seconds = 1.0
+
+        # Set if the station is properly configured
+        self.properly_formed_station = None
+
+    def add_tile(self, tile_ip):
+        """ override add_tile only to provide the Tile Logger """
+
+        # If all traffic is going through 1G then set the destination port to
+        # the lmc_port. If only integrated data is going through the 1G set the
+        # destination port to integrated_data_port
+        dst_port = self.configuration['network']['lmc']['lmc_port']
+        lmc_ip = self.configuration['network']['lmc']['lmc_ip']
+
+        if not self.configuration['network']['lmc']['use_teng_integrated'] and \
+                self.configuration['network']['lmc']['use_teng']:
+            dst_port = self.configuration['network']['lmc']['integrated_data_port']
+            lmc_ip = self.configuration['network']['lmc']['integrated_data_ip']
+
+        self.tiles.append(
+            Tile(tile_ip, self.configuration['network']['lmc']['tpm_cpld_port'], lmc_ip, dst_port, logger=self.logger))
+
+
+class SkalabStation(SkalabBase):
     """ Main UI Window class """
     # Signal for Slots
     signalTlm = QtCore.pyqtSignal()
@@ -34,7 +82,7 @@ class Station(SkalabBase):
         self.wgProBox.setVisible(True)
         self.wgProBox.show()
 
-        super(Station, self).__init__(App="station", Profile=profile, Path=swpath, parent=self.wgProBox)
+        super(SkalabStation, self).__init__(App="station", Profile=profile, Path=swpath, parent=self.wgProBox)
         self.logger = SkalabLog(parent=self.wg.qw_log, logname=__name__, profile=self.profile)
         self.connected = False
         self.tpm_station = None
@@ -210,14 +258,14 @@ class Station(SkalabBase):
                 station.configuration['station']['program'] = True
                 if True:
                     #self.logger.propagate = True
-                    self.tpm_station = station.Station(station.configuration)
-                    for tile in self.tpm_station.tiles:
-                        tile.logger.handlers.clear()
-                        tile.logger.addHandler(self.logger.logInfo)
-                        # tile.logger.addHandler(self.logger.logWarning)
-                        # tile.logger.addHandler(self.logger.logError)
-                        # tile.logger.addHandler(self.logger.file_handler)
-                        tile.logger.setLevel(logging.INFO)
+                    self.tpm_station = MyStation(station.configuration, self.logger)
+                    # for tile in self.tpm_station.tiles:
+                        # tile.logger.handlers.clear()
+                        # tile.logger.addHandler(self.logger.logInfo)
+                        # # tile.logger.addHandler(self.logger.logWarning)
+                        # # tile.logger.addHandler(self.logger.logError)
+                        # # tile.logger.addHandler(self.logger.file_handler)
+                        # tile.logger.setLevel(logging.INFO)
                         # tile.logger.propagate = True
                     #self.logger.propagate = False
                     self.wg.qbutton_station_init.setEnabled(False)
