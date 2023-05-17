@@ -413,6 +413,9 @@
      </property>
     </widget>
     <widget class="QCheckBox" name="check_savedata">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
      <property name="geometry">
       <rect>
        <x>10</x>
@@ -908,7 +911,7 @@ p, li { white-space: pre-wrap; }
       <string/>
      </property>
      <property name="pixmap">
-      <pixmap>../../.designer/backup/Pictures/210510_r38312-951x1024.jpg</pixmap>
+      <pixmap>../Pictures/210510_r38312-951x1024.jpg</pixmap>
      </property>
     </widget>
     <widget class="QLabel" name="label_6">
@@ -924,7 +927,7 @@ p, li { white-space: pre-wrap; }
       <string/>
      </property>
      <property name="pixmap">
-      <pixmap>../../.designer/backup/Pictures/Selection_007.jpg</pixmap>
+      <pixmap>../Pictures/Selection_007.jpg</pixmap>
      </property>
     </widget>
     <widget class="QLabel" name="label_7">
@@ -940,7 +943,7 @@ p, li { white-space: pre-wrap; }
       <string/>
      </property>
      <property name="pixmap">
-      <pixmap>../../.designer/backup/Pictures/Selection_006.jpg</pixmap>
+      <pixmap>../Pictures/Selection_006.jpg</pixmap>
      </property>
     </widget>
     <widget class="QLabel" name="label_8">
@@ -956,7 +959,7 @@ p, li { white-space: pre-wrap; }
       <string/>
      </property>
      <property name="pixmap">
-      <pixmap>../../.designer/backup/Pictures/Selection_009.jpg</pixmap>
+      <pixmap>../Pictures/Selection_009.jpg</pixmap>
      </property>
     </widget>
     <widget class="QLabel" name="label_9">
@@ -972,7 +975,7 @@ p, li { white-space: pre-wrap; }
       <string/>
      </property>
      <property name="pixmap">
-      <pixmap>../../.designer/backup/Pictures/Selection_010.jpg</pixmap>
+      <pixmap>../Pictures/Selection_010.jpg</pixmap>
      </property>
     </widget>
     <widget class="QLabel" name="label_10">
@@ -988,7 +991,7 @@ p, li { white-space: pre-wrap; }
       <string/>
      </property>
      <property name="pixmap">
-      <pixmap>../../.designer/backup/Pictures/Selection_019.jpg</pixmap>
+      <pixmap>../Pictures/Selection_019.jpg</pixmap>
      </property>
     </widget>
     <widget class="QLabel" name="label_11">
@@ -1004,7 +1007,7 @@ p, li { white-space: pre-wrap; }
       <string/>
      </property>
      <property name="pixmap">
-      <pixmap>../../.designer/backup/Pictures/Selection_012.jpg</pixmap>
+      <pixmap>../Pictures/Selection_012.jpg</pixmap>
      </property>
     </widget>
     <widget class="QLabel" name="label_15">
@@ -1020,7 +1023,7 @@ p, li { white-space: pre-wrap; }
       <string/>
      </property>
      <property name="pixmap">
-      <pixmap>../../.designer/backup/Pictures/Selection_011.jpg</pixmap>
+      <pixmap>../Pictures/Selection_011.jpg</pixmap>
      </property>
     </widget>
     <widget class="QLabel" name="label_16">
@@ -1036,7 +1039,7 @@ p, li { white-space: pre-wrap; }
       <string/>
      </property>
      <property name="pixmap">
-      <pixmap>../../.designer/backup/Pictures/Selection_015.jpg</pixmap>
+      <pixmap>../Pictures/Selection_015.jpg</pixmap>
      </property>
     </widget>
     <widget class="QLabel" name="label_13">
@@ -1052,7 +1055,7 @@ p, li { white-space: pre-wrap; }
       <string/>
      </property>
      <property name="pixmap">
-      <pixmap>../../.designer/backup/Pictures/Selection_013.jpg</pixmap>
+      <pixmap>../Pictures/Selection_013.jpg</pixmap>
      </property>
     </widget>
     <widget class="QLabel" name="label_14">
@@ -1068,7 +1071,7 @@ p, li { white-space: pre-wrap; }
       <string/>
      </property>
      <property name="pixmap">
-      <pixmap>../../.designer/backup/Pictures/Selection_016.jpg</pixmap>
+      <pixmap>../Pictures/Selection_016.jpg</pixmap>
      </property>
     </widget>
     <widget class="QLabel" name="label_12">
@@ -1084,7 +1087,7 @@ p, li { white-space: pre-wrap; }
       <string/>
      </property>
      <property name="pixmap">
-      <pixmap>../../.designer/backup/Pictures/Selection_017.jpg</pixmap>
+      <pixmap>../Pictures/Selection_017.jpg</pixmap>
      </property>
     </widget>
    </widget>
