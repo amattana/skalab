@@ -443,7 +443,6 @@ class Monitor(TileInitialization):
         super(Monitor, self).__init__(profile, swpath)
         self.logger = SkalabLog(parent=self.wg.qt_log, logname=__name__, profile=self.profile)
         self.setCentralWidget(self.wg)
-        self.resize(size[0], size[1])
         self.loadEventsMonitor()
         # Set variable
         self.from_subrack = {}
@@ -711,7 +710,6 @@ class MonitorSubrack(Monitor):
         self.query_tiles = []
         self.connected = False
         self.reload(ip=ip, port=port)
-        self.resize(size[0], size[1])
 
         self.tlm_file = ""
         self.tlm_hdf = None
@@ -962,6 +960,8 @@ if __name__ == "__main__":
         window = MonitorSubrack(uiFile="Gui/skalab_monitor.ui", size=[1190, 936],
                                  profile=opt.profile,
                                  swpath=default_app_dir)
+        window.resize(700, 494)
+        window.setFixedSize(1500,930)
         window.dst_port = station.configuration['network']['lmc']['lmc_port']
         window.lmc_ip = station.configuration['network']['lmc']['lmc_ip']
         window.cpld_port = station.configuration['network']['lmc']['tpm_cpld_port']

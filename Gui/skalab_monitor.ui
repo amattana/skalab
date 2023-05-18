@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1826</width>
+    <width>1500</width>
     <height>930</height>
    </rect>
   </property>
@@ -22,11 +22,11 @@
      <x>0</x>
      <y>10</y>
      <width>1811</width>
-     <height>891</height>
+     <height>911</height>
     </rect>
    </property>
    <property name="currentIndex">
-    <number>0</number>
+    <number>1</number>
    </property>
    <widget class="QWidget" name="qtab_app">
     <attribute name="title">
@@ -81,7 +81,7 @@
        <rect>
         <x>0</x>
         <y>30</y>
-        <width>931</width>
+        <width>1221</width>
         <height>571</height>
        </rect>
       </property>
@@ -494,7 +494,7 @@
        <x>800</x>
        <y>0</y>
        <width>661</width>
-       <height>891</height>
+       <height>871</height>
       </rect>
      </property>
      <property name="frameShape">
@@ -698,7 +698,7 @@
         <x>30</x>
         <y>630</y>
         <width>611</width>
-        <height>241</height>
+        <height>221</height>
        </rect>
       </property>
       <property name="verticalScrollBarPolicy">
