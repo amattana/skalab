@@ -26,11 +26,11 @@
     </rect>
    </property>
    <property name="currentIndex">
-    <number>1</number>
+    <number>2</number>
    </property>
    <widget class="QWidget" name="qtab_app">
     <attribute name="title">
-     <string>App</string>
+     <string>Monitoring</string>
     </attribute>
     <widget class="QFrame" name="frame_subrack">
      <property name="geometry">
@@ -476,7 +476,7 @@
    </widget>
    <widget class="QWidget" name="Log">
     <attribute name="title">
-     <string>Log</string>
+     <string>Init and Log</string>
     </attribute>
     <widget class="QWidget" name="qt_log" native="true">
      <property name="geometry">
