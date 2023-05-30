@@ -780,7 +780,6 @@ class MonitorSubrack(Monitor):
                             else:
                                 self.telemetry[tlmk] = data["info"]
                     if 'api_version' in self.telemetry.keys():
-                        self.wg.qlabel_message.setText("Subrack API version: " + self.telemetry['api_version'])
                         self.logger.info("Subrack API version: " + self.telemetry['api_version'])
                     else:
                         self.logger.warning("The Subrack is running with a very old API version!")
@@ -798,7 +797,6 @@ class MonitorSubrack(Monitor):
                         self.signalTlm.emit()
                     self.wait_check_subrack.set()
                 else:
-                    self.wg.qlabel_message.setText("The Subrack server does not respond!")
                     self.logger.error("Unable to connect to the Subrack server %s:%d" % (self.ip, int(self.port)))
                     self.wg.subrack_button.setStyleSheet("background-color: rgb(204, 0, 0);")
                     self.wg.subrack_button.setStyleSheet("background-color: rgb(204, 0, 0);")
