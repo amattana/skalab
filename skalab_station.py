@@ -15,7 +15,7 @@ from pyaavs.station import Station, get_slack_instance
 from pyaavs.tile_wrapper import Tile
 from pyfabil import TPMGeneric
 from pyfabil.base.definitions import LibraryError, BoardError, PluginError, InstrumentError
-import pyaavs.logger
+import subprocess
 
 default_app_dir = str(Path.home()) + "/.skalab/"
 default_profile = "Default"
