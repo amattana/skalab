@@ -22,31 +22,31 @@ default_profile = "Default"
 profile_filename = "station.ini"
 
 
-class MyStation(Station):
-    """ Customized Class representing an AAVS station using parent Logger """
-
-    def __init__(self, config, logger):
-        self.log = logger
-        super().__init__(config)
-
-    def add_tile(self, tile_ip):
-        """ override add_tile only to provide the Tile Logger """
-
-        # If all traffic is going through 1G then set the destination port to
-        # the lmc_port. If only integrated data is going through the 1G set the
-        # destination port to integrated_data_port
-        dst_port = self.configuration['network']['lmc']['lmc_port']
-        lmc_ip = self.configuration['network']['lmc']['lmc_ip']
-
-        if not self.configuration['network']['lmc']['use_teng_integrated'] and \
-                self.configuration['network']['lmc']['use_teng']:
-            dst_port = self.configuration['network']['lmc']['integrated_data_port']
-            lmc_ip = self.configuration['network']['lmc']['integrated_data_ip']
-
-        self.tiles.append(
-            Tile(tile_ip, self.configuration['network']['lmc']['tpm_cpld_port'], lmc_ip, dst_port, logger=self.log))
-
-
+# class MyStation(Station):
+#     """ Customized Class representing an AAVS station using parent Logger """
+#
+#     def __init__(self, config, logger):
+#         self.log = logger
+#         super().__init__(config)
+#
+#     def add_tile(self, tile_ip):
+#         """ override add_tile only to provide the Tile Logger """
+#
+#         # If all traffic is going through 1G then set the destination port to
+#         # the lmc_port. If only integrated data is going through the 1G set the
+#         # destination port to integrated_data_port
+#         dst_port = self.configuration['network']['lmc']['lmc_port']
+#         lmc_ip = self.configuration['network']['lmc']['lmc_ip']
+#
+#         if not self.configuration['network']['lmc']['use_teng_integrated'] and \
+#                 self.configuration['network']['lmc']['use_teng']:
+#             dst_port = self.configuration['network']['lmc']['integrated_data_port']
+#             lmc_ip = self.configuration['network']['lmc']['integrated_data_ip']
+#
+#         self.tiles.append(
+#             Tile(tile_ip, self.configuration['network']['lmc']['tpm_cpld_port'], lmc_ip, dst_port, logger=self.log))
+#
+#
 class SkalabStation(SkalabBase):
     """ Main UI Window class """
     # Signal for Slots
@@ -234,8 +234,7 @@ class SkalabStation(SkalabBase):
         while True:
             if self.doInit:
                 if True:
-                    self.tpm_station = MyStation(station.configuration, self.logger)
-                    swpath = os.getenv("AAVS_HOME")
+                    swpath = os.getenv("AAVS_HOME")[:-1]
                     swstation = "/aavs-system/python/pyaavs/station.py "
                     swopt = " -I"
                     if self.wg.checkProgram.isChecked():
@@ -256,6 +255,7 @@ class SkalabStation(SkalabBase):
                         # print(msg.decode()[:-1])
                         time.sleep(0.01)
 
+                    self.tpm_station = station.Station(station.configuration)
                     self.wg.qbutton_station_init.setEnabled(False)
                     station.configuration['station']['initialise'] = False
                     station.configuration['station']['program'] = False
