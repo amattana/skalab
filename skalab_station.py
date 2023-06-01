@@ -259,19 +259,24 @@ class SkalabStation(SkalabBase):
                     self.wg.qbutton_station_init.setEnabled(False)
                     station.configuration['station']['initialise'] = False
                     station.configuration['station']['program'] = False
+                    self.logger.info("Station Initialization completed, verifying if properly formed...")
                     self.tpm_station.connect()
                     if self.tpm_station.properly_formed_station:
+                        self.logger.info("The Station is properly formed!")
+                        self.logger.info("Switching On TPM PreADUs...")
                         self.wg.qbutton_station_init.setStyleSheet("background-color: rgb(78, 154, 6);")
                         # Switch On the PreADUs
                         for tile in self.tpm_station.tiles:
                             tile["board.regfile.enable.fe"] = 1
                             time.sleep(0.1)
-                        time.sleep(1)
                         self.logger.info("TPM PreADUs Powered ON")
+                        time.sleep(1)
                         if "default_preadu_attenuation" in station.configuration['station'].keys():
-                            self.tpm_station.set_preadu_attenuation(int(station.configuration['station']["default_preadu_attenuation"]))
+                            for tile in self.tpm_station.tiles:
+                                tile.set_preadu_attenuation(int(station.configuration['station']["default_preadu_attenuation"]))
                         if "equalize_preadu" in station.configuration['station'].keys():
-                            self.tpm_station.equalize_preadu_gain(int(station.configuration['station']["equalize_preadu"]))
+                            for tile in self.tpm_station.tiles:
+                                tile.equalize_preadu_gain(int(station.configuration['station']["equalize_preadu"]))
                             self.logger.info("Equalization of Levels done")
                     else:
                         self.wg.qbutton_station_init.setStyleSheet("background-color: rgb(204, 0, 0);")
