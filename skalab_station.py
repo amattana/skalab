@@ -233,24 +233,33 @@ class SkalabStation(SkalabBase):
     def do_station_init(self):
         while True:
             if self.doInit:
-                station.configuration['station']['initialise'] = True
-                station.configuration['station']['program'] = True
                 if True:
-                    #self.logger.propagate = True
                     self.tpm_station = MyStation(station.configuration, self.logger)
-                    # for tile in self.tpm_station.tiles:
-                        # tile.logger.handlers.clear()
-                        # tile.logger.addHandler(self.logger.logInfo)
-                        # # tile.logger.addHandler(self.logger.logWarning)
-                        # # tile.logger.addHandler(self.logger.logError)
-                        # # tile.logger.addHandler(self.logger.file_handler)
-                        # tile.logger.setLevel(logging.INFO)
-                        # tile.logger.propagate = True
-                    #self.logger.propagate = False
+                    swpath = os.getenv("AAVS_HOME")
+                    swstation = "/aavs-system/python/pyaavs/station.py "
+                    swopt = " -I"
+                    if self.wg.checkProgram.isChecked():
+                        swopt += " -P"
+                    sp = subprocess.Popen(
+                        "python " + swpath + swstation + " --config='" + self.config_file + "'" + swopt, shell=True,
+                        stdout=subprocess.PIPE)
+                    while True:
+                        msg = sp.stdout.readline()
+                        if (len(msg) == 0) and (sp.poll() is not None):
+                            break
+                        if "ERROR" in msg.decode()[:-1]:
+                            self.logger.error(msg.decode()[:-1])
+                        elif "WARNING" in msg.decode()[:-1]:
+                            self.logger.warning(msg.decode()[:-1])
+                        else:
+                            self.logger.info(msg.decode()[:-1])
+                        # print(msg.decode()[:-1])
+                        time.sleep(0.01)
+
                     self.wg.qbutton_station_init.setEnabled(False)
-                    self.tpm_station.connect()
                     station.configuration['station']['initialise'] = False
                     station.configuration['station']['program'] = False
+                    self.tpm_station.connect()
                     if self.tpm_station.properly_formed_station:
                         self.wg.qbutton_station_init.setStyleSheet("background-color: rgb(78, 154, 6);")
                         # Switch On the PreADUs
@@ -259,6 +268,11 @@ class SkalabStation(SkalabBase):
                             time.sleep(0.1)
                         time.sleep(1)
                         self.logger.info("TPM PreADUs Powered ON")
+                        if "default_preadu_attenuation" in station.configuration['station'].keys():
+                            self.tpm_station.set_preadu_attenuation(int(station.configuration['station']["default_preadu_attenuation"]))
+                        if "equalize_preadu" in station.configuration['station'].keys():
+                            self.tpm_station.equalize_preadu_gain(int(station.configuration['station']["equalize_preadu"]))
+                            self.logger.info("Equalization of Levels done")
                     else:
                         self.wg.qbutton_station_init.setStyleSheet("background-color: rgb(204, 0, 0);")
                     self.wg.qbutton_station_init.setEnabled(True)
