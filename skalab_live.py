@@ -1129,8 +1129,9 @@ class Live(SkalabBase):
             #self.livePlots.plotClear()
             for n, i in enumerate(self.live_input_list):
                 # Plot X Pol
-                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][self.live_mapping[i - 1], 0, :],
-                                                self.nsamples)
+                spettro, rfpow, rms = calcolaspettro(
+                    self.live_data[int(self.wg.qcombo_tpm.currentIndex())][self.live_mapping[i - 1], 0, :],
+                    self.nsamples)
                 self.livePlots.plotCurve(self.asse_x, spettro, n, xAxisRange=xAxisRange,
                                          yAxisRange=yAxisRange, title="INPUT-%02d" % i,
                                          xLabel="MHz", yLabel="dB", colore="b", rfpower=rms,
@@ -1138,8 +1139,9 @@ class Live(SkalabBase):
                                          show_line=self.wg.qcheck_xpol_sp.isChecked())
 
                 # Plot Y Pol
-                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][self.live_mapping[i - 1], 1, :],
-                                              self.nsamples)
+                spettro, rfpow, rms = calcolaspettro(
+                    self.live_data[int(self.wg.qcombo_tpm.currentIndex())][self.live_mapping[i - 1], 1, :],
+                    self.nsamples)
                 self.livePlots.plotCurve(self.asse_x, spettro, n, xAxisRange=xAxisRange,
                                          yAxisRange=yAxisRange, colore="g", rfpower=rms,
                                          annotate_rms=self.show_rms, grid=self.show_spectra_grid, lw=lw,
