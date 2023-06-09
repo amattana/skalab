@@ -17,6 +17,8 @@ from pyfabil import TPMGeneric
 from pyfabil.base.definitions import LibraryError, BoardError, PluginError, InstrumentError
 import subprocess
 
+from skalab_utils import MapPlot
+
 default_app_dir = str(Path.home()) + "/.skalab/"
 default_profile = "Default"
 profile_filename = "station.ini"
@@ -85,19 +87,64 @@ class SkalabStation(SkalabBase):
         self.setup_config()
         self.tpm_ips_from_subrack = []
 
-        # pyaavs.logger.root_logger.setLevel(logging.INFO)
-        # pyaavs.logger.root_logger.handlers.clear()
-        # pyaavs.logger.root_logger.addHandler(self.logger.logInfo)
-        # pyaavs.logger.root_logger.addHandler(self.logger.logWarning)
-        # pyaavs.logger.root_logger.addHandler(self.logger.logError)
-        # pyaavs.logger.root_logger.addHandler(self.logger.file_handler)
-        # pyaavs.logger.root_logger.setLevel(logging.INFO)
+        self.maks_tiles = np.arange(1, 17).tolist()
+        self.populate_cb_tiles()
+        self.station_map = []
+        if "station_map" in self.profile['Station'].keys():
+            self.wg.qline_map_file.setText(self.profile['Station']["station_map"])
+            self.loadStationMap(self.profile['Station']["station_map"])
+            self.mapPlot = MapPlot(self.wg.plotWidgetMap, self.station_map, self.maks_tiles)
+            self.plotMap()
+
+    def plotMap(self):
+        if len(self.station_map):
+            self.mapPlot.plotClear()
+            if self.wg.rb_circle.isChecked():
+                self.mapPlot.plotMap(marker='o')
+            else:
+                self.mapPlot.plotMap(marker='+')
+            if self.wg.cb_id.isChecked():
+                self.mapPlot.printId()
+
+    def populate_cb_tiles(self):
+        self.wg.cb_tiles = []
+        for i in range(16):
+            self.wg.cb_tiles += [QtWidgets.QCheckBox(self.wg.qframe_tiles)]
+            self.wg.cb_tiles[-1].setGeometry(QtCore.QRect(20 + (70 * (i % 4)), 20 + (40 * int(i / 4)), 51, 23))
+            self.wg.cb_tiles[-1].setChecked(True)
+            self.wg.cb_tiles[-1].setText(str(i + 1))
+            self.wg.cb_tiles[-1].stateChanged.connect(self.change_mask)
+
+    def change_mask(self):
+        self.mapPlot.mask = []
+        for i in range(16):
+            if self.wg.cb_tiles[i].isChecked():
+                self.mapPlot.mask += [i + 1]
+        self.plotMap()
+
+    def tile_select_none(self):
+        for i in range(16):
+            self.wg.cb_tiles[i].setChecked(False)
+        self.mapPlot.mask = []
+        self.plotMap()
+
+    def tile_select_all(self):
+        for i in range(16):
+            self.wg.cb_tiles[i].setChecked(True)
+        self.mapPlot.mask = np.arange(1, 17).tolist()
+        self.plotMap()
 
     def load_events(self):
         self.wg.qbutton_browse.clicked.connect(lambda: self.browse_config())
         self.wg.qbutton_edit.clicked.connect(lambda: self.edit_config())
         self.wg.qbutton_load_configuration.clicked.connect(lambda: self.setup_config())
         self.wg.qbutton_station_init.clicked.connect(lambda: self.station_init())
+        self.wg.rb_circle.toggled.connect(lambda: self.plotMap())
+        self.wg.rb_cross.toggled.connect(lambda: self.plotMap())
+        self.wg.rb_cross.toggled.connect(lambda: self.plotMap())
+        self.wg.cb_id.stateChanged.connect(lambda: self.plotMap())
+        self.wg.qbutton_map_deselect.clicked.connect(lambda: self.tile_select_none())
+        self.wg.qbutton_map_select.clicked.connect(lambda: self.tile_select_all())
 
     def browse_config(self):
         fd = QtWidgets.QFileDialog()
@@ -106,6 +153,19 @@ class SkalabStation(SkalabBase):
         self.config_file = fd.getOpenFileName(self, caption="Select a Station Config File...",
                                               directory="/opt/aavs/config/", options=options)[0]
         self.wg.qline_configfile.setText(self.config_file)
+
+    def loadStationMap(self, map_file):
+        with open(map_file) as f:
+            data = f.readlines()
+        self.station_map = []
+        for d in data:
+            if (len(d.split()) == 5) and (d[0] != "#"):
+                antenna_map = {'tile': int(d.split()[0]),
+                               'input': int(d.split()[1]),
+                               'id': int(d.split()[2]),
+                               'North': float(d.split()[3]),
+                               'East': float(d.split()[4])}
+                self.station_map += [antenna_map]
 
     def edit_config(self):
         if not self.text_editor == "":

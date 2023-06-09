@@ -959,3 +959,85 @@ class Archive:
     def close(self):
         self.hfile.close()
         self.open = False
+
+
+class MapCanvas(FigureCanvas):
+    def __init__(self, parent=None, dpi=80, size=(9.4, 9.4)):
+        self.dpi = dpi
+        self.fig = Figure(size, dpi=self.dpi, facecolor='white')
+        self.fig.set_tight_layout(True)
+        self.ax = self.fig.add_subplot(1, 1, 1)
+        #self.ax.set_facecolor('white')
+        self.ax.axis([-20, 20, -20, 20])
+        self.circle1 = plt.Circle((0, 0), 38.5/2, color='tan', linewidth=1.5)  # , fill=False)
+        self.ax.add_artist(self.circle1)
+        # self.circle1 = plt.Circle((0, 0), 38.1/2, color='w', linewidth=1.5)  # , fill=False)
+        # self.ax.add_artist(self.circle1)
+        # self.ax.grid()
+
+        FigureCanvas.__init__(self, self.fig)
+        FigureCanvas.setSizePolicy(self, QtWidgets.QSizePolicy.Expanding,QtWidgets.QSizePolicy.Expanding)
+        FigureCanvas.updateGeometry(self)
+
+
+class MapPlot(QtWidgets.QWidget):
+
+    def __init__(self, parent=None, ant=None, mask=None):
+        QtWidgets.QWidget.__init__(self, parent)
+        if mask is None:
+            mask = []
+        if ant is None:
+            ant = []
+        self.canvas = MapCanvas()  # create canvas that will hold our plot
+        self.updateGeometry()
+        self.vbl = QtWidgets.QVBoxLayout()
+        self.vbl.addWidget(self.canvas)
+        self.setLayout(self.vbl)
+        self.show()
+        self.tiles = [int(a['tile']) for a in ant]
+        self.x = [float(str(a['East']).replace(",", ".")) for a in ant]
+        self.y = [float(str(a['North']).replace(",", ".")) for a in ant]
+        self.ids = [int(str(a['id'])) for a in ant]
+        self.mask = mask
+
+    def plotMap(self, marker='o'):
+        if len(self.x):
+            if marker == 'o':
+                for i, ant in enumerate(self.ids):
+                    if self.tiles[i] in self.mask:
+                        self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=16, linestyle='None',
+                                            color='k')
+                        self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=14, linestyle='None',
+                                            color='wheat')
+                        self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=14, linestyle='None',
+                                            color='w')
+            else:
+                for i, ant in enumerate(self.ids):
+                    if self.tiles[i] in self.mask:
+                        self.canvas.ax.plot(self.x[i], self.y[i], marker=marker, markersize=16, linestyle='None',
+                                            color='k')
+            self.updatePlot()
+
+    def printId(self):
+        if len(self.x):
+            for i, ant_id in enumerate(self.ids):
+                if self.tiles[i] in self.mask:
+                    self.canvas.ax.text(self.x[i] + 0.1, self.y[i] + 0.3, ("%d" % ant_id), fontsize=10) # , fontweight='bold')
+            self.updatePlot()
+
+    def updatePlot(self):
+        self.canvas.draw()
+        self.show()
+
+    def oPlot(self, x, y, marker='8', markersize=8, color='b'):
+        self.canvas.ax.plot(x, y, marker=marker, markersize=markersize, linestyle='None', color=color)
+        self.updatePlot()
+
+    def plotClear(self):
+        # Reset the plot landscape
+        self.canvas.ax.clear()
+        self.canvas.ax.axis([-20, 20, -20, 20])
+        circle1 = plt.Circle((0, 0), 38.5/2, color='tan', linewidth=1.5)  # , fill=False)
+        self.canvas.ax.add_artist(circle1)
+        self.updatePlot()
+
