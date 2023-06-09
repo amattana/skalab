@@ -64,7 +64,8 @@ def getTextFromFile(fname):
 
 
 class MiniCanvas(FigureCanvas):
-    def __init__(self, nplot, parent=None, dpi=100, xlabel="MHz", ylabel="dB", xlim=[0, 400], ylim=[-80, -20], size=(11.5, 6.8)):
+    def __init__(self, nplot, parent=None, dpi=100, xlabel="MHz", ylabel="dB",
+                 xlim=[0, 400], ylim=[-80, -20], size=(11.5, 6.7)):
         self.nplot = nplot
         self.dpi = dpi
         self.fig = Figure(size, dpi=self.dpi, facecolor='white')
@@ -177,7 +178,7 @@ class MiniPlots(QtWidgets.QWidget):
         self.canvas.ax[ant].set_title(title, fontsize=10)
 
     def plotPower(self, assex, data, ant, xAxisRange=None, yAxisRange=None, colore="b", xLabel="", yLabel="", title="",
-                  titlesize=10, grid=False, show_line=True, lw=1):
+                  titlesize=10, grid=False, show_line=True, lw=1, xdatetime=False):
         """ Plot the data as a curve"""
         self.titlesize = titlesize
         if len(data) != 0:
@@ -185,7 +186,11 @@ class MiniPlots(QtWidgets.QWidget):
             self.plots[int(ant)][colore + 'line'] = line
             self.plots[int(ant)][colore + 'line'].set_visible(show_line)
             if not xAxisRange == None:
-                self.canvas.ax[ant].set_xlim(xAxisRange)
+                if not xdatetime:
+                    if xAxisRange[0] == xAxisRange[1]:
+                        self.canvas.ax[ant].set_xlim(xAxisRange[0] - 1, xAxisRange[0] + 1)
+                    else:
+                        self.canvas.ax[ant].set_xlim(xAxisRange)
             if not yAxisRange == None:
                 self.canvas.ax[ant].set_ylim(yAxisRange)
             if not title == "":
@@ -198,6 +203,37 @@ class MiniPlots(QtWidgets.QWidget):
                 self.canvas.ax[ant].grid(grid)
             self.plots[int(ant)]['xAxisRange'] = xAxisRange
             self.plots[int(ant)]['yAxisRange'] = yAxisRange
+            if xdatetime:
+                t_start = int(assex[0])
+                t_stop = int(assex[-1])
+                if t_start == t_stop:
+                    t_start = t_start - 1
+                    t_stop = t_stop + 1
+                self.canvas.ax[ant].set_xlim(t_start, t_stop)
+                delta = assex[-1] - assex[0]
+                if delta < 3600 * 24:
+                    delta_h = int((t_stop - t_start) / 60)
+                    x = np.array(range(t_stop - t_start + 100)) + t_start
+
+                    xticks = np.array(range(delta_h)) * 60 + t_start
+                    xticklabels = []
+                    for n, f in enumerate((np.array(range(delta_h)) + datetime.datetime.utcfromtimestamp(t_start).minute)):
+                        xticklabels += [datetime.datetime.strftime(datetime.datetime.utcfromtimestamp(t_start) +
+                                                                   datetime.timedelta(minutes=int(f)), "%H:%M")]
+                else:
+                    delta_h = int((t_stop - t_start) / 3600)
+                    x = np.array(range(t_stop - t_start + 100)) + t_start
+
+                    xticks = np.array(range(delta_h)) * 3600 + t_start
+                    xticklabels = [f if f != 0 else datetime.datetime.strftime(
+                        datetime.datetime.utcfromtimestamp(t_start) + datetime.timedelta(
+                            (datetime.datetime.utcfromtimestamp(t_start).hour + n) / 24), "%Y-%m-%d") for n, f in
+                                   enumerate((np.array(range(delta_h)) + datetime.datetime.utcfromtimestamp(
+                                       t_start).hour) % 24)]
+
+                self.canvas.ax[int(ant)].set_xticks(xticks[int(len(xticks) / 7 / 2)::int(len(xticks) / 7)])
+                self.canvas.ax[int(ant)].set_xticklabels(
+                    xticklabels[int(len(xticklabels) / 7 / 2)::int(len(xticklabels) / 7)], rotation=90, fontsize=8)
 
     def showGrid(self, show_grid=True):
         for i in range(self.nplot):
@@ -260,8 +296,7 @@ class MiniPlots(QtWidgets.QWidget):
 
     def savePicture(self, fname=""):
         if not fname == "":
-            a = self.canvas.print_figure(fname)
-            print(a)
+            self.canvas.print_figure(fname)
 
     def plotClear(self):
         # Reset the plot landscape
@@ -309,7 +344,7 @@ def calcSpectra(vett):
     return np.real(spettro)
 
 
-def calcolaspettro(dati, nsamples=32768, log=True, adurms=False):
+def calcolaspettro(dati, nsamples=32768, log=True):
     n = int(nsamples)  # split and average number, from 128k to 16 of 8k # aavs1 federico
     sp = [dati[x:x + n] for x in range(0, len(dati), n)]
     mediato = np.zeros(len(calcSpectra(sp[0])))
@@ -319,19 +354,18 @@ def calcolaspettro(dati, nsamples=32768, log=True, adurms=False):
     mediato[:] /= (2 ** 15 / nsamples)  # federico
     with np.errstate(divide='ignore', invalid='ignore'):
         mediato[:] = 20 * np.log10(mediato / 127.0)
-    d = np.array(dati, dtype=np.int8)
+    d = np.array(dati, dtype=np.int64)
     with np.errstate(divide='ignore', invalid='ignore'):
         adu_rms = np.sqrt(np.mean(np.power(d, 2), 0))
+    if adu_rms == np.nan:
+        adu_rms = 0
     volt_rms = adu_rms * (1.7 / 256.)
     with np.errstate(divide='ignore', invalid='ignore'):
         power_adc = 10 * np.log10(np.power(volt_rms, 2) / 400.) + 30
     power_rf = power_adc + 12
     if not log:
         mediato = dB2Linear(mediato)
-    if not adurms:
-        return mediato, power_rf
-    else:
-        return mediato, power_rf, adu_rms
+    return mediato, power_rf, adu_rms
 
 
 def dircheck(directory="", tile=1):
@@ -379,19 +413,21 @@ def read_data(fmanager=None, hdf5_file="", tile=1, nof_tiles=16):
 def calc_disk_usage(directory=".", pattern="*.hdf5"):
     cmd = "find " + directory + " -type f -name '" + pattern + "' -exec du -ch {} + | grep total"
     try:
-        subprocess.check_output(cmd, shell=True).decode("utf-8").split()
-        total = 0
-        unit = 'MB'
-        for r in l:
-            if not 'total' in r:
-                val = float(r.replace(",", ".")[:-1])
-                if 'G' in r:
-                    val = val * 1024
-                total = total + val
-        if len(str(total)) > 3:
-            total = total / 1000.
-            unit = 'GB'
-        return "%d%s" % (total, unit)
+        #print(cmd)
+        l = subprocess.check_output(cmd, shell=True).decode("utf-8").split()
+        # print(l)
+        # total = 0
+        # unit = 'MB'
+        # for r in l:
+        #     if not 'total' in r:
+        #         val = float(r.replace(",", ".")[:-1])
+        #         if 'G' in r:
+        #             val = val * 1024
+        #         total = total + val
+        # if len(str(total)) > 3:
+        #     total = total / 1000.
+        #     unit = 'GB'
+        return "%d%s" % (float(l[0].replace(",", ".")[:-1]), l[0][-1])
     except:
         return "0 MB"
 
@@ -692,6 +728,8 @@ class BarPlot(QtWidgets.QWidget):
         del self.markers
         self.markers = []
         if nbar > 1:
+            if nbar % 2:
+                nbar = nbar + 1
             for pol in range(2):
                 markers, = self.canvas.ax.plot(np.arange(0, nbar, 2) + 1 + pol, np.zeros(int(nbar/2)),
                                                linestyle='None', marker="s", markersize=self.markersize)
@@ -702,6 +740,7 @@ class BarPlot(QtWidgets.QWidget):
                                            markersize=self.markersize)
             markers.set_visible(False)
             self.markers += [markers]
+        self.canvas.ax.set_xlim([0, nbar])
         self.updatePlot()
 
     def showMarkers(self):

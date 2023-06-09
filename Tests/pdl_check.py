@@ -83,7 +83,7 @@ def runDAQ(directory="/storage/daq/tmp/", chan=0, tpm=0, duration=10, interval=0
     return power
 
 
-def runRms(chan=0, tpm=0, duration=10, interval=0.01, ylim="", autoy=False, version=2):
+def runRms(chan=0, tpm=0, duration=10, interval=0.01, ylim="", autoy=False, title=""):
     power = {'tstamp': [], 'Pol-X': np.array([]), 'Pol-Y': np.array([])}
     pol = ['Pol-X', 'Pol-Y']
 
@@ -102,7 +102,10 @@ def runRms(chan=0, tpm=0, duration=10, interval=0.01, ylim="", autoy=False, vers
     ax1.set_ylabel("normalized dB", fontsize=20)
     ax1.grid(True)
     ax1.autoscale(enable=True, axis='y')
-    ax1.set_title("PDL Measure of TPM-%02d Input Fibre %02d" % (tpm + 1, chan + 1), fontsize=26)
+    if title == "":
+        ax1.set_title("PDL Measure of TPM-%02d Input Fibre %02d" % (tpm + 1, chan + 1), fontsize=26)
+    else:
+        ax1.set_title(title, fontsize=26)
     ax2.plot(range(100), color='w')
     ax2.set_xlim(0, 100)
     pdl_x_ann = ax2.annotate("Pol-X:", (2, 80), fontsize=38, color='b')
@@ -368,7 +371,7 @@ if __name__ == "__main__":
                       interval=opts.interval, resolution=opts.resolution, band=band)
     else:
         data = runRms(chan=(opts.channel - 1), tpm=(opts.tpm - 1), duration=opts.duration, interval=opts.interval,
-                      ylim=opts.ylim, autoy=opts.autoscale, version=board_version)
+                      ylim=opts.ylim, autoy=opts.autoscale, title=opts.title)
     if len(data['Pol-X']):
         path = opts.dir
         if not path[-1] == "/":
@@ -376,10 +379,10 @@ if __name__ == "__main__":
         if not os.path.exists(path + "DATA"):
             os.mkdir(path + "DATA")
         data_ora = datetime.datetime.strftime(datetime.datetime.utcnow(), "%Y-%m-%d_%H%M%S")
-        if opts.title == "":
-            fname = path + "DATA/%s_PDL_TPM-%02d_INPUT-%02d.txt" % (data_ora, opts.tpm, opts.channel)
-        else:
+        if not opts.title == "":
             fname = path + "DATA/%s_PDL_%s.txt" % (data_ora, opts.title)
+        else:
+            fname = path + "DATA/%s_PDL_%s_INPUT-%02d.txt" % (data_ora, opts.title, opts.channel)
         with open(fname, "w") as f:
             f.write("Timestamp\tPol-Y\tPol-X\tDSA (Y-X)\t%d\t%d\n" % (dsa_y, dsa_x))
             for i in range(len(data['tstamp'])):
@@ -387,10 +390,10 @@ if __name__ == "__main__":
         if not os.path.exists(path + "PICTURES"):
             os.mkdir(path + "PICTURES")
         #plt.title("PDL of Fibre #%d are --> Pol-X %3.2f dB,  Pol-Y %3.2f dB" % (opts.channel, pdl_x, pdl_y))
-        if opts.title == "":
-            fname = path + "PICTURES/%s_PDL_TPM-%02d_INPUT-%02d.png" % (data_ora, opts.tpm, opts.channel)
-        else:
+        if not opts.title == "":
             fname = path + "PICTURES/%s_PDL_%s.png" % (data_ora, opts.title)
+        else:
+            fname = path + "PICTURES/%s_PDL_%s_INPUT-%02d.png" % (data_ora, opts.title, opts.channel)
         plt.savefig(fname)
         plt.show()
     else:

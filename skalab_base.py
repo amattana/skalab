@@ -9,7 +9,7 @@ class SkalabBase(QtWidgets.QMainWindow):
         super().__init__()
         self.connected = False
         self.profile = {}
-        self.wgProfile = uic.loadUi("skalab_profile.ui", parent)
+        self.wgProfile = uic.loadUi("Gui/skalab_profile.ui", parent)
         self.wgProfile.qbutton_load.clicked.connect(lambda: self.load())
         self.wgProfile.qbutton_saveas.clicked.connect(lambda: self.save_as_profile())
         self.wgProfile.qbutton_save.clicked.connect(lambda: self.save_profile())
@@ -45,6 +45,7 @@ class SkalabBase(QtWidgets.QMainWindow):
     def readConfig(self, fname):
         profile = {}
         confparser = configparser.ConfigParser()
+        confparser.optionxform = str
         confparser.read(fname)
         for s in confparser.sections():
             if not s in profile.keys():
@@ -59,6 +60,7 @@ class SkalabBase(QtWidgets.QMainWindow):
 
     def writeConfig(self, profileConfig, fname):
         conf = configparser.ConfigParser()
+        conf.optionxform = str
         for s in profileConfig.keys():
             # print(s, ": ", self.profile[s], type(self.profile[s]))
             if type(profileConfig[s]) == dict:
@@ -75,7 +77,7 @@ class SkalabBase(QtWidgets.QMainWindow):
     def load_profile(self, App="", Profile="", Path=""):
         if not Profile == "":
             loadPath = Path + Profile + "/"
-            fullPath = loadPath + App + ".ini"
+            fullPath = loadPath + App.lower() + ".ini"
             if os.path.exists(fullPath):
                 print("Loading " + App + " Profile: " + Profile + " (" + fullPath + ")")
             else:
@@ -128,7 +130,7 @@ class SkalabBase(QtWidgets.QMainWindow):
                 msgBox.setIcon(QtWidgets.QMessageBox.Critical)
                 msgBox.setText("The Template for the " +
                                App.upper() +
-                               "Profile file is not available.\n" +
+                               " Profile file is not available.\n" +
                                "Please, check it out from the repo.")
                 msgBox.setWindowTitle("Error!")
                 msgBox.exec_()
@@ -256,7 +258,7 @@ class SkalabBase(QtWidgets.QMainWindow):
     def updateProfileCombo(self, current):
         profiles = []
         for d in os.listdir(self.profile['Base']['path']):
-            if os.path.exists(self.profile['Base']['path'] + d + "/" + self.profile['Base']['app'] + ".ini"):
+            if os.path.exists(self.profile['Base']['path'] + d + "/" + self.profile['Base']['app'].lower() + ".ini"):
                 profiles += [d]
         if profiles:
             self.wgProfile.qcombo_profile.clear()
