@@ -94,17 +94,22 @@ class SkalabStation(SkalabBase):
             self.wg.qline_map_file.setText(self.profile['Station']["station_map"])
             self.loadStationMap(self.profile['Station']["station_map"])
             self.mapPlot = MapPlot(self.wg.plotWidgetMap, self.station_map, self.maks_tiles)
+            self.mapPlot.plotMap()
+            self.plotMap()
+
+    def rb_changed(self):
+        if self.wg.rb_circle.isChecked():
+            self.plotMap()
+        elif self.wg.rb_cross.isChecked():
             self.plotMap()
 
     def plotMap(self):
         if len(self.station_map):
-            self.mapPlot.plotClear()
-            if self.wg.rb_circle.isChecked():
-                self.mapPlot.plotMap(marker='o')
-            else:
-                self.mapPlot.plotMap(marker='+')
-            if self.wg.cb_id.isChecked():
-                self.mapPlot.printId()
+            print("Circle", self.wg.rb_circle.isChecked(), "Cross", self.wg.rb_cross.isChecked(), "ID", self.wg.cb_id.isChecked())
+            self.mapPlot.showCircle(flag=self.wg.rb_circle.isChecked())
+            self.mapPlot.showCross(flag=self.wg.rb_cross.isChecked())
+            self.mapPlot.printId(flag=self.wg.cb_id.isChecked())
+            self.mapPlot.updatePlot()
 
     def populate_cb_tiles(self):
         self.wg.cb_tiles = []
@@ -139,9 +144,8 @@ class SkalabStation(SkalabBase):
         self.wg.qbutton_edit.clicked.connect(lambda: self.edit_config())
         self.wg.qbutton_load_configuration.clicked.connect(lambda: self.setup_config())
         self.wg.qbutton_station_init.clicked.connect(lambda: self.station_init())
-        self.wg.rb_circle.toggled.connect(lambda: self.plotMap())
-        self.wg.rb_cross.toggled.connect(lambda: self.plotMap())
-        self.wg.rb_cross.toggled.connect(lambda: self.plotMap())
+        self.wg.rb_circle.toggled.connect(lambda: self.rb_changed())
+        self.wg.rb_cross.toggled.connect(lambda: self.rb_changed())
         self.wg.cb_id.stateChanged.connect(lambda: self.plotMap())
         self.wg.qbutton_map_deselect.clicked.connect(lambda: self.tile_select_none())
         self.wg.qbutton_map_select.clicked.connect(lambda: self.tile_select_all())

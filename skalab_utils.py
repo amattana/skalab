@@ -999,31 +999,52 @@ class MapPlot(QtWidgets.QWidget):
         self.y = [float(str(a['North']).replace(",", ".")) for a in ant]
         self.ids = [int(str(a['id'])) for a in ant]
         self.mask = mask
+        self.circle = []
+        self.cross = []
+        self.names = []
 
-    def plotMap(self, marker='o'):
+    def plotMap(self):
         if len(self.x):
-            if marker == 'o':
-                for i, ant in enumerate(self.ids):
-                    if self.tiles[i] in self.mask:
-                        self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=16, linestyle='None',
-                                            color='k')
-                        self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=14, linestyle='None',
-                                            color='wheat')
-                        self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=14, linestyle='None',
-                                            color='w')
+            for i, ant in enumerate(self.ids):
+                circle = [self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=16,
+                                                     linestyle='None', color='k')[0],
+                                 self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=14,
+                                                     linestyle='None', color='wheat')[0],
+                                 self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=14,
+                                                     linestyle='None', color='w')[0]]
+                for c in circle:
+                    c.set(visible=False)
+                self.circle += [circle]
+                self.cross += [
+                    self.canvas.ax.plot(self.x[i], self.y[i], marker='+', markersize=16, linestyle='None',
+                                        color='k')[0]]
+                self.cross[-1].set(visible=False)
+                self.names += [self.canvas.ax.text(self.x[i] + 0.1, self.y[i] + 0.3, ("%d" % ant), fontsize=10)]
+                self.names[-1].set(visible=False)
+            self.updatePlot()
+
+    def showCross(self, flag=True):
+        for i, cross in enumerate(self.cross):
+            if self.tiles[i] in self.mask:
+                cross.set(visible=flag)
             else:
-                for i, ant in enumerate(self.ids):
-                    if self.tiles[i] in self.mask:
-                        self.canvas.ax.plot(self.x[i], self.y[i], marker=marker, markersize=16, linestyle='None',
-                                            color='k')
-            self.updatePlot()
+                cross.set(visible=False)
 
-    def printId(self):
-        if len(self.x):
-            for i, ant_id in enumerate(self.ids):
-                if self.tiles[i] in self.mask:
-                    self.canvas.ax.text(self.x[i] + 0.1, self.y[i] + 0.3, ("%d" % ant_id), fontsize=10) # , fontweight='bold')
-            self.updatePlot()
+    def showCircle(self, flag=True):
+        for i, circle in enumerate(self.circle):
+            if self.tiles[i] in self.mask:
+                for c in circle:
+                    c.set(visible=flag)
+            else:
+                for c in circle:
+                    c.set(visible=False)
+
+    def printId(self, flag=True):
+        for i, ant_id in enumerate(self.names):
+            if self.tiles[i] in self.mask:
+                ant_id.set(visible=flag)
+            else:
+                ant_id.set(visible=False)
 
     def updatePlot(self):
         self.canvas.draw()
