@@ -962,13 +962,15 @@ class Archive:
 
 
 class MapCanvas(FigureCanvas):
-    def __init__(self, parent=None, dpi=80, size=(9.4, 9.4)):
+    def __init__(self, parent=None, dpi=80, size=(9.8, 9.8)):
         self.dpi = dpi
         self.fig = Figure(size, dpi=self.dpi, facecolor='white')
         self.fig.set_tight_layout(True)
         self.ax = self.fig.add_subplot(1, 1, 1)
         #self.ax.set_facecolor('white')
         self.ax.axis([-20, 20, -20, 20])
+        self.ax.set_xlabel("West-East (m)", fontsize=14)
+        self.ax.set_ylabel("South-North (m)", fontsize=14)
         self.circle1 = plt.Circle((0, 0), 38.5/2, color='tan', linewidth=1.5)  # , fill=False)
         self.ax.add_artist(self.circle1)
         # self.circle1 = plt.Circle((0, 0), 38.1/2, color='w', linewidth=1.5)  # , fill=False)
@@ -1002,23 +1004,29 @@ class MapPlot(QtWidgets.QWidget):
         self.circle = []
         self.cross = []
         self.names = []
+        self.locate = []
+        self.located = []
 
     def plotMap(self):
         if len(self.x):
             for i, ant in enumerate(self.ids):
-                circle = [self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=16,
+                circle = [self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=22,
                                                      linestyle='None', color='k')[0],
-                                 self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=14,
+                                 self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=20,
                                                      linestyle='None', color='wheat')[0],
-                                 self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=14,
+                                 self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=20,
                                                      linestyle='None', color='w')[0]]
+                locate = self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=20,
+                                                     linestyle='None', color='y')[0]
                 for c in circle:
                     c.set(visible=False)
                 self.circle += [circle]
                 self.cross += [
-                    self.canvas.ax.plot(self.x[i], self.y[i], marker='+', markersize=16, linestyle='None',
-                                        color='k')[0]]
+                    self.canvas.ax.plot(self.x[i], self.y[i], marker='+', markersize=24, mew=2, linestyle='None',
+                                        color='#636363')[0]]
                 self.cross[-1].set(visible=False)
+                self.locate += [locate]
+                self.locate[-1].set(visible=False)
                 self.names += [self.canvas.ax.text(self.x[i] + 0.1, self.y[i] + 0.3, ("%d" % ant), fontsize=10)]
                 self.names[-1].set(visible=False)
             self.updatePlot()
@@ -1039,6 +1047,22 @@ class MapPlot(QtWidgets.QWidget):
                 for c in circle:
                     c.set(visible=False)
 
+    def highlightClear(self):
+        if len(self.located):
+            for l in self.located:
+                self.locate[l].set(visible=False)
+            self.located = []
+            self.updatePlot()
+
+    def highlightAntenna(self, antId=None, color='b'):
+        if len(antId):
+            for a in antId:
+                mapId = self.ids.index(a)
+                self.locate[mapId].set(visible=True)
+                self.locate[mapId].set(color=color)
+                self.located += [mapId]
+            self.updatePlot()
+
     def printId(self, flag=True):
         for i, ant_id in enumerate(self.names):
             if self.tiles[i] in self.mask:
@@ -1057,6 +1081,9 @@ class MapPlot(QtWidgets.QWidget):
     def plotClear(self):
         # Reset the plot landscape
         self.canvas.ax.clear()
+        self.canvas.ax.axis([-20, 20, -20, 20])
+        self.canvas.ax.set_xlabel("West-East (m)", fontsize=14)
+        self.canvas.ax.set_ylabel("South-North (m)", fontsize=14)
         self.canvas.ax.axis([-20, 20, -20, 20])
         circle1 = plt.Circle((0, 0), 38.5/2, color='tan', linewidth=1.5)  # , fill=False)
         self.canvas.ax.add_artist(circle1)

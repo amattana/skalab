@@ -89,10 +89,11 @@ class SkalabStation(SkalabBase):
 
         self.maks_tiles = np.arange(1, 17).tolist()
         self.populate_cb_tiles()
+        self.pauseAction = False
         self.station_map = []
         if "station_map" in self.profile['Station'].keys():
             self.wg.qline_map_file.setText(self.profile['Station']["station_map"])
-            self.loadStationMap(self.profile['Station']["station_map"])
+            self.station_map = self.loadStationMap(self.profile['Station']["station_map"])
             self.mapPlot = MapPlot(self.wg.plotWidgetMap, self.station_map, self.maks_tiles)
             self.mapPlot.plotMap()
             self.plotMap()
@@ -105,7 +106,7 @@ class SkalabStation(SkalabBase):
 
     def plotMap(self):
         if len(self.station_map):
-            print("Circle", self.wg.rb_circle.isChecked(), "Cross", self.wg.rb_cross.isChecked(), "ID", self.wg.cb_id.isChecked())
+            #print("Circle", self.wg.rb_circle.isChecked(), "Cross", self.wg.rb_cross.isChecked(), "ID", self.wg.cb_id.isChecked())
             self.mapPlot.showCircle(flag=self.wg.rb_circle.isChecked())
             self.mapPlot.showCross(flag=self.wg.rb_cross.isChecked())
             self.mapPlot.printId(flag=self.wg.cb_id.isChecked())
@@ -121,23 +122,75 @@ class SkalabStation(SkalabBase):
             self.wg.cb_tiles[-1].stateChanged.connect(self.change_mask)
 
     def change_mask(self):
-        self.mapPlot.mask = []
-        for i in range(16):
-            if self.wg.cb_tiles[i].isChecked():
-                self.mapPlot.mask += [i + 1]
-        self.plotMap()
+        if not self.pauseAction:
+            self.mapPlot.mask = []
+            for i in range(16):
+                if self.wg.cb_tiles[i].isChecked():
+                    self.mapPlot.mask += [i + 1]
+            self.plotMap()
 
     def tile_select_none(self):
+        self.pauseAction = True
         for i in range(16):
             self.wg.cb_tiles[i].setChecked(False)
+        self.pauseAction = False
         self.mapPlot.mask = []
         self.plotMap()
 
     def tile_select_all(self):
+        self.pauseAction = True
         for i in range(16):
             self.wg.cb_tiles[i].setChecked(True)
+        self.pauseAction = False
         self.mapPlot.mask = np.arange(1, 17).tolist()
         self.plotMap()
+
+    def locateAntenna(self):
+        self.mapPlot.highlightClear()
+        if self.wg.cb_locate_enable_antenna.isChecked():
+            antId = [ant['id'] for ant in self.station_map if ant['id'] == int(self.wg.combo_antenna.currentText())]
+            if len(antId):
+                self.mapPlot.highlightAntenna(antId=antId, color='yellow')
+        if self.wg.cb_locate_enable_antenna_list.isChecked():
+            try:
+                ant_records = self.wg.qline_find_antlist.text().split(",")
+                ant_list = []
+                for a in ant_records:
+                    if "-" in a:
+                        ant_list += np.arange(int(a.split("-")[0]), int(a.split("-")[1])+1).tolist()
+                    else:
+                        ant_list += [int(a)]
+                antId = []
+                for a in ant_list:
+                    antId += [ant['id'] for ant in self.station_map if ant['id'] == a]
+                self.wg.qlabel_malformed_list.setText("query form ok")
+                self.mapPlot.highlightAntenna(antId=antId, color='#00c800')
+            except:
+                self.wg.qlabel_malformed_list.setText("<-- malformed")
+        if self.wg.cb_locate_enable_tpm.isChecked():
+            tpmId = int(self.wg.combo_tpm.currentText())
+            inputId = int(self.wg.combo_input.currentText())
+            antId = [ant['id'] for ant in self.station_map if ((ant['tile'] == tpmId) and (ant['input'] == inputId))]
+            if len(antId):
+                self.mapPlot.highlightAntenna(antId=antId, color='b')
+
+    def enableLocateAntenna(self):
+        if self.wg.cb_locate_enable_antenna.isChecked():
+            self.wg.cb_locate_enable_tpm.setChecked(False)
+            self.wg.cb_locate_enable_antenna_list.setChecked(False)
+        self.locateAntenna()
+
+    def enableLocateAntennaList(self):
+        if self.wg.cb_locate_enable_antenna_list.isChecked():
+            self.wg.cb_locate_enable_tpm.setChecked(False)
+            self.wg.cb_locate_enable_antenna.setChecked(False)
+        self.locateAntenna()
+
+    def enableLocateTpmInput(self):
+        if self.wg.cb_locate_enable_tpm.isChecked():
+            self.wg.cb_locate_enable_antenna.setChecked(False)
+            self.wg.cb_locate_enable_antenna_list.setChecked(False)
+        self.locateAntenna()
 
     def load_events(self):
         self.wg.qbutton_browse.clicked.connect(lambda: self.browse_config())
@@ -147,6 +200,13 @@ class SkalabStation(SkalabBase):
         self.wg.rb_circle.toggled.connect(lambda: self.rb_changed())
         self.wg.rb_cross.toggled.connect(lambda: self.rb_changed())
         self.wg.cb_id.stateChanged.connect(lambda: self.plotMap())
+        self.wg.combo_antenna.currentIndexChanged.connect(lambda: self.locateAntenna())
+        self.wg.combo_tpm.currentIndexChanged.connect(lambda: self.locateAntenna())
+        self.wg.combo_input.currentIndexChanged.connect(lambda: self.locateAntenna())
+        self.wg.cb_locate_enable_antenna.stateChanged.connect(lambda: self.enableLocateAntenna())
+        self.wg.cb_locate_enable_antenna_list.stateChanged.connect(lambda: self.enableLocateAntennaList())
+        self.wg.qline_find_antlist.textChanged.connect(lambda: self.enableLocateAntennaList())
+        self.wg.cb_locate_enable_tpm.stateChanged.connect(lambda: self.enableLocateTpmInput())
         self.wg.qbutton_map_deselect.clicked.connect(lambda: self.tile_select_none())
         self.wg.qbutton_map_select.clicked.connect(lambda: self.tile_select_all())
 
@@ -161,7 +221,7 @@ class SkalabStation(SkalabBase):
     def loadStationMap(self, map_file):
         with open(map_file) as f:
             data = f.readlines()
-        self.station_map = []
+        station_map = []
         for d in data:
             if (len(d.split()) == 5) and (d[0] != "#"):
                 antenna_map = {'tile': int(d.split()[0]),
@@ -169,7 +229,8 @@ class SkalabStation(SkalabBase):
                                'id': int(d.split()[2]),
                                'North': float(d.split()[3]),
                                'East': float(d.split()[4])}
-                self.station_map += [antenna_map]
+                station_map += [antenna_map]
+        return station_map
 
     def edit_config(self):
         if not self.text_editor == "":
