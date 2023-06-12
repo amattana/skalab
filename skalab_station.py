@@ -94,9 +94,49 @@ class SkalabStation(SkalabBase):
         if "station_map" in self.profile['Station'].keys():
             self.wg.qline_map_file.setText(self.profile['Station']["station_map"])
             self.station_map = self.loadStationMap(self.profile['Station']["station_map"])
+            ant_id_list = sorted(["%03d" % x['id'] for x in self.station_map])
+            tpm_list = list(dict.fromkeys(["%d" % x['tile'] for x in self.station_map]))
+            input_list = ["%d" % x for x in np.arange(1, 17)]
+            self.wg.combo_antenna.addItems(ant_id_list)
+            self.wg.combo_tpm.addItems(tpm_list)
+            self.wg.combo_input.addItems(input_list)
             self.mapPlot = MapPlot(self.wg.plotWidgetMap, self.station_map, self.maks_tiles)
             self.mapPlot.plotMap()
+            self.mapPlot.canvas.mpl_connect('motion_notify_event', self.onmotion)
             self.plotMap()
+            self.annot = self.mapPlot.canvas.ax.annotate("", xy=(0, 0), xytext=(20, 20), textcoords="offset points",
+                                bbox=dict(boxstyle="round", fc="w"),
+                                arrowprops=dict(arrowstyle="->"))
+            self.annot.set_visible(False)
+
+    def update_annot(self, x, y, text):
+        pos = (x, y)
+        self.annot.xy = pos
+        self.annot.set_text(text)
+        self.annot.get_bbox_patch().set_facecolor('w')
+
+    def mouseonbase(self, x, y):
+        for a in self.station_map:
+            if (a['East'] > x - 0.6) and (a['East'] < x + 0.6):
+                if (a['North'] > y - 0.6) and (a['North'] < y + 0.6):
+                    return "Antenna ID: " + str(a['id']) + "\nTILE: " + str(int(a['tile'])) + ", Input: " + str(
+                        int(a['input']))
+        return ""
+
+    def onmotion(self, event):
+        if self.wg.cb_tooltip.isChecked():
+            vis = self.annot.get_visible()
+            if event.inaxes == self.mapPlot.canvas.ax:
+                cont, ind = self.mapPlot.canvas.ax.contains(event)
+                hc = self.mouseonbase(event.xdata, event.ydata)
+                if cont and (hc != ""):
+                    self.update_annot(event.xdata, event.ydata, hc)
+                    self.annot.set_visible(True)
+                    self.mapPlot.updatePlot()
+                else:
+                    if vis:
+                        self.annot.set_visible(False)
+                        self.mapPlot.updatePlot()
 
     def rb_changed(self):
         if self.wg.rb_circle.isChecked():
@@ -106,7 +146,6 @@ class SkalabStation(SkalabBase):
 
     def plotMap(self):
         if len(self.station_map):
-            #print("Circle", self.wg.rb_circle.isChecked(), "Cross", self.wg.rb_cross.isChecked(), "ID", self.wg.cb_id.isChecked())
             self.mapPlot.showCircle(flag=self.wg.rb_circle.isChecked())
             self.mapPlot.showCross(flag=self.wg.rb_cross.isChecked())
             self.mapPlot.printId(flag=self.wg.cb_id.isChecked())
@@ -192,6 +231,11 @@ class SkalabStation(SkalabBase):
             self.wg.cb_locate_enable_antenna_list.setChecked(False)
         self.locateAntenna()
 
+    def enableTooltip(self):
+        if not self.wg.cb_tooltip.isChecked():
+            self.annot.set_visible(False)
+            self.mapPlot.updatePlot()
+
     def load_events(self):
         self.wg.qbutton_browse.clicked.connect(lambda: self.browse_config())
         self.wg.qbutton_edit.clicked.connect(lambda: self.edit_config())
@@ -207,6 +251,7 @@ class SkalabStation(SkalabBase):
         self.wg.cb_locate_enable_antenna_list.stateChanged.connect(lambda: self.enableLocateAntennaList())
         self.wg.qline_find_antlist.textChanged.connect(lambda: self.enableLocateAntennaList())
         self.wg.cb_locate_enable_tpm.stateChanged.connect(lambda: self.enableLocateTpmInput())
+        self.wg.cb_tooltip.stateChanged.connect(lambda: self.enableTooltip())
         self.wg.qbutton_map_deselect.clicked.connect(lambda: self.tile_select_none())
         self.wg.qbutton_map_select.clicked.connect(lambda: self.tile_select_all())
 

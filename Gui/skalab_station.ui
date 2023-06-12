@@ -442,7 +442,7 @@
      <property name="geometry">
       <rect>
        <x>830</x>
-       <y>90</y>
+       <y>100</y>
        <width>291</width>
        <height>61</height>
       </rect>
@@ -503,7 +503,7 @@
      <property name="geometry">
       <rect>
        <x>920</x>
-       <y>80</y>
+       <y>90</y>
        <width>101</width>
        <height>21</height>
       </rect>
@@ -525,7 +525,7 @@
      <property name="geometry">
       <rect>
        <x>920</x>
-       <y>170</y>
+       <y>180</y>
        <width>101</width>
        <height>21</height>
       </rect>
@@ -547,7 +547,7 @@
      <property name="geometry">
       <rect>
        <x>830</x>
-       <y>180</y>
+       <y>190</y>
        <width>291</width>
        <height>231</height>
       </rect>
@@ -589,7 +589,7 @@
      <property name="geometry">
       <rect>
        <x>830</x>
-       <y>440</y>
+       <y>450</y>
        <width>291</width>
        <height>291</height>
       </rect>
@@ -918,7 +918,7 @@
      <property name="geometry">
       <rect>
        <x>920</x>
-       <y>430</y>
+       <y>440</y>
        <width>101</width>
        <height>21</height>
       </rect>
@@ -936,6 +936,60 @@
       <set>Qt::AlignCenter</set>
      </property>
     </widget>
+    <widget class="QFrame" name="qframe_add_on">
+     <property name="geometry">
+      <rect>
+       <x>830</x>
+       <y>770</y>
+       <width>291</width>
+       <height>71</height>
+      </rect>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <widget class="QCheckBox" name="cb_tooltip">
+      <property name="geometry">
+       <rect>
+        <x>70</x>
+        <y>30</y>
+        <width>141</width>
+        <height>23</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Antenna ToolTip</string>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QLabel" name="qlabel_add_on">
+     <property name="geometry">
+      <rect>
+       <x>920</x>
+       <y>760</y>
+       <width>101</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="layoutDirection">
+      <enum>Qt::LeftToRight</enum>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">background-color: rgb(238, 238, 236);</string>
+     </property>
+     <property name="text">
+      <string>ADD ON</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
     <zorder>plotWidgetMap</zorder>
     <zorder>qlabel_config_2</zorder>
     <zorder>qline_map_file</zorder>
@@ -947,6 +1001,8 @@
     <zorder>qlabel_tiles</zorder>
     <zorder>qframe_locate</zorder>
     <zorder>qlabel_locate</zorder>
+    <zorder>qframe_add_on</zorder>
+    <zorder>qlabel_add_on</zorder>
    </widget>
    <widget class="QWidget" name="qtab_conf">
     <attribute name="title">
