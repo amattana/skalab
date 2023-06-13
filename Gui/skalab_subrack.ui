@@ -915,6 +915,19 @@
       </rect>
      </property>
     </widget>
+    <widget class="QPushButton" name="qbutton_check_ips">
+     <property name="geometry">
+      <rect>
+       <x>750</x>
+       <y>251</y>
+       <width>131</width>
+       <height>24</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>CHECK TPM IPs</string>
+     </property>
+    </widget>
     <zorder>qlabel_message</zorder>
     <zorder>qcombo_chart</zorder>
     <zorder>qplot_chart_tpm</zorder>
@@ -933,6 +946,7 @@
     <zorder>qlabel_tstamp</zorder>
     <zorder>qline_ip</zorder>
     <zorder>qw_log</zorder>
+    <zorder>qbutton_check_ips</zorder>
    </widget>
    <widget class="QWidget" name="qtab_conf">
     <attribute name="title">

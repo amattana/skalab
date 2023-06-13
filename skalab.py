@@ -20,36 +20,32 @@ __version__ = "1.3.1"
 __release__ = "2023-03-22"
 __maintainer__ = "Andrea Mattana"
 
-import gc
 import shutil
-import socket
 import sys
 import os
+import threading
 import time
 from threading import Thread
 
 import numpy as np
 import configparser
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
-from pyaavs import station
-from pyfabil import TPMGeneric
-from pyfabil.base.definitions import LibraryError, BoardError, PluginError, InstrumentError
 
 from skalab_live import Live
 from skalab_playback import Playback
 from skalab_subrack import Subrack
 from skalab_monitor import Monitor
+from skalab_station import SkalabStation
 from skalab_utils import parse_profile, getTextFromFile
-from skalab_base import SkalabBase
 from pathlib import Path
+import logging
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
 
 default_app_dir = str(Path.home()) + "/.skalab/"
 default_profile = "Default"
 profile_filename = "skalab.ini"
-
-import logging
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
 
 COLORI = ["b", "g"]
 
@@ -108,54 +104,41 @@ class SkaLab(QtWidgets.QMainWindow):
         self.setCentralWidget(self.wg)
         self.resize(1210, 970)
         self.setWindowTitle("The SKA in LAB Project")
-        self.profile = {'App': {'subrack': "",
-                                'monitor': "",
-                                'live': "",
-                                'playback': ""},
-                        'Init': {'station_setup': ""}}
+        # self.profile = {'App': {'subrack': "",
+        #                         'live': "",
+        #                         'playback': "",
+        #                         'station': ""},
+        #                 'Init': {'station_setup': ""}}
         self.profile_name = ""
         self.profile_file = ""
-        self.text_editor = ""
         self.load_profile(profile)
         self.updateProfileCombo(current=self.profile_name)
 
-        self.config_file = ""
-        if self.profile_name:
-            self.config_file = self.profile['Init']['station_file']
-            self.wg.qline_configfile.setText(self.config_file)
-        self.tpm_station = None
-        self.doInit = False
-        self.stopThreads = False
-        self.processInit = Thread(target=self.do_station_init)
-        self.processInit.start()
-
-        self.tabSubrackIndex = 1
-        self.tabMonitorIndex = 2
+        self.tabStationIndex = 1
+        self.tabSubrackIndex = 2
         self.tabLiveIndex = 3
         self.tabPlayIndex = 4
 
-
         self.pic_ska = QtWidgets.QLabel(self.wg.qwpics)
-        self.pic_ska.setGeometry(1, 1, 489, 120)
-        self.pic_ska.setPixmap(QtGui.QPixmap(os.getcwd() + "/Pictures/ska_inaf_logo.png"))
+        self.pic_ska.setGeometry(1, 1, 1111, 401)
+        self.pic_ska.setPixmap(QtGui.QPixmap(os.getcwd() + "/Pictures/bungarra.png"))
 
         self.pic_ska_help = QtWidgets.QLabel(self.wg.qwpics_help)
         self.pic_ska_help.setGeometry(1, 1, 489, 120)
-        self.pic_ska_help.setPixmap(QtGui.QPixmap(os.getcwd() + "/Pictures/ska_inaf_logo.png"))
+        self.pic_ska_help.setPixmap(QtGui.QPixmap(os.getcwd() + "/Pictures/ska_inaf_logo_mini.png"))
         self.wg.qlabel_sw_version.setText("Version: " + __version__)
         self.wg.qlabel_sw_release.setText("Released on: " + __release__)
         self.wg.qlabel_sw_author.setText("Author: " + __author__)
 
-        QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabMonitorIndex, True)
-        self.wgMonitorLayout = QtWidgets.QVBoxLayout()
-        self.wgMonitor = Monitor(self.config_file, uiFile="skalab_monitor.ui", size=[1190, 936],
-                                 profile=self.profile['Base']['monitor'],
-                                 swpath=default_app_dir)
-        self.wgMonitorLayout.addWidget(self.wgMonitor)
-        self.wg.qwMonitor.setLayout(self.wgMonitorLayout)
-        self.wgMonitor.dst_port = configuration['network']['lmc']['lmc_port']
-        self.wgMonitor.lmc_ip = configuration['network']['lmc']['lmc_ip']
-        self.wgMonitor.cpld_port = configuration['network']['lmc']['tpm_cpld_port']
+        # Instantiating Station Tab. This must be always done as first
+        QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabStationIndex, True)
+        self.wgStationLayout = QtWidgets.QVBoxLayout()
+        self.wgStation = SkalabStation(uiFile="Gui/skalab_station.ui", size=[1190, 936],
+                           profile=self.profile['Base']['station'],
+                           swpath=default_app_dir)
+        self.wgStationLayout.addWidget(self.wgStation)
+        self.wg.qwStation.setLayout(self.wgStationLayout)
+        self.config_file = self.wgStation.profile['Station']['station_file']
 
         QtWidgets.QTabWidget.setTabVisible(self.wg.qtabMain, self.tabLiveIndex, True)
         self.wgLiveLayout = QtWidgets.QVBoxLayout()
@@ -212,38 +195,35 @@ class SkaLab(QtWidgets.QMainWindow):
         self.power = {}
         self.raw = {}
         self.rms = {}
-        if self.config_file:
-            self.setup_config()
         self.populate_help()
+        self.stopThreads = False
+        self.procUpdate = Thread(target=self.procUpdateChildren)
+        self.procUpdate.start()
+        # print("Start Thread Skalab procUpdateChildren")
 
     def load_events(self):
-        self.wg.qbutton_browse.clicked.connect(lambda: self.browse_config())
-        self.wg.qbutton_edit.clicked.connect(lambda: self.edit_config())
-        self.wg.qbutton_load_configuration.clicked.connect(lambda: self.setup_config())
         self.wg.qbutton_profile_save.clicked.connect(lambda: self.save_profile(self.wg.qcombo_profiles.currentText()))
         self.wg.qbutton_profile_saveas.clicked.connect(lambda: self.save_as_profile())
         self.wg.qbutton_profile_load.clicked.connect(lambda: self.reload_profile(self.wg.qcombo_profiles.currentText()))
         self.wg.qbutton_profile_delete.clicked.connect(lambda: self.delete_profile(self.wg.qcombo_profiles.currentText()))
-        self.wg.qbutton_station_init.clicked.connect(lambda: self.station_init())
 
-    def edit_config(self):
-        if not self.text_editor == "":
-            fname = self.wg.qline_configfile.text()
-            if not fname == "":
-                if os.path.exists(fname):
-                    os.system(self.text_editor + " " + fname + " &")
-                else:
-                    msgBox = QtWidgets.QMessageBox()
-                    msgBox.setText("The selected config file does not exist!")
-                    msgBox.setWindowTitle("Error!")
-                    msgBox.exec_()
-        else:
-            msgBox = QtWidgets.QMessageBox()
-            txt = "\nA text editor is not defined in the current profile file.\n\n['Extras']\ntext_editor = <example: gedit>'\n\n"
-            msgBox.setText(txt)
-            msgBox.setWindowTitle("Warning!")
-            msgBox.setIcon(QtWidgets.QMessageBox.Warning)
-            msgBox.exec_()
+    def procUpdateChildren(self):
+        while True:
+            # If a connection to the Subrack has been estabilished update the list of TPM IPs
+            if self.wgSubrack.updateRequest:
+                self.wgSubrack.updateRequest = False
+                #print("RECEIVED TPM IPs: ", self.wgSubrack.tpm_ips)
+                self.wgStation.tpm_ips_from_subrack = self.wgSubrack.tpm_ips.copy()
+                self.wgLive.setupNewTilesIPs(self.wgSubrack.tpm_ips)
+
+            if self.wgLive.updateRequest:
+                pass
+            if self.wgStation.updateRequest:
+                pass
+            if self.stopThreads:
+                #print("Stopping Thread SKALAB Update children")
+                break
+            time.sleep(1)
 
     def load_profile(self, profile):
         if not profile == "":
@@ -267,11 +247,11 @@ class SkaLab(QtWidgets.QMainWindow):
                 msgBox.exec_()
             else:
                 self.config_file = self.profile['Init']['station_file']
-                self.wg.qline_configfile.setText(self.config_file)
+                # self.wg.qline_configfile.setText(self.config_file)
                 self.populate_table_profile()
-                if 'Extras' in self.profile.keys():
-                    if 'text_editor' in self.profile['Extras'].keys():
-                        self.text_editor = self.profile['Extras']['text_editor']
+                # if 'Extras' in self.profile.keys():
+                #     if 'text_editor' in self.profile['Extras'].keys():
+                #         self.text_editor = self.profile['Extras']['text_editor']
 
     def reload_profile(self, profile):
         self.load_profile(profile=profile)
@@ -309,169 +289,6 @@ class SkaLab(QtWidgets.QMainWindow):
         helpkeys = [d[d.rfind('name="Help_'):].split('"')[1] for d in data if 'name="Help_' in d]
         for k in helpkeys:
             self.wg.findChild(QtWidgets.QTextEdit, k).setText(getTextFromFile(k.replace("_", "/")+".html"))
-
-    def browse_config(self):
-        fd = QtWidgets.QFileDialog()
-        fd.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
-        options = fd.options()
-        self.config_file = fd.getOpenFileName(self, caption="Select a Station Config File...",
-                                              directory="/opt/aavs/config/", options=options)[0]
-        self.wg.qline_configfile.setText(self.config_file)
-
-    def setup_config(self):
-        if not self.config_file == "":
-            self.wgPlay.config_file = self.config_file
-            self.wgLive.config_file = self.config_file
-            station.load_configuration_file(self.config_file)
-            self.station_name = station.configuration['station']['name']
-            self.nof_tiles = len(station.configuration['tiles'])
-            self.nof_antennas = int(station.configuration['station']['number_of_antennas'])
-            self.bitfile = station.configuration['station']['bitfile']
-            if len(self.bitfile) > 52:
-                self.wg.qlabel_bitfile.setText("..." + self.bitfile[-52:])
-            else:
-                self.wg.qlabel_bitfile.setText(self.bitfile)
-            self.truncation = int(station.configuration['station']['channel_truncation'])
-            self.populate_table_station()
-            if not self.wgPlay == None:
-                self.wgPlay.wg.qcombo_tpm.clear()
-            if not self.wgLive == None:
-                self.wgLive.wg.qcombo_tpm.clear()
-            self.tiles = []
-            for n, i in enumerate(station.configuration['tiles']):
-                if not self.wgPlay == None:
-                    self.wgPlay.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (n + 1, i))
-                if not self.wgLive == None:
-                    self.wgLive.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (n + 1, i))
-                self.tiles += [i]
-        else:
-            msgBox = QtWidgets.QMessageBox()
-            msgBox.setText("SKALAB: Please SELECT a valid configuration file first...")
-            msgBox.setWindowTitle("Error!")
-            msgBox.exec_()
-
-    def station_init(self):
-        result = QtWidgets.QMessageBox.question(self, "Confirm Action -IP",
-                                                "Are you sure to Program and Init the Station?",
-                                                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-        if result == QtWidgets.QMessageBox.Yes:
-            if self.config_file:
-                # Create station
-                station.load_configuration_file(self.config_file)
-                # Check wether the TPM are ON or OFF
-                station_on = True
-                tpm_ip_list = list(station.configuration['tiles'])
-                tpm_ip_from_subrack = self.wgSubrack.getTiles()
-                if tpm_ip_from_subrack:
-                    tpm_ip_from_subrack_short = [x for x in tpm_ip_from_subrack if not x == '0']
-                    if not len(tpm_ip_list) == len(tpm_ip_from_subrack_short):
-                        msgBox = QtWidgets.QMessageBox()
-                        message = "STATION\nOne or more TPMs forming the station are OFF\nPlease check the power!"
-                        msgBox.setText(message)
-                        msgBox.setWindowTitle("ERROR: TPM POWERED OFF")
-                        msgBox.setIcon(QtWidgets.QMessageBox.Critical)
-                        details = "STATION IP LIST FROM CONFIG FILE (%d): " % len(tpm_ip_list)
-                        for i in tpm_ip_list:
-                            details += "\n%s" % i
-                        details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(tpm_ip_from_subrack_short)
-                        for i in tpm_ip_from_subrack_short:
-                            details += "\n%s" % i
-                        msgBox.setDetailedText(details)
-                        msgBox.exec_()
-                        print(self.wgSubrack.telemetry)
-                        return
-                    else:
-                        if not np.array_equal(tpm_ip_list, tpm_ip_from_subrack_short):
-                            msgBox = QtWidgets.QMessageBox()
-                            message = "STATION\nIPs provided by the Subrack are different from what defined in the " \
-                                      "config file.\nINIT will use the new assigned IPs."
-                            msgBox.setText(message)
-                            msgBox.setWindowTitle("WARNING: IP mismatch")
-                            msgBox.setIcon(QtWidgets.QMessageBox.Warning)
-                            details = "STATION IP LIST FROM CONFIG FILE (%d): " % len(tpm_ip_list)
-                            for i in tpm_ip_list:
-                                details += "\n%s" % i
-                            details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(tpm_ip_from_subrack_short)
-                            for i in tpm_ip_from_subrack_short:
-                                details += "\n%s" % i
-                            msgBox.setDetailedText(details)
-                            msgBox.exec_()
-                            station.configuration['tiles'] = list(tpm_ip_from_subrack_short)
-                            self.wgLive.setupNewTilesIPs(list(tpm_ip_from_subrack))
-                for tpm_ip in station.configuration['tiles']:
-                    try:
-                        tpm = TPMGeneric()
-                        tpm_version = tpm.get_tpm_version(socket.gethostbyname(tpm_ip), 10000)
-                    except (BoardError, LibraryError):
-                        station_on = False
-                        break
-                if station_on:
-                    self.doInit = True
-                else:
-                    msgBox = QtWidgets.QMessageBox()
-                    msgBox.setText("STATION\nOne or more TPMs forming the station is unreachable\n"
-                                   "Please check the power or the connection!")
-                    msgBox.setWindowTitle("ERROR: TPM UNREACHABLE")
-                    msgBox.setIcon(QtWidgets.QMessageBox.Critical)
-                    details = "STATION IP LIST FROM CONFIG FILE (%d): " % len(tpm_ip_list)
-                    for i in tpm_ip_list:
-                        details += "\n%s" % i
-                    details += "\n\nSUBRACK IP LIST OF TPM POWERED ON: (%d): " % len(tpm_ip_from_subrack)
-                    for i in tpm_ip_from_subrack:
-                        details += "\n%s" % i
-                    msgBox.setDetailedText(details)
-                    msgBox.exec_()
-            else:
-                msgBox = QtWidgets.QMessageBox()
-                msgBox.setText("SKALAB: Please LOAD a configuration file first...")
-                msgBox.setWindowTitle("Error!")
-                msgBox.setIcon(QtWidgets.QMessageBox.Critical)
-                msgBox.exec_()
-
-    def do_station_init(self):
-        while True:
-            if self.doInit:
-                station.configuration['station']['initialise'] = True
-                station.configuration['station']['program'] = True
-                try:
-                    self.tpm_station = station.Station(station.configuration)
-                    self.wg.qbutton_station_init.setEnabled(False)
-                    self.tpm_station.connect()
-                    station.configuration['station']['initialise'] = False
-                    station.configuration['station']['program'] = False
-                    if self.tpm_station.properly_formed_station:
-                        self.wg.qbutton_station_init.setStyleSheet("background-color: rgb(78, 154, 6);")
-
-                        # if not self.tpm_station.tiles[0].tpm_version() == "tpm_v1_2":
-                        #     # ByPass the MCU temperature controls on TPM 1.6
-                        #     for tile in self.tpm_station.tiles:
-                        #         tile[0x90000034] = 0xBADC0DE
-                        #         tile[0x30000518] = 1
-                        #         time.sleep(0.1)
-                        #     time.sleep(1)
-                        #     print("MCU Controls Hacked with \nVal 0xBADC0DE in Reg 0x90000034,"
-                        #           "\nVal 0x0000001 in Reg 0x30000518")
-
-                        # Switch On the PreADUs
-                        for tile in self.tpm_station.tiles:
-                            tile["board.regfile.enable.fe"] = 1
-                            time.sleep(0.1)
-                        time.sleep(1)
-                        self.tpm_station.set_preadu_attenuation(0)
-                        print("TPM PreADUs Powered ON")
-
-                    else:
-                        self.wg.qbutton_station_init.setStyleSheet("background-color: rgb(204, 0, 0);")
-                    self.wg.qbutton_station_init.setEnabled(True)
-                    del self.tpm_station
-                    gc.collect()
-                except:
-                    self.wg.qbutton_station_init.setEnabled(True)
-                self.tpm_station = None
-                self.doInit = False
-            if self.stopThreads:
-                break
-            time.sleep(0.3)
 
     def populate_table_profile(self):
         #self.wg.qtable_profile = QtWidgets.QTableWidget(self.wg.qtabMain)
@@ -531,134 +348,14 @@ class SkaLab(QtWidgets.QMainWindow):
         self.wg.qtable_profile.horizontalHeader().setDefaultSectionSize(365)
         self.wg.qtable_profile.setSortingEnabled(__sortingEnabled)
 
-    def populate_table_station(self):
-        # TABLE STATION
-        self.wg.qtable_station.clearSpans()
-        #self.wg.qtable_station.setGeometry(QtCore.QRect(20, 140, 171, 31))
-        self.wg.qtable_station.setObjectName("conf_qtable_station")
-        self.wg.qtable_station.setColumnCount(1)
-        self.wg.qtable_station.setRowCount(len(station.configuration['station'].keys()) - 1)
-        n = 0
-        for i in station.configuration['station'].keys():
-            if not i == "bitfile":
-                self.wg.qtable_station.setVerticalHeaderItem(n, QtWidgets.QTableWidgetItem(i.upper()))
-                n = n + 1
-
-        item = QtWidgets.QTableWidgetItem()
-        font = QtGui.QFont()
-        font.setBold(True)
-        font.setWeight(75)
-        item.setFont(font)
-        item.setText("SECTION: STATION")
-        self.wg.qtable_station.setHorizontalHeaderItem(0, item)
-        __sortingEnabled = self.wg.qtable_station.isSortingEnabled()
-        self.wg.qtable_station.setSortingEnabled(False)
-        n = 0
-        for i in station.configuration['station'].keys():
-            if not i == "bitfile":
-                item = QtWidgets.QTableWidgetItem(str(station.configuration['station'][i]))
-                item.setFlags(QtCore.Qt.ItemIsEnabled)
-                self.wg.qtable_station.setItem(n, 0, item)
-                n = n + 1
-        self.wg.qtable_station.horizontalHeader().setStretchLastSection(True)
-        self.wg.qtable_station.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wg.qtable_station.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wg.qtable_station.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-
-        # TABLE TPM
-        self.wg.qtable_tpm.clearSpans()
-        #self.wg.qtable_tpm.setGeometry(QtCore.QRect(20, 180, 511, 141))
-        self.wg.qtable_tpm.setObjectName("conf_qtable_tpm")
-        self.wg.qtable_tpm.setColumnCount(2)
-        self.wg.qtable_tpm.setRowCount(len(station.configuration['tiles']))
-        for i in range(len(station.configuration['tiles'])):
-            self.wg.qtable_tpm.setVerticalHeaderItem(i, QtWidgets.QTableWidgetItem("TPM-%02d" % (i + 1)))
-        item = QtWidgets.QTableWidgetItem("IP ADDR")
-        font = QtGui.QFont()
-        font.setBold(True)
-        font.setWeight(75)
-        item.setFont(font)
-        item.setTextAlignment(QtCore.Qt.AlignCenter)
-        self.wg.qtable_tpm.setHorizontalHeaderItem(0, item)
-        item = QtWidgets.QTableWidgetItem("DELAYS")
-        font = QtGui.QFont()
-        font.setBold(True)
-        font.setWeight(75)
-        item.setFont(font)
-        item.setTextAlignment(QtCore.Qt.AlignCenter)
-        self.wg.qtable_tpm.setHorizontalHeaderItem(1, item)
-        for n, i in enumerate(station.configuration['tiles']):
-            item = QtWidgets.QTableWidgetItem(str(i))
-            item.setTextAlignment(QtCore.Qt.AlignCenter)
-            item.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.wg.qtable_tpm.setItem(n, 0, item)
-        for n, i in enumerate(station.configuration['time_delays']):
-            item = QtWidgets.QTableWidgetItem(str(i))
-            item.setTextAlignment(QtCore.Qt.AlignCenter)
-            item.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.wg.qtable_tpm.setItem(n, 1, item)
-        self.wg.qtable_tpm.horizontalHeader().setStretchLastSection(True)
-        self.wg.qtable_tpm.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wg.qtable_tpm.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wg.qtable_tpm.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-
-        # TABLE NETWORK
-        self.wg.qtable_network.clearSpans()
-        #self.wg.qtable_network.setGeometry(QtCore.QRect(600, 230, 511, 481))
-        self.wg.qtable_network.setObjectName("conf_qtable_network")
-        self.wg.qtable_network.setColumnCount(1)
-
-        total_rows = len(station.configuration['network'].keys()) * 2 - 1
-        for i in station.configuration['network'].keys():
-            total_rows += len(station.configuration['network'][i])
-        self.wg.qtable_network.setRowCount(total_rows)
-        item = QtWidgets.QTableWidgetItem("SECTION: NETWORK")
-        font = QtGui.QFont()
-        font.setBold(True)
-        font.setWeight(75)
-        item.setFont(font)
-        item.setTextAlignment(QtCore.Qt.AlignCenter)
-        item.setFlags(QtCore.Qt.ItemIsEnabled)
-        self.wg.qtable_network.setHorizontalHeaderItem(0, item)
-        n = 0
-        for i in station.configuration['network'].keys():
-            if n:
-                item = QtWidgets.QTableWidgetItem(" ")
-                item.setTextAlignment(QtCore.Qt.AlignCenter)
-                item.setFlags(QtCore.Qt.ItemIsEnabled)
-                self.wg.qtable_network.setVerticalHeaderItem(n, item)
-                item = QtWidgets.QTableWidgetItem(" ")
-                item.setTextAlignment(QtCore.Qt.AlignCenter)
-                item.setFlags(QtCore.Qt.ItemIsEnabled)
-                self.wg.qtable_network.setItem(n, 0, item)
-                n = n + 1
-            self.wg.qtable_network.setVerticalHeaderItem(n, QtWidgets.QTableWidgetItem(str(i).upper()))
-            item = QtWidgets.QTableWidgetItem(" ")
-            item.setFlags(QtCore.Qt.ItemIsEnabled)
-            self.wg.qtable_network.setItem(n, 0, item)
-            n = n + 1
-            for k in sorted(station.configuration['network'][i].keys()):
-                self.wg.qtable_network.setVerticalHeaderItem(n, QtWidgets.QTableWidgetItem(str(k).upper()))
-                if "MAC" in str(k).upper() and not str(station.configuration['network'][i][k]) == "None":
-                    item = QtWidgets.QTableWidgetItem(hex(station.configuration['network'][i][k]).upper())
-                else:
-                    item = QtWidgets.QTableWidgetItem(str(station.configuration['network'][i][k]))
-                item.setTextAlignment(QtCore.Qt.AlignLeft)
-                item.setFlags(QtCore.Qt.ItemIsEnabled)
-                self.wg.qtable_network.setItem(n, 0, item)
-                n = n + 1
-        self.wg.qtable_network.horizontalHeader().setStretchLastSection(True)
-        self.wg.qtable_network.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wg.qtable_network.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.wg.qtable_network.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-
-    def make_profile(self, profile="Default", subrack="Default", monitor="Default", live="Default", playback="Default", config=""):
+    def make_profile(self, profile="Default", subrack="Default", live="Default", playback="Default", station="Default", config=""):
         conf = configparser.ConfigParser()
         conf['Base'] = {'subrack': subrack,
                         'live': live,
-                        'playback': playback}
+                        'playback': playback,
+                        'station': station}
         conf['Init'] = {'station_file': config}
-        conf['Extras'] = {'text_editor': self.text_editor}
+        #conf['Extras'] = {'text_editor': self.text_editor}
         if not os.path.exists(default_app_dir):
             os.makedirs(default_app_dir)
         conf_path = default_app_dir + profile
@@ -682,6 +379,7 @@ class SkaLab(QtWidgets.QMainWindow):
                           subrack=self.wgSubrack.profile['Base']['profile'],
                           live=self.wgLive.profile['Base']['profile'],
                           playback=self.wgPlay.profile['Base']['profile'],
+                          station=self.wgStation.profile['Base']['profile'],
                           config=self.config_file)
         if reload:
             self.load_profile(profile=this_profile)
@@ -700,11 +398,14 @@ class SkaLab(QtWidgets.QMainWindow):
 
         if result == QtWidgets.QMessageBox.Yes:
             event.accept()
-            self.wgLive.stopThreads = True
-            self.wgSubrack.stopThreads = True
-            self.wgMonitor.stopThreads = True
+            # print("Total Threads to close: ", threading.activeCount())
             self.stopThreads = True
+            self.wgLive.cmdClose()
+            self.wgStation.cmdClose()
+            self.wgSubrack.cmdClose()
+            self.wgPlay.cmdClose()
             time.sleep(1)
+            # print("Still active Threads: ", threading.activeCount())
             if self.wg.qradio_autosave.isChecked():
                 self.save_profile(this_profile=self.profile_name, reload=False)
 

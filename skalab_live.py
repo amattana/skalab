@@ -27,11 +27,6 @@ from pyaavs import station
 from threading import Thread
 from pydaq.persisters import ChannelFormatFileManager, FileDAQModes
 
-# profile_extension = {
-#     'Live': {
-#         'station_config': "",
-#         'preadu_version': 3.0}}
-
 default_app_dir = str(Path.home()) + "/.skalab/"
 default_profile = "Default"
 profile_filename = "live.ini"
@@ -89,7 +84,7 @@ class Live(SkalabBase):
     signalRms = QtCore.pyqtSignal()
     signalTemp = QtCore.pyqtSignal()
 
-    def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936], swpath=""):
+    def __init__(self, config="", uiFile="", profile="Default", size=[1190, 936], swpath=default_app_dir):
         """ Initialise main window """
         self.wg = uic.loadUi(uiFile)
 
@@ -105,6 +100,7 @@ class Live(SkalabBase):
         self.setCentralWidget(self.wg)
         self.resize(size[0], size[1])
         self.populate_table_profile()
+        self.updateRequest = False
 
         self.preadu_version = self.profile['Live']['preadu_version']
 
@@ -176,8 +172,10 @@ class Live(SkalabBase):
         self.live_data = []
         self.procRun = Thread(target=self.procRunDaq)
         self.procRun.start()
+        # print("Start Thread Live RunDAQ")
         self.procRms = Thread(target=self.procReadRms)
         self.procRms.start()
+        # print("Start Thread Live ReadRms")
         self.monitor_daq = None
         self.initMonitor = True
         self.monitor_tstart = 0
@@ -453,8 +451,8 @@ class Live(SkalabBase):
             if self.newTilesIPs is not None:
                 station.configuration['tiles'] = self.newTilesIPs
             # Test
-            if True:
-            #try:
+            #if True:
+            try:
                 # Create station
                 self.tpm_station = Station(station.configuration)
                 # Connect station (program, initialise and configure if required)
@@ -470,6 +468,7 @@ class Live(SkalabBase):
                     #self.wg.qlabel_connection.setText("Connected")
                     self.wg.qbutton_connect.setStyleSheet("background-color: rgb(78, 154, 6);")
                     self.wg.qbutton_connect.setText("ONLINE")
+                    # print("REINIT LIVE BARs: ", len(self.tpm_station.tiles))
                     self.tempBoardPlots.reinit(len(self.tpm_station.tiles))
                     self.tempFpga1Plots.reinit(len(self.tpm_station.tiles))
                     self.tempFpga2Plots.reinit(len(self.tpm_station.tiles))
@@ -499,8 +498,8 @@ class Live(SkalabBase):
                     msgBox.setWindowTitle("Error!")
                     msgBox.setIcon(QtWidgets.QMessageBox.Critical)
                     msgBox.exec_()
-            else:
-            #except Exception as e:
+            #else:
+            except Exception as e:
                 msgBox = QtWidgets.QMessageBox()
                 msgBox.setText("An exception occurred while trying to connect to the Station.\n\nException: " + str(e))
                 msgBox.setWindowTitle("Error!")
@@ -560,6 +559,7 @@ class Live(SkalabBase):
                     cycle = cycle + 0.1
                 self.skipThreadPause = False
             if self.stopThreads:
+                # print("Stopping Thread Live: RunDAQ")
                 break
             sleep(0.5)
 
@@ -602,7 +602,7 @@ class Live(SkalabBase):
                 #except:
                 #    pass
 
-                try:
+                if True:
                     if not self.ThreadTempPause:
                         while self.commBusy:
                             time.sleep(0.2)
@@ -626,11 +626,11 @@ class Live(SkalabBase):
                         self.commBusy = False
                         self.signalTemp.emit()
                         self.signalRms.emit()
-                except:
-                    self.logger.logger.warning("Failed to get RMS and/or Temperature data!")
-                    self.commBusy = False
-                    # self.preadu.Busy = False
-                    pass
+                # except:
+                #     self.logger.logger.warning("Failed to get RMS and/or Temperature data!")
+                #     self.commBusy = False
+                #     # self.preadu.Busy = False
+                #     pass
                 cycle = 0.0
                 while cycle < float(self.profile['Live']['query_interval']) and not self.stopThreads:
                     sleep(0.1)
@@ -672,7 +672,7 @@ class Live(SkalabBase):
                             self.writing_preadu = False
 
             if self.stopThreads:
-                #self.closeRms()
+                #print("Stopping Thread Live ReadRMS")
                 break
             sleep(1)
 
@@ -960,6 +960,7 @@ class Live(SkalabBase):
         self.newTilesIPs = [x for x in newTiles if not x == '0']
         self.station_configuration['tiles'] = self.newTilesIPs
         self.updateComboIps(newTiles)
+        #self.
 
     def runAcquisition(self):
         self.live_data = self.mydaq.execute()
@@ -1128,8 +1129,9 @@ class Live(SkalabBase):
             #self.livePlots.plotClear()
             for n, i in enumerate(self.live_input_list):
                 # Plot X Pol
-                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][self.live_mapping[i - 1], 0, :],
-                                                self.nsamples)
+                spettro, rfpow, rms = calcolaspettro(
+                    self.live_data[int(self.wg.qcombo_tpm.currentIndex())][self.live_mapping[i - 1], 0, :],
+                    self.nsamples)
                 self.livePlots.plotCurve(self.asse_x, spettro, n, xAxisRange=xAxisRange,
                                          yAxisRange=yAxisRange, title="INPUT-%02d" % i,
                                          xLabel="MHz", yLabel="dB", colore="b", rfpower=rms,
@@ -1137,8 +1139,9 @@ class Live(SkalabBase):
                                          show_line=self.wg.qcheck_xpol_sp.isChecked())
 
                 # Plot Y Pol
-                spettro, rms = calcolaspettro(self.live_data[int(self.wg.qcombo_tpm.currentIndex())][self.live_mapping[i - 1], 1, :],
-                                              self.nsamples)
+                spettro, rfpow, rms = calcolaspettro(
+                    self.live_data[int(self.wg.qcombo_tpm.currentIndex())][self.live_mapping[i - 1], 1, :],
+                    self.nsamples)
                 self.livePlots.plotCurve(self.asse_x, spettro, n, xAxisRange=xAxisRange,
                                          yAxisRange=yAxisRange, colore="g", rfpower=rms,
                                          annotate_rms=self.show_rms, grid=self.show_spectra_grid, lw=lw,
@@ -1196,6 +1199,8 @@ class Live(SkalabBase):
         for nn, i in enumerate(tpm_list):
             if not i == "0":
                 self.wg.qcombo_tpm.addItem("TPM-%02d (%s)" % (nn + 1, i))
+        if tpm_list:
+            self.wg.qcombo_tpm.setCurrentIndex(0)
 
     def export_data(self):
         if self.wg.play_qradio_spectrogram.isChecked():
@@ -1250,6 +1255,11 @@ class Live(SkalabBase):
             self.show_spectra_grid = False
             self.livePlots.showGrid(show_grid=False)
 
+    def cmdClose(self):
+        self.stopThreads = True
+        self.logger.logger.info("Stopping Threads")
+        self.logger.stopLog()
+
     def closeEvent(self, event):
         result = QtWidgets.QMessageBox.question(self,
                                                 "Confirm Exit...",
@@ -1260,6 +1270,7 @@ class Live(SkalabBase):
         if result == QtWidgets.QMessageBox.Yes:
             event.accept()
             self.stopThreads = True
+            self.logger.stopLog()
             sleep(1)
             if self.monitor_daq is not None:
                 self.monitor_daq.stop_daq()

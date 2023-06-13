@@ -469,7 +469,7 @@ def calcSpectra(vett):
     return np.real(spettro)
 
 
-def calcolaspettro(dati, nsamples=32768, log=True, adurms=False):
+def calcolaspettro(dati, nsamples=32768, log=True):
     n = int(nsamples)  # split and average number, from 128k to 16 of 8k # aavs1 federico
     sp = [dati[x:x + n] for x in range(0, len(dati), n)]
     mediato = np.zeros(len(calcSpectra(sp[0])))
@@ -479,19 +479,18 @@ def calcolaspettro(dati, nsamples=32768, log=True, adurms=False):
     mediato[:] /= (2 ** 15 / nsamples)  # federico
     with np.errstate(divide='ignore', invalid='ignore'):
         mediato[:] = 20 * np.log10(mediato / 127.0)
-    d = np.array(dati, dtype=np.int8)
+    d = np.array(dati, dtype=np.int64)
     with np.errstate(divide='ignore', invalid='ignore'):
         adu_rms = np.sqrt(np.mean(np.power(d, 2), 0))
+    if adu_rms == np.nan:
+        adu_rms = 0
     volt_rms = adu_rms * (1.7 / 256.)
     with np.errstate(divide='ignore', invalid='ignore'):
         power_adc = 10 * np.log10(np.power(volt_rms, 2) / 400.) + 30
     power_rf = power_adc + 12
     if not log:
         mediato = dB2Linear(mediato)
-    if not adurms:
-        return mediato, power_rf
-    else:
-        return mediato, power_rf, adu_rms
+    return mediato, power_rf, adu_rms
 
 
 def dircheck(directory="", tile=1):
@@ -854,6 +853,8 @@ class BarPlot(QtWidgets.QWidget):
         del self.markers
         self.markers = []
         if nbar > 1:
+            if nbar % 2:
+                nbar = nbar + 1
             for pol in range(2):
                 markers, = self.canvas.ax.plot(np.arange(0, nbar, 2) + 1 + pol, np.zeros(int(nbar/2)),
                                                linestyle='None', marker="s", markersize=self.markersize)
@@ -864,6 +865,7 @@ class BarPlot(QtWidgets.QWidget):
                                            markersize=self.markersize)
             markers.set_visible(False)
             self.markers += [markers]
+        self.canvas.ax.set_xlim([0, nbar])
         self.updatePlot()
 
     def showMarkers(self):
@@ -1082,3 +1084,133 @@ class Archive:
     def close(self):
         self.hfile.close()
         self.open = False
+
+
+class MapCanvas(FigureCanvas):
+    def __init__(self, parent=None, dpi=80, size=(9.8, 9.8)):
+        self.dpi = dpi
+        self.fig = Figure(size, dpi=self.dpi, facecolor='white')
+        self.fig.set_tight_layout(True)
+        self.ax = self.fig.add_subplot(1, 1, 1)
+        #self.ax.set_facecolor('white')
+        self.ax.axis([-20, 20, -20, 20])
+        self.ax.set_xlabel("West-East (m)", fontsize=14)
+        self.ax.set_ylabel("South-North (m)", fontsize=14)
+        self.circle1 = plt.Circle((0, 0), 38.5/2, color='tan', linewidth=1.5)  # , fill=False)
+        self.ax.add_artist(self.circle1)
+        # self.circle1 = plt.Circle((0, 0), 38.1/2, color='w', linewidth=1.5)  # , fill=False)
+        # self.ax.add_artist(self.circle1)
+        # self.ax.grid()
+
+        FigureCanvas.__init__(self, self.fig)
+        FigureCanvas.setSizePolicy(self, QtWidgets.QSizePolicy.Expanding,QtWidgets.QSizePolicy.Expanding)
+        FigureCanvas.updateGeometry(self)
+
+
+class MapPlot(QtWidgets.QWidget):
+
+    def __init__(self, parent=None, ant=None, mask=None):
+        QtWidgets.QWidget.__init__(self, parent)
+        if mask is None:
+            mask = []
+        if ant is None:
+            ant = []
+        self.canvas = MapCanvas()  # create canvas that will hold our plot
+        self.updateGeometry()
+        self.vbl = QtWidgets.QVBoxLayout()
+        self.vbl.addWidget(self.canvas)
+        self.setLayout(self.vbl)
+        self.show()
+        self.tiles = [int(a['tile']) for a in ant]
+        self.x = [float(str(a['East']).replace(",", ".")) for a in ant]
+        self.y = [float(str(a['North']).replace(",", ".")) for a in ant]
+        self.ids = [int(str(a['id'])) for a in ant]
+        self.mask = mask
+        self.circle = []
+        self.cross = []
+        self.names = []
+        self.locate = []
+        self.located = []
+
+    def plotMap(self):
+        if len(self.x):
+            for i, ant in enumerate(self.ids):
+                circle = [self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=22,
+                                                     linestyle='None', color='k')[0],
+                                 self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=20,
+                                                     linestyle='None', color='wheat')[0],
+                                 self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=20,
+                                                     linestyle='None', color='w')[0]]
+                locate = self.canvas.ax.plot(self.x[i], self.y[i], marker='o', markersize=20,
+                                                     linestyle='None', color='y')[0]
+                for c in circle:
+                    c.set(visible=False)
+                self.circle += [circle]
+                self.cross += [
+                    self.canvas.ax.plot(self.x[i], self.y[i], marker='+', markersize=24, mew=2, linestyle='None',
+                                        color='#636363')[0]]
+                self.cross[-1].set(visible=False)
+                self.locate += [locate]
+                self.locate[-1].set(visible=False)
+                self.names += [self.canvas.ax.text(self.x[i] + 0.1, self.y[i] + 0.3, ("%d" % ant), fontsize=10)]
+                self.names[-1].set(visible=False)
+            self.updatePlot()
+
+    def showCross(self, flag=True):
+        for i, cross in enumerate(self.cross):
+            if self.tiles[i] in self.mask:
+                cross.set(visible=flag)
+            else:
+                cross.set(visible=False)
+
+    def showCircle(self, flag=True):
+        for i, circle in enumerate(self.circle):
+            if self.tiles[i] in self.mask:
+                for c in circle:
+                    c.set(visible=flag)
+            else:
+                for c in circle:
+                    c.set(visible=False)
+
+    def highlightClear(self):
+        if len(self.located):
+            for l in self.located:
+                self.locate[l].set(visible=False)
+            self.located = []
+            self.updatePlot()
+
+    def highlightAntenna(self, antId=None, color='b'):
+        if len(antId):
+            for a in antId:
+                mapId = self.ids.index(a)
+                self.locate[mapId].set(visible=True)
+                self.locate[mapId].set(color=color)
+                self.located += [mapId]
+            self.updatePlot()
+
+    def printId(self, flag=True):
+        for i, ant_id in enumerate(self.names):
+            if self.tiles[i] in self.mask:
+                ant_id.set(visible=flag)
+            else:
+                ant_id.set(visible=False)
+
+    def updatePlot(self):
+        self.canvas.draw()
+        self.show()
+
+    def oPlot(self, x, y, marker='8', markersize=8, color='b'):
+        self.canvas.ax.plot(x, y, marker=marker, markersize=markersize, linestyle='None', color=color)
+        self.updatePlot()
+
+    def plotClear(self):
+        # Reset the plot landscape
+        self.canvas.ax.clear()
+        self.canvas.ax.axis([-20, 20, -20, 20])
+        self.canvas.ax.set_xlabel("West-East (m)", fontsize=14)
+        self.canvas.ax.set_ylabel("South-North (m)", fontsize=14)
+        self.canvas.ax.axis([-20, 20, -20, 20])
+        circle1 = plt.Circle((0, 0), 38.5/2, color='tan', linewidth=1.5)  # , fill=False)
+        self.canvas.ax.add_artist(circle1)
+        self.updatePlot()
+

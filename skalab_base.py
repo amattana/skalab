@@ -61,7 +61,6 @@ class SkalabBase(QtWidgets.QMainWindow):
     def writeConfig(self, profileConfig, fname):
         conf = configparser.ConfigParser()
         conf.optionxform = str
-
         for s in profileConfig.keys():
             # print(s, ": ", self.profile[s], type(self.profile[s]))
             if type(profileConfig[s]) == dict:
@@ -131,7 +130,7 @@ class SkalabBase(QtWidgets.QMainWindow):
                 msgBox.setIcon(QtWidgets.QMessageBox.Critical)
                 msgBox.setText("The Template for the " +
                                App.upper() +
-                               "Profile file is not available.\n" +
+                               " Profile file is not available.\n" +
                                "Please, check it out from the repo.")
                 msgBox.setWindowTitle("Error!")
                 msgBox.exec_()
