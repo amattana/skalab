@@ -280,9 +280,24 @@
    </widget>
    <widget class="QWidget" name="qtabSubrack">
     <attribute name="title">
-     <string>SubRack</string>
+     <string>Subrack</string>
     </attribute>
     <widget class="QWidget" name="qwSubrack" native="true">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>0</y>
+       <width>1191</width>
+       <height>936</height>
+      </rect>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="qtabMonitor">
+    <attribute name="title">
+     <string>TPM Monitor</string>
+    </attribute>
+    <widget class="QWidget" name="qwMonitor" native="true">
      <property name="geometry">
       <rect>
        <x>0</x>

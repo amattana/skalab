@@ -8,7 +8,7 @@
    Supported Devices are:
 
       - TPM_1_2 and TPM_1_6
-      - SubRack with WebServer API
+      - Subrack with WebServer API
 
 """
 
@@ -34,6 +34,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets, uic
 from skalab_live import Live
 from skalab_playback import Playback
 from skalab_subrack import Subrack
+from skalab_monitor import Monitor
 from skalab_station import SkalabStation
 from skalab_utils import parse_profile, getTextFromFile
 from pathlib import Path
@@ -166,6 +167,8 @@ class SkaLab(QtWidgets.QMainWindow):
         self.wgSubrackLayout.addWidget(self.wgSubrack)
         self.wg.qwSubrack.setLayout(self.wgSubrackLayout)
         self.wgSubrack.signalTlm.connect(self.wgSubrack.updateTlm)
+        self.wgSubrack.signal_to_monitor.connect(self.wgMonitor.read_subrack_attribute)
+        self.wgSubrack.signal_to_monitor_for_tpm.connect(self.wgMonitor.tpm_status_changed)
 
         self.show()
         self.load_events()
@@ -255,6 +258,8 @@ class SkaLab(QtWidgets.QMainWindow):
         if self.profile.sections():
             if self.profile['Base']['subrack']:
                 self.wgSubrack.load_profile(App="subrack", Profile=self.profile['Base']['subrack'], Path=default_app_dir)
+            if self.profile['Base']['monitor']:
+                self.wgMonitor.load_profile(App="monitor", Profile=self.profile['Base']['monitor'], Path=default_app_dir)
             if self.profile['Base']['live']:
                 self.wgLive.load_profile(App="live", Profile=self.profile['Base']['live'], Path=default_app_dir)
             if self.profile['Base']['playback']:
