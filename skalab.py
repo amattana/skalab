@@ -167,8 +167,8 @@ class SkaLab(QtWidgets.QMainWindow):
         self.wgSubrackLayout.addWidget(self.wgSubrack)
         self.wg.qwSubrack.setLayout(self.wgSubrackLayout)
         self.wgSubrack.signalTlm.connect(self.wgSubrack.updateTlm)
-        self.wgSubrack.signal_to_monitor.connect(self.wgMonitor.read_subrack_attribute)
-        self.wgSubrack.signal_to_monitor_for_tpm.connect(self.wgMonitor.tpm_status_changed)
+        # self.wgSubrack.signal_to_monitor.connect(self.wgMonitor.read_subrack_attribute)
+        # self.wgSubrack.signal_to_monitor_for_tpm.connect(self.wgMonitor.tpm_status_changed)
 
         self.show()
         self.load_events()
